@@ -963,15 +963,15 @@ describe('runProviderDeterministicMergeCloseout', () => {
           policies: {
             rolling_freshness_cohorts: {
               canonical_owner_key: 'docs:freshness:maintain',
-              owner_issue: 'CO-431',
+              owner_issue: 'CO-444',
               canonical_owner_issues: [{ canonical_owner_key: 'baseline:clean', owner_issue: 'CO-444' }]
             }
           }
         },
         maintainDecision: ownerMaintenanceDecision({
           freshness_decision: 'clean',
-          owner_issue: 'CO-431',
-          owner_issue_action: { mode: 'update_existing', issue: 'CO-431', reason: 'succeeded' },
+          owner_issue: 'CO-444',
+          owner_issue_action: { mode: 'update_existing', issue: 'CO-444', reason: 'succeeded' },
           owner_finalizer: {
             status: 'not_applicable',
             active_owner_issue: null,
@@ -993,10 +993,10 @@ describe('runProviderDeterministicMergeCloseout', () => {
         status: 'merged',
         reason: 'merged_and_transitioned_done_after_recovery',
         docs_freshness_owner: {
-          policy_owner_issue: 'CO-431',
+          policy_owner_issue: 'CO-444',
           policy_canonical_owner_key: 'docs:freshness:maintain',
           terminal_transition_blocked: false,
-          owner_issue: 'CO-431',
+          owner_issue: 'CO-444',
           owner_finalizer: {
             status: 'not_applicable',
             active_owner_issue: null,
@@ -1187,6 +1187,86 @@ describe('runProviderDeterministicMergeCloseout', () => {
             blocking_owner_issue: 'CO-444',
             canonical_owner_key: 'docs:freshness:maintain',
             reason: 'owner_terminal_after_candidate_resolution'
+          }
+        },
+        linear_transition: {
+          target_state: 'Blocked'
+        }
+      });
+      expect(transitionIssueState).toHaveBeenCalledWith(expect.objectContaining({
+        stateName: 'Blocked'
+      }));
+    } finally {
+      await rm(repoRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('blocks Done closeout when owner finalizer verification is unavailable for a rehomed owner', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'provider-merge-closeout-docs-finalizer-verification-unavailable-'));
+    try {
+      await writeDocsFreshnessFixtureRepo({
+        repoRoot,
+        catalog: {
+          policies: {
+            rolling_freshness_cohorts: {
+              canonical_owner_key: 'docs:freshness:maintain',
+              owner_issue: 'CO-444',
+              canonical_owner_issues: [
+                {
+                  canonical_owner_key: 'baseline_cohort_id:active-owner',
+                  owner_issue: 'CO-568'
+                }
+              ]
+            }
+          }
+        },
+        maintainDecision: ownerMaintenanceDecision({
+          freshness_decision: 'pass_with_owned_rolling_debt',
+          owner_issue: 'CO-444',
+          owner_issue_action: { mode: 'update_existing', issue: 'CO-444', reason: 'succeeded' },
+          owner_finalizer: {
+            status: 'blocked_owner_verification_unavailable',
+            blocking_owner_issue: 'CO-568',
+            active_owner_issue: 'CO-568',
+            active_owner_issues: ['CO-568'],
+            active_owner_records: [
+              {
+                owner_issue: 'CO-568',
+                canonical_owner_key: 'baseline_cohort_id:active-owner',
+                cohort_id: 'active-owner'
+              }
+            ],
+            canonical_owner_key: 'baseline_cohort_id:active-owner',
+            active_canonical_owner_key: 'baseline_cohort_id:active-owner',
+            reason: 'owner_verification_unavailable'
+          },
+          candidate_cohorts: [
+            {
+              id: 'active-owner',
+              canonical_owner_key: 'baseline_cohort_id:active-owner',
+              owner_issue: 'CO-568'
+            }
+          ],
+          blocking_changed_paths: []
+        })
+      });
+      const { result, transitionIssueState } = await runMergedCloseoutFixture({
+        repoRoot,
+        useDefaultDocsFreshnessResolver: true
+      });
+
+      expect(result).toMatchObject({
+        status: 'action_required',
+        reason: 'docs_freshness_live_owner_blocks_done_transition',
+        docs_freshness_owner: {
+          terminal_transition_blocked: true,
+          policy_owner_issue: 'CO-444',
+          owner_finalizer: {
+            status: 'blocked_owner_verification_unavailable',
+            blocking_owner_issue: 'CO-568',
+            active_owner_issue: 'CO-568',
+            active_owner_issues: ['CO-568'],
+            reason: 'owner_verification_unavailable'
           }
         },
         linear_transition: {

@@ -2010,7 +2010,6 @@ function docsFreshnessOwnerFinalizerBlocksIssue(
   issueIdentifier: string
 ): boolean {
   const status = normalizeOptionalString(ownerFinalizer.status);
-  const blockingOwnerIssue = normalizeOptionalString(ownerFinalizer.blocking_owner_issue);
   const activeOwnerIssues = new Set<string>();
   const activeOwnerIssue = normalizeOptionalString(ownerFinalizer.active_owner_issue);
   if (activeOwnerIssue) {
@@ -2035,8 +2034,8 @@ function docsFreshnessOwnerFinalizerBlocksIssue(
       }
     }
   }
-  if (status === 'blocked_terminal_owner') {
-    return blockingOwnerIssue === issueIdentifier || activeOwnerIssues.has(issueIdentifier);
+  if (status?.startsWith('blocked_')) {
+    return true;
   }
   return activeOwnerIssues.has(issueIdentifier);
 }

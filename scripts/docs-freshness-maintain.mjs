@@ -1461,13 +1461,6 @@ function ownerFinalizerRecordsForDecision(decision) {
     .filter(Boolean);
 }
 
-function verificationMatchesFinalizerRecord(verification, record) {
-  if (!verification || !record || verification.issue !== record.owner_issue) {
-    return false;
-  }
-  return !verification.canonical_owner_key || verification.canonical_owner_key === record.canonical_owner_key;
-}
-
 function exactVerificationMatchesFinalizerRecord(verification, record) {
   return (
     Boolean(record?.canonical_owner_key) &&
@@ -1560,7 +1553,7 @@ function buildDocsFreshnessOwnerFinalizer(decision, ownerFinalizerVerifications 
       .filter(
         (verification) =>
           verification.is_terminal &&
-          !records.some((record) => verificationMatchesFinalizerRecord(verification, record))
+          !records.some((record) => selectOwnerFinalizerVerification(verifications, record) === verification)
       )
       .map((verification) => verification.issue)
   );

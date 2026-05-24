@@ -125,9 +125,9 @@ export function isTaskPacketLifecyclePath(docPath) {
   return TASK_PACKET_PATH_FAMILIES.has(classifyTaskPacketPathFamily(docPath));
 }
 
-const OPEN_CHECKLIST_ITEM_PATTERN = /^\s*(?:[-*+]|\d+[.)])\s+\[ \]\s+.+$/u;
+const OPEN_CHECKLIST_ITEM_PATTERN = /^\s*(?:[-*+]|\d+[.)])\s+\[ \](?:\s+.*)?$/u;
 const MARKDOWN_LIST_ITEM_PATTERN = /^([ \t]*)([-*+]|\d+[.)])([ \t]+)/u;
-const MARKDOWN_FENCE_PATTERN = /^([ \t]*)(`{3,}|~{3,})/u;
+const MARKDOWN_FENCE_PATTERN = /^([ \t]*)(`{3,}|~{3,})(.*)$/u;
 
 function leadingIndentWidth(line) {
   let width = 0;
@@ -175,8 +175,20 @@ function parseMarkdownFence(line) {
   return {
     indentWidth: leadingIndentWidth(match[1]),
     char: match[2][0],
-    length: match[2].length
+    length: match[2].length,
+    tail: match[3]
   };
+}
+
+function closesMarkdownFence(line, fence) {
+  const closingFence = parseMarkdownFence(line);
+  return Boolean(
+    closingFence &&
+      closingFence.char === fence.char &&
+      closingFence.length >= fence.length &&
+      closingFence.indentWidth - fence.baseIndentWidth <= 3 &&
+      closingFence.tail.trim() === ''
+  );
 }
 
 function popListContextsForIndent(listContexts, indentWidth) {
@@ -212,13 +224,7 @@ export function extractOpenChecklistItems(content) {
     const isBlank = line.trim().length === 0;
 
     if (fence) {
-      const closingFence = parseMarkdownFence(line);
-      if (
-        closingFence &&
-        closingFence.char === fence.char &&
-        closingFence.length >= fence.length &&
-        closingFence.indentWidth - fence.baseIndentWidth <= 3
-      ) {
+      if (closesMarkdownFence(line, fence)) {
         fence = null;
       }
       previousWasBlank = false;

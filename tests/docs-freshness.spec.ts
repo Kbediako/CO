@@ -262,6 +262,16 @@ describe('docs freshness reporting', () => {
         name: 'unterminated fence hides checklist-looking examples through EOF',
         markdown: ['```md', '- [ ] Example syntax, not live work.'],
         expected: []
+      },
+      {
+        name: 'fence-looking content with info does not close fenced block',
+        markdown: ['```md', '```example', '- [ ] Still fenced example, not live work.', '```', '- [ ] Actual open work.'],
+        expected: ['- [ ] Actual open work.']
+      },
+      {
+        name: 'empty unchecked checklist markers remain open obligations',
+        markdown: ['- [ ]', '1. [ ]   ', '- [ ] Actual open work.'],
+        expected: ['- [ ]', '1. [ ]', '- [ ] Actual open work.']
       }
     ];
 

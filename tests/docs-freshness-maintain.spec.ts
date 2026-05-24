@@ -2182,6 +2182,69 @@ last_review: ${lastReview}
     );
   });
 
+  it('reports exact-key precedence when an exact active verification wins over a same-issue unkeyed terminal fallback', () => {
+    const canonicalOwnerKey = 'baseline_cohort_id:fixture-owner';
+    const ownerActionEvidence = buildDocsFreshnessOwnerActionEvidence(
+      {
+        freshness_decision: 'pass_with_owned_rolling_debt',
+        owner_issue: 'CO-300',
+        owner_issue_action: {
+          mode: 'update_existing_multiple',
+          issues: ['CO-320'],
+          canonical_owner_keys: [canonicalOwnerKey],
+          reason: 'canonical_owner_key_match_multiple'
+        },
+        candidate_cohorts: [
+          {
+            id: 'fixture-owner',
+            canonical_owner_key: canonicalOwnerKey,
+            owner_issue: 'CO-320',
+            owner_issue_action: {
+              mode: 'update_existing',
+              issue: 'CO-320',
+              canonical_owner_key: canonicalOwnerKey
+            },
+            sample_paths: ['tasks/tasks-1164-historical.md']
+          }
+        ]
+      },
+      {
+        env: { LINEAR_API_KEY: 'token' } as NodeJS.ProcessEnv,
+        ownerFinalizerVerifications: [
+          {
+            issue: 'CO-320',
+            canonical_owner_key: null,
+            state: 'Done',
+            state_type: 'completed',
+            is_terminal: true,
+            usable: true,
+            verification_status: 'succeeded'
+          },
+          {
+            issue: 'CO-320',
+            canonical_owner_key: canonicalOwnerKey,
+            state: 'In Progress',
+            state_type: 'started',
+            is_terminal: false,
+            usable: true,
+            verification_status: 'succeeded'
+          }
+        ]
+      }
+    );
+
+    expect(ownerActionEvidence.status).toBe('action_required');
+    expect(ownerActionEvidence.should_block).toBe(false);
+    expect(ownerActionEvidence.owner_finalizer).toEqual(
+      expect.objectContaining({
+        status: 'passed_exact_canonical_owner_precedence',
+        active_owner_issue: 'CO-320',
+        active_canonical_owner_key: canonicalOwnerKey,
+        ignored_terminal_owner_issues: ['CO-320']
+      })
+    );
+  });
+
   it('blocks when owner finalization finds the resolved canonical owner terminal', () => {
     const lastReview = '2026-03-23';
     const canonicalOwnerKey =
