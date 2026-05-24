@@ -136,7 +136,10 @@ describe('docs freshness reporting', () => {
     const repoRoot = await mkdtemp(join(tmpdir(), 'docs-freshness-missing-catalog-'));
     createdDirs.push(repoRoot);
 
-    await mkdir(join(repoRoot, 'docs'), { recursive: true });
+    await Promise.all([
+      mkdir(join(repoRoot, 'docs'), { recursive: true }),
+      mkdir(join(repoRoot, 'tasks'), { recursive: true })
+    ]);
     await writeFile(join(repoRoot, 'README.md'), '# Front door\n', 'utf8');
     await writeFile(
       join(repoRoot, 'docs', 'docs-freshness-registry.json'),
@@ -171,7 +174,10 @@ describe('docs freshness reporting', () => {
     const repoRoot = await mkdtemp(join(tmpdir(), 'docs-freshness-catalog-'));
     createdDirs.push(repoRoot);
 
-    await mkdir(join(repoRoot, 'docs'), { recursive: true });
+    await Promise.all([
+      mkdir(join(repoRoot, 'docs'), { recursive: true }),
+      mkdir(join(repoRoot, 'tasks'), { recursive: true })
+    ]);
     await mkdir(join(repoRoot, 'tasks'), { recursive: true });
     await writeFile(join(repoRoot, 'README.md'), '# Front door\n', 'utf8');
     await writeFile(join(repoRoot, 'docs', 'README.md'), '# Repo guide\n', 'utf8');
@@ -238,7 +244,10 @@ describe('docs freshness reporting', () => {
     const repoRoot = await mkdtemp(join(tmpdir(), 'docs-freshness-uncatalogued-'));
     createdDirs.push(repoRoot);
 
-    await mkdir(join(repoRoot, 'docs'), { recursive: true });
+    await Promise.all([
+      mkdir(join(repoRoot, 'docs'), { recursive: true }),
+      mkdir(join(repoRoot, 'tasks'), { recursive: true })
+    ]);
     await writeFile(join(repoRoot, 'README.md'), '# Front door\n', 'utf8');
     await writeFile(join(repoRoot, 'docs', 'README.md'), '# Repo guide\n', 'utf8');
     await writeDocsFreshnessFixture(repoRoot, {
@@ -282,7 +291,10 @@ describe('docs freshness reporting', () => {
     const repoRoot = await mkdtemp(join(tmpdir(), 'docs-freshness-normalized-paths-'));
     createdDirs.push(repoRoot);
 
-    await mkdir(join(repoRoot, 'docs'), { recursive: true });
+    await Promise.all([
+      mkdir(join(repoRoot, 'docs'), { recursive: true }),
+      mkdir(join(repoRoot, 'tasks'), { recursive: true })
+    ]);
     await writeFile(join(repoRoot, 'README.md'), '# Front door\n', 'utf8');
     await writeFile(join(repoRoot, 'docs', 'README.md'), '# Repo guide\n', 'utf8');
     await writeDocsFreshnessFixture(repoRoot, {
@@ -657,6 +669,121 @@ describe('docs freshness reporting', () => {
         registry_was_stale: true
       })
     ]);
+  });
+
+  it('does not use statusless task index reviews to mask stale registry rows', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docs-freshness-task-index-statusless-review-'));
+    createdDirs.push(repoRoot);
+    const docPath = 'docs/TECH_SPEC-statusless-fixture.md';
+
+    await Promise.all([
+      mkdir(join(repoRoot, 'docs'), { recursive: true }),
+      mkdir(join(repoRoot, 'tasks'), { recursive: true })
+    ]);
+    await writeFile(join(repoRoot, docPath), '# Statusless task packet\n', 'utf8');
+    await writeFile(
+      join(repoRoot, 'tasks', 'index.json'),
+      JSON.stringify(
+        {
+          items: [
+            {
+              id: '20260422-statusless-fixture',
+              last_review: reviewDateDaysAgo(1),
+              paths: { docs: docPath }
+            }
+          ]
+        },
+        null,
+        2
+      ),
+      'utf8'
+    );
+    await writeDocsFreshnessFixture(repoRoot, {
+      registryEntries: [
+        {
+          path: docPath,
+          owner: 'Codex',
+          status: 'active',
+          last_review: reviewDateDaysAgo(31),
+          cadence_days: 30
+        }
+      ],
+      catalogPatterns: [{ glob: 'docs/TECH_SPEC-*.md', doc_class: 'task_packet' }]
+    });
+
+    const { report, hasFailures } = await runDocsFreshness(repoRoot, {
+      outRoot: join(repoRoot, 'out'),
+      taskId: 'fixture'
+    });
+
+    expect(hasFailures).toBe(true);
+    expect(report.totals.task_index_review_overrides).toBe(0);
+    expect(report.stale_entries).toEqual([
+      expect.objectContaining({
+        path: docPath
+      })
+    ]);
+    expect(report.stale_entries[0]).not.toHaveProperty('last_review_source');
+  });
+
+  it('does not use colliding numeric task-key aliases to mask stale registry rows', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docs-freshness-task-index-alias-collision-'));
+    createdDirs.push(repoRoot);
+    const aliasPath = 'docs/PRD-shared-fixture.md';
+
+    await Promise.all([
+      mkdir(join(repoRoot, 'docs'), { recursive: true }),
+      mkdir(join(repoRoot, 'tasks'), { recursive: true })
+    ]);
+    await writeFile(join(repoRoot, aliasPath), '# Shared task packet PRD\n', 'utf8');
+    await writeFile(
+      join(repoRoot, 'tasks', 'index.json'),
+      JSON.stringify(
+        {
+          items: [
+            {
+              id: '20260422-1234-shared-fixture',
+              status: 'in_progress',
+              last_review: reviewDateDaysAgo(1)
+            },
+            {
+              id: '20260423-5678-shared-fixture',
+              status: 'in_progress',
+              last_review: reviewDateDaysAgo(2)
+            }
+          ]
+        },
+        null,
+        2
+      ),
+      'utf8'
+    );
+    await writeDocsFreshnessFixture(repoRoot, {
+      registryEntries: [
+        {
+          path: aliasPath,
+          owner: 'Codex',
+          status: 'active',
+          last_review: reviewDateDaysAgo(31),
+          cadence_days: 30
+        }
+      ],
+      catalogPatterns: [{ glob: 'docs/PRD-*.md', doc_class: 'task_packet' }]
+    });
+
+    const { report, hasFailures } = await runDocsFreshness(repoRoot, {
+      outRoot: join(repoRoot, 'out'),
+      taskId: 'fixture'
+    });
+
+    expect(hasFailures).toBe(true);
+    expect(report.totals.task_index_review_overrides).toBe(0);
+    expect(report.stale_entries).toEqual([
+      expect.objectContaining({
+        path: aliasPath
+      })
+    ]);
+    expect(report.stale_entries[0]).not.toHaveProperty('last_review_source');
   });
 
   it('keeps non-eligible stale docs as blocking failures when rolling cohorts are enabled', async () => {

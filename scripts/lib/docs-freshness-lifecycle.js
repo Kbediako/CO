@@ -15,6 +15,23 @@ export const TERMINAL_TASK_STATUSES = new Set([
   'merged'
 ]);
 
+const ACTIVE_TASK_INDEX_REVIEW_STATUSES = new Set([
+  'active',
+  'blocked',
+  'in_progress',
+  'in-progress',
+  'implementation',
+  'implementation_update_validation_pending',
+  'implementation_validated',
+  'implementation_complete_pr_pending',
+  'in_progress_docs_packet_validated',
+  'recovered_validation_green',
+  'review_green_pre_pr',
+  'review_handoff_prep',
+  'review_handoff_ready',
+  'validation_green_before_review'
+]);
+
 export const TASK_PACKET_PATH_FAMILIES = new Set([
   '.agent/task',
   'tasks/specs',
@@ -96,6 +113,10 @@ export function isTaskPacketLifecyclePath(docPath) {
 
 export function isTerminalTaskStatus(status) {
   return typeof status === 'string' && TERMINAL_TASK_STATUSES.has(status.trim().toLowerCase());
+}
+
+export function isActiveTaskIndexReviewStatus(status) {
+  return typeof status === 'string' && ACTIVE_TASK_INDEX_REVIEW_STATUSES.has(status.trim().toLowerCase());
 }
 
 export function isTerminalTaskItem(item) {
@@ -249,11 +270,13 @@ function normalizeLastReviewDate(item) {
 }
 
 function buildTaskIndexEntry(item, taskKey) {
+  const status = normalizeOptionalString(item.status);
   return {
     task_id: normalizeOptionalString(item.id) ?? taskKey,
     task_key: taskKey,
     title: normalizeOptionalString(item.title),
-    status: normalizeOptionalString(item.status),
+    status,
+    review_authoritative: isActiveTaskIndexReviewStatus(status),
     last_review: normalizeLastReviewDate(item),
     source_issue: readSourceIssue(item)
   };
@@ -279,6 +302,16 @@ export function buildTaskPacketLifecycleIndex(items) {
   const terminalItems = [];
   const taskItemsByPath = new Map();
   const sourceItems = Array.isArray(items) ? items : [];
+  const indexedItems = [];
+  const primaryOwnersByPath = new Map();
+  const aliasOwnersByPath = new Map();
+
+  const addOwner = (ownersByPath, docPath, ownerKey) => {
+    if (!ownersByPath.has(docPath)) {
+      ownersByPath.set(docPath, new Set());
+    }
+    ownersByPath.get(docPath).add(ownerKey);
+  };
 
   for (const item of sourceItems) {
     const taskKey = normalizeTaskKey(item);
@@ -287,14 +320,44 @@ export function buildTaskPacketLifecycleIndex(items) {
     }
 
     const taskIndexEntry = buildTaskIndexEntry(item, taskKey);
-    for (const docPath of collectIndexedTaskPacketPaths(item)) {
-      const entry = {
-        ...taskIndexEntry,
-        path: docPath,
-        path_family: classifyTaskPacketPathFamily(docPath)
-      };
-      if (shouldReplaceTaskIndexEntry(taskItemsByPath.get(docPath), entry)) {
-        taskItemsByPath.set(docPath, entry);
+    const ownerKey = `${taskIndexEntry.task_id ?? ''}\0${taskKey}`;
+    const primaryPaths = collectIndexedTaskPacketPaths(item, { includeSlugAliases: false });
+    const primaryPathSet = new Set(primaryPaths);
+    const allPaths = collectIndexedTaskPacketPaths(item);
+    const aliasPaths = allPaths.filter((docPath) => !primaryPathSet.has(docPath));
+
+    indexedItems.push({ item, taskKey, taskIndexEntry, ownerKey, primaryPaths, aliasPaths, allPaths });
+    for (const docPath of primaryPaths) {
+      addOwner(primaryOwnersByPath, docPath, ownerKey);
+    }
+    for (const docPath of aliasPaths) {
+      addOwner(aliasOwnersByPath, docPath, ownerKey);
+    }
+  }
+
+  function canUseAliasPathForTaskIndex(docPath, ownerKey) {
+    const aliasOwners = aliasOwnersByPath.get(docPath);
+    if (!aliasOwners || aliasOwners.size !== 1 || !aliasOwners.has(ownerKey)) {
+      return false;
+    }
+    const primaryOwners = primaryOwnersByPath.get(docPath);
+    return !primaryOwners || (primaryOwners.size === 1 && primaryOwners.has(ownerKey));
+  }
+
+  for (const { item, taskKey, taskIndexEntry, ownerKey, primaryPaths, aliasPaths, allPaths } of indexedItems) {
+    if (taskIndexEntry.review_authoritative) {
+      for (const docPath of [
+        ...primaryPaths,
+        ...aliasPaths.filter((aliasPath) => canUseAliasPathForTaskIndex(aliasPath, ownerKey))
+      ]) {
+        const entry = {
+          ...taskIndexEntry,
+          path: docPath,
+          path_family: classifyTaskPacketPathFamily(docPath)
+        };
+        if (shouldReplaceTaskIndexEntry(taskItemsByPath.get(docPath), entry)) {
+          taskItemsByPath.set(docPath, entry);
+        }
       }
     }
 
@@ -314,7 +377,7 @@ export function buildTaskPacketLifecycleIndex(items) {
     };
     terminalItems.push(taskLifecycle);
 
-    for (const docPath of collectIndexedTaskPacketPaths(item)) {
+    for (const docPath of allPaths) {
       byPath.set(docPath, {
         ...taskLifecycle,
         path: docPath,

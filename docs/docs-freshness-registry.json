@@ -3,23 +3,6 @@
   "generated_at": "2026-05-24",
   "entries": [
     {
-      "path": "docs/findings/linear-5634bf98-fe59-41f5-8623-60c9ef0b2993-pre-expiry-spec-review.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-24",
-      "cadence_days": 30,
-      "source_issue": {
-        "id": "5634bf98-fe59-41f5-8623-60c9ef0b2993",
-        "identifier": "CO-579",
-        "url": "https://linear.app/asabeko/issue/CO-579"
-      },
-      "doc_class": "report_only",
-      "lifecycle_state": "active",
-      "created_at": "2026-05-24",
-      "next_review": "2026-06-23",
-      "notes": "CO-579 evidence for the 21 active pre-expiry spec reviews refreshed on 2026-05-24."
-    },
-    {
       "path": ".agent/task/linear-5634bf98-fe59-41f5-8623-60c9ef0b2993.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -34274,10 +34257,8 @@
       "path": "tasks/specs/linear-033979b5-6903-4d5f-9c9b-41769aa69330.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-05-24",
-      "cadence_days": 30,
-      "next_review": "2026-06-23",
-      "notes": "CO-579 pre-expiry review: retained active or blocked scope; no spec contract changes required."
+      "last_review": "2026-04-30",
+      "cadence_days": 30
     },
     {
       "path": "tasks/specs/linear-0354e9d0-84ee-4340-b098-a9c685c191b5.md",
@@ -34619,10 +34600,8 @@
       "path": "tasks/specs/linear-213f6858-ab77-40b9-b80a-f5e5bdde4b37.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-05-24",
-      "cadence_days": 30,
-      "next_review": "2026-06-23",
-      "notes": "CO-579 pre-expiry review: retained active or blocked scope; no spec contract changes required."
+      "last_review": "2026-05-03",
+      "cadence_days": 30
     },
     {
       "path": "tasks/specs/linear-217c6584-bb47-486a-9765-f24e8ed84fc0.md",
@@ -34791,10 +34770,8 @@
       "path": "tasks/specs/linear-345cd50c-4962-4376-a7ca-1982ba311699.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-05-24",
-      "cadence_days": 30,
-      "next_review": "2026-06-23",
-      "notes": "CO-579 pre-expiry review: retained active or blocked scope; no spec contract changes required."
+      "last_review": "2026-04-30",
+      "cadence_days": 30
     },
     {
       "path": "tasks/specs/linear-34b60caa-258b-4f18-8d67-cdad3f6352cf.md",
@@ -34914,10 +34891,8 @@
       "path": "tasks/specs/linear-3ed4e0c0-4a6a-428b-bf31-d6252f230377.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-05-24",
-      "cadence_days": 30,
-      "next_review": "2026-06-23",
-      "notes": "CO-579 pre-expiry review: retained active or blocked scope; no spec contract changes required."
+      "last_review": "2026-04-30",
+      "cadence_days": 30
     },
     {
       "path": "tasks/specs/linear-3f7dfd9d-e6dc-4e79-bd56-a2786a15c277.md",
@@ -35214,10 +35189,8 @@
       "path": "tasks/specs/linear-552f2825-b9e0-4f14-afe0-21b072aa9bb5.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-05-24",
-      "cadence_days": 30,
-      "next_review": "2026-06-23",
-      "notes": "CO-579 pre-expiry review: retained active or blocked scope; no spec contract changes required."
+      "last_review": "2026-04-30",
+      "cadence_days": 30
     },
     {
       "path": "tasks/specs/linear-5561a9a9-39dd-4ed4-99a0-896553327669.md",
@@ -35258,10 +35231,8 @@
       "path": "tasks/specs/linear-590e4e09-315a-4957-bb72-66b8322e86a6.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-05-24",
-      "cadence_days": 30,
-      "next_review": "2026-06-23",
-      "notes": "CO-579 pre-expiry review: retained active or blocked scope; no spec contract changes required."
+      "last_review": "2026-05-01",
+      "cadence_days": 30
     },
     {
       "path": "tasks/specs/linear-59a75110-93e5-42f4-a2d2-31dcde884c91.md",
@@ -35302,10 +35273,8 @@
       "path": "tasks/specs/linear-5d677c44-06c1-43ca-9aac-5a74f96671b4.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-05-24",
-      "cadence_days": 30,
-      "next_review": "2026-06-23",
-      "notes": "CO-579 pre-expiry review: retained active or blocked scope; no spec contract changes required."
+      "last_review": "2026-04-30",
+      "cadence_days": 30
     },
     {
       "path": "tasks/specs/linear-5d882b0c-d553-4d63-8d62-6f973090a13c.md",
@@ -35521,19 +35490,15 @@
       "path": "tasks/specs/linear-6d7e842c-b10a-42f5-a7e0-8a30a8dd9442.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-05-24",
-      "cadence_days": 30,
-      "next_review": "2026-06-23",
-      "notes": "CO-579 pre-expiry review: retained active or blocked scope; no spec contract changes required."
+      "last_review": "2026-05-01",
+      "cadence_days": 30
     },
     {
       "path": "tasks/specs/linear-6df648e0-4a48-45a2-bdd3-aeaa9c1deb2b.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-05-24",
-      "cadence_days": 30,
-      "next_review": "2026-06-23",
-      "notes": "CO-579 pre-expiry review: retained active or blocked scope; no spec contract changes required."
+      "last_review": "2026-04-30",
+      "cadence_days": 30
     },
     {
       "path": "tasks/specs/linear-6dfd5b1c-ee27-46e4-b31c-7742ea3bdaa3.md",
@@ -35806,10 +35771,8 @@
       "path": "tasks/specs/linear-8098459b-be08-4f9f-8e45-bd315fb4c9b9.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-05-24",
-      "cadence_days": 30,
-      "next_review": "2026-06-23",
-      "notes": "CO-579 pre-expiry review: retained active or blocked scope; no spec contract changes required."
+      "last_review": "2026-04-30",
+      "cadence_days": 30
     },
     {
       "path": "tasks/specs/linear-80d4473e-e9c7-4d4d-9340-bc1193103a7d.md",
@@ -35952,10 +35915,8 @@
       "path": "tasks/specs/linear-8bd36e2e-2e54-4c8d-ae79-7b1319fc6adc.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-05-24",
-      "cadence_days": 30,
-      "next_review": "2026-06-23",
-      "notes": "CO-579 pre-expiry review: retained active or blocked scope; no spec contract changes required."
+      "last_review": "2026-05-01",
+      "cadence_days": 30
     },
     {
       "path": "tasks/specs/linear-8c691f55-5277-443a-b5dd-1f3f548b1b6d.md",
@@ -36206,10 +36167,8 @@
       "path": "tasks/specs/linear-9aedac3e-09df-4859-b818-b6f2d4dc8ccc.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-05-24",
-      "cadence_days": 30,
-      "next_review": "2026-06-23",
-      "notes": "CO-579 pre-expiry review: retained active or blocked scope; no spec contract changes required."
+      "last_review": "2026-05-01",
+      "cadence_days": 30
     },
     {
       "path": "tasks/specs/linear-9b1440f0-a3af-4863-8bb5-2f8ea78bd02d.md",
@@ -36667,10 +36626,8 @@
       "path": "tasks/specs/linear-b78c98eb-8ed4-4e19-9099-81d5e34bb33c.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-05-24",
-      "cadence_days": 30,
-      "next_review": "2026-06-23",
-      "notes": "CO-579 pre-expiry review: retained active or blocked scope; no spec contract changes required."
+      "last_review": "2026-04-30",
+      "cadence_days": 30
     },
     {
       "path": "tasks/specs/linear-b792b517-98e4-4518-9fb2-860996dd62c8.md",
@@ -36729,19 +36686,15 @@
       "path": "tasks/specs/linear-b9a1044e-03b0-49ef-8435-92840eaf90b9.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-05-24",
-      "cadence_days": 30,
-      "next_review": "2026-06-23",
-      "notes": "CO-579 pre-expiry review: retained active or blocked scope; no spec contract changes required."
+      "last_review": "2026-04-30",
+      "cadence_days": 30
     },
     {
       "path": "tasks/specs/linear-b9e7583a-3051-40d3-a87f-0388faa9df61.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-05-24",
-      "cadence_days": 30,
-      "next_review": "2026-06-23",
-      "notes": "CO-579 pre-expiry review: retained active or blocked scope; no spec contract changes required."
+      "last_review": "2026-04-30",
+      "cadence_days": 30
     },
     {
       "path": "tasks/specs/linear-ba9a1c35-c8d1-4b76-aa33-4937502d1964-co-status-prune-terminal-released-issues.md",
@@ -36783,10 +36736,8 @@
       "path": "tasks/specs/linear-bdfd9046-97b5-43bd-850f-b305558cdada.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-05-24",
-      "cadence_days": 30,
-      "next_review": "2026-06-23",
-      "notes": "CO-579 pre-expiry review: retained active or blocked scope; no spec contract changes required."
+      "last_review": "2026-05-01",
+      "cadence_days": 30
     },
     {
       "path": "tasks/specs/linear-bea56fb8-c601-4554-8ece-0a63c5fd34bc.md",
@@ -37103,10 +37054,8 @@
       "path": "tasks/specs/linear-d412792b-9a2a-43d9-96dc-ca021e728d09.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-05-24",
-      "cadence_days": 30,
-      "next_review": "2026-06-23",
-      "notes": "CO-579 pre-expiry review: retained active or blocked scope; no spec contract changes required."
+      "last_review": "2026-05-01",
+      "cadence_days": 30
     },
     {
       "path": "tasks/specs/linear-d43b6785-88d6-442b-a34e-2ad19d4f723a.md",
@@ -37126,19 +37075,15 @@
       "path": "tasks/specs/linear-d536879d-3ddc-47b0-ae37-0ab657af18ba.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-05-24",
-      "cadence_days": 30,
-      "next_review": "2026-06-23",
-      "notes": "CO-579 pre-expiry review: retained active or blocked scope; no spec contract changes required."
+      "last_review": "2026-05-01",
+      "cadence_days": 30
     },
     {
       "path": "tasks/specs/linear-d78c6860-93f6-4936-b3ad-b40e8de8a566.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-05-24",
-      "cadence_days": 30,
-      "next_review": "2026-06-23",
-      "notes": "CO-579 pre-expiry review: retained active or blocked scope; no spec contract changes required."
+      "last_review": "2026-04-30",
+      "cadence_days": 30
     },
     {
       "path": "tasks/specs/linear-d9c8d1b2-3b38-42ef-9087-556870e2d88f.md",
@@ -37217,10 +37162,8 @@
       "path": "tasks/specs/linear-dc2bb702-db1d-450c-be19-a98571289a21.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-05-24",
-      "cadence_days": 30,
-      "next_review": "2026-06-23",
-      "notes": "CO-579 pre-expiry review: retained active or blocked scope; no spec contract changes required."
+      "last_review": "2026-04-30",
+      "cadence_days": 30
     },
     {
       "path": "tasks/specs/linear-dcfbd1cc-2b22-41dc-94c6-ce00c38258a2.md",
@@ -37500,10 +37443,8 @@
       "path": "tasks/specs/linear-f57f28e8-e876-4bff-9217-fc5e17ee030f.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-05-24",
-      "cadence_days": 30,
-      "next_review": "2026-06-23",
-      "notes": "CO-579 pre-expiry review: retained active or blocked scope; no spec contract changes required."
+      "last_review": "2026-05-01",
+      "cadence_days": 30
     },
     {
       "path": "tasks/specs/linear-f667a32d-b8db-4717-8565-429409026f92.md",

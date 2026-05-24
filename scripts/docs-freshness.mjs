@@ -230,7 +230,12 @@ function resolveEffectiveReviewDate(lifecycleIndex, entryPath, registryLastRevie
 
   const taskIndexEntry = lifecycleIndex.taskItemsByPath?.get(entryPath);
   const taskIndexReviewDate = parseIsoDate(taskIndexEntry?.last_review);
-  if (!taskIndexEntry || !taskIndexReviewDate || taskIndexReviewDate <= registryReviewDate) {
+  if (
+    !taskIndexEntry ||
+    !taskIndexEntry.review_authoritative ||
+    !taskIndexReviewDate ||
+    taskIndexReviewDate <= registryReviewDate
+  ) {
     return fallback;
   }
 

@@ -2,7 +2,7 @@
 
 ## Summary
 - Goal: clear the terminal global docs freshness owner recurrence and the task-packet/spec freshness drift that validation exposed after the owner re-home.
-- Scope: docs-first packet, registry mirrors, `docs/docs-catalog.json` owner binding, `docs/guides/docs-freshness-cohorts.md` current-owner prose, task-index-backed freshness resolution, historical numeric task-key aliases, one CO-300 finding registry reclassification, 21 active pre-expiry spec reviews, two CO-545 historical path prose repairs, and linked follow-up CO-580 for the larger lifecycle/finalizer refactor.
+- Scope: docs-first packet, registry mirrors, `docs/docs-catalog.json` owner binding, `docs/guides/docs-freshness-cohorts.md` current-owner prose, task-index-backed freshness resolution, guarded historical numeric task-key aliases, one CO-300 finding registry reclassification, two CO-545 historical path prose repairs, and linked follow-up CO-580 for the larger lifecycle/finalizer refactor.
 - Assumptions:
   - CO-579 is live and same-project.
   - CO-575 is terminal Done/completed and should remain lineage only.
@@ -12,9 +12,17 @@
 - Intent checksum / protected terms carried forward: `docs:freshness`, `docs:freshness:maintain`, `canonical_owner_key=docs:freshness:maintain`, `owner_issue=CO-575`, terminal owner, `configured_owner_terminal`, rolling cohort entries, `docs/docs-catalog.json`, `CO-568`, `CO-569`.
 - Not done if: terminal CO-575 remains configured; CO-568/CO-569 ownership is hidden; historical docs are deleted; freshness/spec checks are weakened; provider/runtime/review-wrapper behavior is changed.
 - Pre-implementation issue-quality review: 2026-05-24 approved. Evidence comes from CO-527 packet validation plus live CO-579, CO-575, CO-568, and CO-569 issue-context.
-- Fallback / refactor decision: remove fallback; terminal CO-575 must not remain configured as the live owner.
+- Fallback / refactor decision: remove the terminal CO-575 owner fallback and retain only expiring, guarded task-index freshness seams until CO-580 lands the shared lifecycle resolver/finalizer.
 - Durable retention evidence: not applicable.
 - Large-refactor check: the full lifecycle/finalizer refactor is warranted but split to CO-580; CO-579 keeps the bounded owner/freshness repair and records the evidence without landing an over-broad frontmatter-only classifier.
+- Minor-seam decision: the task-index freshness seam is acceptable only with active-status gating, unique-alias gating, report-level override audit output, focused regressions, and CO-580 expiry.
+
+| Surface | Fallback / seam | Decision | Owner | Trigger | Introduced date | Review date | Maximum lifetime | Removal condition | Validation |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `docs:freshness:maintain` global owner binding | Terminal `CO-575` remains configured as live global owner. | remove fallback | CO-579 | `docs:freshness:maintain --check` reports `configured_owner_terminal`. | 2026-05-23 | 2026-05-24 | Not retained | `docs/docs-catalog.json` points to non-terminal CO-579 and maintain check verifies live owner. | docs freshness maintain, docs check, spec guard. |
+| Task-index review-date override | Newer `tasks/index.json` `last_review` can override older registry review dates for indexed task-packet paths. | expire fallback | CO-579 / CO-580 | Task-index review date is newer than registry date for the same task-packet path. | 2026-05-24 | 2026-06-07 | 2026-06-23 | CO-580 lands a centralized lifecycle resolver/finalizer or task-packet mirrors are explicit/archive-clean so registry freshness no longer needs inferred task-index authority. | P1 regressions for statusless entries and numeric alias collisions, task-index override audit output, docs freshness, docs freshness maintain. |
+| Historical numeric task-key aliases | Older task packets can list task/spec/docs paths under numeric task keys while PRD/ACTION mirrors omit the numeric prefix. | expire fallback | CO-579 / CO-580 | Historical PRD/ACTION mirrors are not covered by task-index review authority without numeric aliasing. | 2026-05-24 | 2026-06-07 | 2026-06-23 | Historical mirrors are archived or task-index rows explicitly enumerate all mirror paths. | P1 numeric alias collision regression plus live docs freshness override audit output. |
+| Lifecycle authority split | Terminal source state, spec frontmatter, registry status, task-index status, and linked checklist readiness can disagree. | expire fallback | CO-580 | CO-579 found frontmatter-only terminal detection over-blocked active-reviewed packets. | 2026-05-24 | 2026-06-07 | 2026-06-23 | CO-580 lands a shared lifecycle resolver/finalizer or an equivalent smaller proven contract. | CO-580 linked Backlog issue with labels and acceptance criteria. |
 
 ## Milestones & Sequencing
 1. [x] Create CO-579 in Linear without using the known-risk `create-follow-up` helper.
@@ -26,7 +34,7 @@
 7. [x] Add task-index-backed freshness resolution and exact canonical owner reporting for rolling cohorts in both `docs:freshness` and `spec-guard`.
 8. [x] Add historical numeric task-key alias support for older PRD/ACTION mirrors.
 9. [x] Reclassify the residual CO-300 classification finding registry row as archived.
-10. [x] Review and refresh the 21 active specs approaching `spec-guard` expiry without changing active/blocked status.
+10. [x] Withdraw the unrelated pre-expiry spec refresh from CO-579 after guard evidence showed it would hide stale fallback windows owned by other lanes.
 11. [x] Create/link CO-580 for the shared lifecycle resolver and owner-finalizer refactor.
 12. [ ] Run packet and docs validation.
 13. [ ] Transition CO-579 out of In Progress only after packet validation and owner verification.

@@ -5,12 +5,10 @@ relates_to: docs/PRD-linear-8bd36e2e-2e54-4c8d-ae79-7b1319fc6adc.md
 risk: high
 owners:
   - Codex
-last_review: 2026-05-24
+last_review: 2026-05-01
 related_action_plan: docs/ACTION_PLAN-linear-8bd36e2e-2e54-4c8d-ae79-7b1319fc6adc.md
 task_checklists:
   - tasks/tasks-linear-8bd36e2e-2e54-4c8d-ae79-7b1319fc6adc.md
-review_notes:
-  - "2026-05-24: CO-579 pre-expiry review: retained active or blocked scope; no spec contract changes required."
 ---
 
 # TECH_SPEC - CO-461 provider docs-review child-stream task identity guard compatibility
