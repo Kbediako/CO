@@ -264,8 +264,65 @@ describe('docs freshness reporting', () => {
         expected: []
       },
       {
+        name: 'list-scoped unterminated fence ends when the parent list item ends',
+        markdown: [
+          '- Parent with local fenced example',
+          '',
+          '  ```md',
+          '  - [ ] Fenced example, not live work.',
+          '',
+          '- [ ] Actual open work.'
+        ],
+        expected: ['- [ ] Actual open work.']
+      },
+      {
+        name: 'outdented fence close after list-scoped fence does not hide following work',
+        markdown: [
+          '- Parent with local fenced example',
+          '',
+          '  ```md',
+          '  - [ ] Fenced example, not live work.',
+          '```',
+          '- [ ] Actual open work.'
+        ],
+        expected: ['- [ ] Actual open work.']
+      },
+      {
         name: 'fence-looking content with info does not close fenced block',
         markdown: ['```md', '```example', '- [ ] Still fenced example, not live work.', '```', '- [ ] Actual open work.'],
+        expected: ['- [ ] Actual open work.']
+      },
+      {
+        name: 'raw HTML comments and pre blocks do not report checklist-looking examples',
+        markdown: [
+          '# Example',
+          '',
+          '<!--',
+          '- [ ] Commented example, not live work.',
+          '-->',
+          '',
+          '<pre>',
+          '- [ ] Raw HTML example, not live work.',
+          '</pre>',
+          '',
+          '<!-- - [ ] Single-line comment example, not live work. -->',
+          '',
+          '<pre>- [ ] Single-line raw HTML example, not live work.</pre>',
+          '',
+          '- [ ] Actual open work.'
+        ],
+        expected: ['- [ ] Actual open work.']
+      },
+      {
+        name: 'list-scoped raw HTML blocks end when the parent list item ends',
+        markdown: [
+          '- Parent with local raw HTML example',
+          '',
+          '  <!--',
+          '  - [ ] Commented example, not live work.',
+          '',
+          '- [ ] Actual open work.'
+        ],
         expected: ['- [ ] Actual open work.']
       },
       {

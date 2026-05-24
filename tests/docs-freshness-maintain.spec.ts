@@ -2417,6 +2417,59 @@ last_review: ${lastReview}
     );
   });
 
+  it('blocks when an active owner finalizer verification is missing', () => {
+    const canonicalOwnerKey = 'baseline_cohort_id:fixture-owner';
+    const ownerActionEvidence = buildDocsFreshnessOwnerActionEvidence(
+      {
+        freshness_decision: 'pass_with_owned_rolling_debt',
+        owner_issue: 'CO-300',
+        owner_issue_action: {
+          mode: 'update_existing_multiple',
+          issues: ['CO-320'],
+          canonical_owner_keys: [canonicalOwnerKey],
+          reason: 'canonical_owner_key_match_multiple'
+        },
+        candidate_cohorts: [
+          {
+            id: 'fixture-owner',
+            canonical_owner_key: canonicalOwnerKey,
+            owner_issue: 'CO-320',
+            owner_issue_action: {
+              mode: 'update_existing',
+              issue: 'CO-320',
+              canonical_owner_key: canonicalOwnerKey
+            },
+            sample_paths: ['tasks/tasks-1164-historical.md']
+          }
+        ]
+      },
+      {
+        env: { LINEAR_API_KEY: 'token' } as NodeJS.ProcessEnv,
+        ownerFinalizerVerifications: []
+      }
+    );
+
+    expect(ownerActionEvidence.status).toBe('blocked_owner_verification_unavailable');
+    expect(ownerActionEvidence.required_actions).toBe(1);
+    expect(ownerActionEvidence.should_block).toBe(true);
+    expect(ownerActionEvidence.owner_finalizer).toEqual(
+      expect.objectContaining({
+        status: 'blocked_owner_verification_unavailable',
+        blocking_owner_issue: 'CO-320',
+        active_owner_issue: 'CO-320',
+        active_owner_issues: ['CO-320'],
+        canonical_owner_key: canonicalOwnerKey,
+        active_canonical_owner_key: canonicalOwnerKey,
+        reason: 'owner_verification_unavailable',
+        verification_status: null,
+        state: null,
+        state_type: null,
+        cohort_id: 'fixture-owner',
+        sample_paths: ['tasks/tasks-1164-historical.md']
+      })
+    );
+  });
+
   it('routes stale active spec-guard cohorts through CO-428 owner action evidence', () => {
     const lastReview = reviewDateDaysAgo(31);
     const tasksSpecKey =

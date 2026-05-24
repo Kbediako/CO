@@ -128,6 +128,7 @@ export function isTaskPacketLifecyclePath(docPath) {
 const OPEN_CHECKLIST_ITEM_PATTERN = /^\s*(?:[-*+]|\d+[.)])\s+\[ \](?:\s+.*)?$/u;
 const MARKDOWN_LIST_ITEM_PATTERN = /^([ \t]*)([-*+]|\d+[.)])([ \t]+)/u;
 const MARKDOWN_FENCE_PATTERN = /^([ \t]*)(`{3,}|~{3,})(.*)$/u;
+const RAW_HTML_BLOCK_TAGS = new Set(['pre', 'script', 'style', 'textarea']);
 
 function leadingIndentWidth(line) {
   let width = 0;
@@ -181,14 +182,60 @@ function parseMarkdownFence(line) {
 }
 
 function closesMarkdownFence(line, fence) {
-  const closingFence = parseMarkdownFence(line);
+  const closingFence = matchingMarkdownFenceMarker(line, fence);
   return Boolean(
     closingFence &&
-      closingFence.char === fence.char &&
-      closingFence.length >= fence.length &&
-      closingFence.indentWidth - fence.baseIndentWidth <= 3 &&
-      closingFence.tail.trim() === ''
+      closingFence.indentWidth >= fence.baseIndentWidth &&
+      closingFence.indentWidth - fence.baseIndentWidth <= 3
   );
+}
+
+function matchingMarkdownFenceMarker(line, fence) {
+  const closingFence = parseMarkdownFence(line);
+  if (
+    !closingFence ||
+    closingFence.char !== fence.char ||
+    closingFence.length < fence.length ||
+    closingFence.tail.trim() !== ''
+  ) {
+    return null;
+  }
+  return closingFence;
+}
+
+function parseMarkdownHtmlBlock(line) {
+  const indentWidth = leadingIndentWidth(line);
+  const trimmed = line.trimStart();
+  if (trimmed.startsWith('<!--')) {
+    return {
+      type: 'comment',
+      indentWidth,
+      closed: trimmed.includes('-->')
+    };
+  }
+
+  const tagMatch = trimmed.match(/^<([A-Za-z][A-Za-z0-9-]*)(?=[\s>/])[^>]*>/u);
+  if (!tagMatch) {
+    return null;
+  }
+  const tagName = tagMatch[1].toLowerCase();
+  if (!RAW_HTML_BLOCK_TAGS.has(tagName)) {
+    return null;
+  }
+  return {
+    type: 'tag',
+    tagName,
+    indentWidth,
+    closed: new RegExp(`</\\s*${tagName}\\s*>`, 'iu').test(trimmed)
+  };
+}
+
+function closesMarkdownHtmlBlock(line, htmlBlock) {
+  const trimmed = line.trimStart();
+  if (htmlBlock.type === 'comment') {
+    return trimmed.includes('-->');
+  }
+  return new RegExp(`</\\s*${htmlBlock.tagName}\\s*>`, 'iu').test(trimmed);
 }
 
 function popListContextsForIndent(listContexts, indentWidth) {
@@ -216,6 +263,7 @@ export function extractOpenChecklistItems(content) {
   const openItems = [];
   const listContexts = [];
   let fence = null;
+  let htmlBlock = null;
   let indentedCodeBlock = null;
   let previousWasBlank = true;
 
@@ -226,9 +274,32 @@ export function extractOpenChecklistItems(content) {
     if (fence) {
       if (closesMarkdownFence(line, fence)) {
         fence = null;
+        previousWasBlank = false;
+        continue;
       }
-      previousWasBlank = false;
-      continue;
+      if (fence.listDepth === 0 || isBlank || indentWidth >= fence.baseIndentWidth) {
+        previousWasBlank = false;
+        continue;
+      }
+      if (matchingMarkdownFenceMarker(line, fence)) {
+        fence = null;
+        previousWasBlank = false;
+        continue;
+      }
+      fence = null;
+    }
+
+    if (htmlBlock) {
+      if (closesMarkdownHtmlBlock(line, htmlBlock)) {
+        htmlBlock = null;
+        previousWasBlank = false;
+        continue;
+      }
+      if (htmlBlock.listDepth === 0 || isBlank || indentWidth >= htmlBlock.baseIndentWidth) {
+        previousWasBlank = false;
+        continue;
+      }
+      htmlBlock = null;
     }
 
     if (isBlank) {
@@ -251,12 +322,14 @@ export function extractOpenChecklistItems(content) {
 
     const listItem = parseMarkdownListItem(line);
     const openingFence = parseMarkdownFence(line);
+    const openingHtmlBlock = parseMarkdownHtmlBlock(line);
     if (
       listContexts.length > 0 &&
       !previousWasBlank &&
       indentWidth < currentListContentIndent(listContexts) &&
       !listItem &&
       !openingFence &&
+      !openingHtmlBlock &&
       isMarkdownParagraphContinuation(line)
     ) {
       previousWasBlank = false;
@@ -271,8 +344,22 @@ export function extractOpenChecklistItems(content) {
       fence = {
         char: openingFence.char,
         length: openingFence.length,
-        baseIndentWidth
+        baseIndentWidth,
+        listDepth: listContexts.length
       };
+      previousWasBlank = false;
+      continue;
+    }
+
+    if (openingHtmlBlock && relativeIndentWidth >= 0 && relativeIndentWidth <= 3) {
+      if (!openingHtmlBlock.closed) {
+        htmlBlock = {
+          type: openingHtmlBlock.type,
+          tagName: openingHtmlBlock.tagName,
+          baseIndentWidth,
+          listDepth: listContexts.length
+        };
+      }
       previousWasBlank = false;
       continue;
     }

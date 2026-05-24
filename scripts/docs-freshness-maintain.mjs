@@ -1481,12 +1481,40 @@ function selectOwnerFinalizerVerification(verifications, record) {
   );
 }
 
+function ownerFinalizerVerificationsForDecision(decision) {
+  return [
+    decision?.owner_issue_verification ?? null,
+    ...(Array.isArray(decision?.canonical_owner_issue_verifications)
+      ? decision.canonical_owner_issue_verifications
+      : [])
+  ].filter(Boolean);
+}
+
 function ownerFinalizerRecordPayload(record) {
   return {
     owner_issue: record.owner_issue,
     canonical_owner_key: record.canonical_owner_key,
     cohort_id: record.cohort_id,
     sample_paths: record.sample_paths
+  };
+}
+
+function blockedOwnerFinalizerRecordPayload(record, activeOwnerIssues, activeOwnerRecords, reason, verification = null) {
+  return {
+    status: 'blocked_owner_verification_unavailable',
+    blocking_owner_issue: record.owner_issue,
+    active_owner_issue: record.owner_issue,
+    active_owner_issues: activeOwnerIssues,
+    active_owner_records: activeOwnerRecords,
+    canonical_owner_key: record.canonical_owner_key,
+    active_canonical_owner_key: record.canonical_owner_key,
+    reason,
+    verification_status: verification?.verification_status ?? null,
+    state: verification?.state ?? null,
+    state_type: verification?.state_type ?? null,
+    cohort_id: record.cohort_id,
+    sample_paths: record.sample_paths,
+    ignored_terminal_owner_issues: []
   };
 }
 
@@ -1510,6 +1538,14 @@ function buildDocsFreshnessOwnerFinalizer(decision, ownerFinalizerVerifications 
     .filter(Boolean);
   for (const record of records) {
     const verification = selectOwnerFinalizerVerification(verifications, record);
+    if (!verification) {
+      return blockedOwnerFinalizerRecordPayload(
+        record,
+        activeOwnerIssues,
+        activeOwnerRecords,
+        'owner_verification_unavailable'
+      );
+    }
     if (verification?.is_terminal) {
       return {
         status: 'blocked_terminal_owner',
@@ -1528,22 +1564,13 @@ function buildDocsFreshnessOwnerFinalizer(decision, ownerFinalizerVerifications 
       };
     }
     if (verification && (verification.usable !== true || verification.verification_status !== 'succeeded')) {
-      return {
-        status: 'blocked_owner_verification_unavailable',
-        blocking_owner_issue: record.owner_issue,
-        active_owner_issue: record.owner_issue,
-        active_owner_issues: activeOwnerIssues,
-        active_owner_records: activeOwnerRecords,
-        canonical_owner_key: record.canonical_owner_key,
-        active_canonical_owner_key: record.canonical_owner_key,
-        reason: verification?.verification_status === 'failed' ? 'owner_verification_failed' : 'owner_verification_unavailable',
-        verification_status: verification?.verification_status ?? null,
-        state: verification?.state ?? null,
-        state_type: verification?.state_type ?? null,
-        cohort_id: record.cohort_id,
-        sample_paths: record.sample_paths,
-        ignored_terminal_owner_issues: []
-      };
+      return blockedOwnerFinalizerRecordPayload(
+        record,
+        activeOwnerIssues,
+        activeOwnerRecords,
+        verification?.verification_status === 'failed' ? 'owner_verification_failed' : 'owner_verification_unavailable',
+        verification
+      );
     }
   }
 
@@ -1573,12 +1600,19 @@ function buildDocsFreshnessOwnerFinalizer(decision, ownerFinalizerVerifications 
 
 export function buildDocsFreshnessOwnerActionEvidence(
   decision,
-  {
-    env = process.env,
-    dryRunLinearActions = false,
-    ownerFinalizerVerifications = []
-  } = {}
+  options = {}
 ) {
+  const {
+    env = process.env,
+    dryRunLinearActions = false
+  } = options;
+  const ownerFinalizerVerificationsProvided = Object.prototype.hasOwnProperty.call(
+    options,
+    'ownerFinalizerVerifications'
+  );
+  const ownerFinalizerVerifications = ownerFinalizerVerificationsProvided
+    ? options.ownerFinalizerVerifications
+    : ownerFinalizerVerificationsForDecision(decision);
   const cohorts = Array.isArray(decision?.candidate_cohorts) ? decision.candidate_cohorts : [];
   if (cohorts.length === 0) {
     const preExpiryOwnerAction = buildSpecGuardPreExpiryOwnerAction(decision);
@@ -1624,12 +1658,15 @@ export function buildDocsFreshnessOwnerActionEvidence(
   const actions = consolidatedAction ? [consolidatedAction] : rawActions;
   const result = buildOwnerActionEvidenceResult(decision, actions, { env, dryRunLinearActions });
   const ownerFinalizer = buildDocsFreshnessOwnerFinalizer(decision, ownerFinalizerVerifications);
-  const ownerFinalizerBlocks =
-    ownerFinalizer.status === 'blocked_terminal_owner' ||
-    ownerFinalizer.status === 'blocked_owner_verification_unavailable';
+  const ownerFinalizerBlocks = ownerFinalizer.status.startsWith('blocked_');
+  const ownerFinalizerOwnsStatus =
+    ownerFinalizerBlocks &&
+    (ownerFinalizerVerificationsProvided ||
+      result.status === 'resolved' ||
+      ownerFinalizer.verification_status !== null);
   return {
     ...result,
-    status: ownerFinalizerBlocks ? ownerFinalizer.status : result.status,
+    status: ownerFinalizerOwnsStatus ? ownerFinalizer.status : result.status,
     should_block: result.should_block || ownerFinalizerBlocks,
     required_actions: ownerFinalizerBlocks ? Math.max(result.required_actions, 1) : result.required_actions,
     owner_finalizer: ownerFinalizer
