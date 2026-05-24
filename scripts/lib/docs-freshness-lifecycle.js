@@ -327,7 +327,7 @@ export function buildTaskPacketLifecycleIndex(items) {
     const allPaths = collectIndexedTaskPacketPaths(item);
     const aliasPaths = allPaths.filter((docPath) => !primaryPathSet.has(docPath));
 
-    indexedItems.push({ item, taskKey, taskIndexEntry, ownerKey, primaryPaths, aliasPaths, allPaths });
+    indexedItems.push({ item, taskKey, taskIndexEntry, ownerKey, primaryPaths, aliasPaths });
     for (const docPath of primaryPaths) {
       addOwner(primaryOwnersByPath, docPath, ownerKey);
     }
@@ -345,10 +345,19 @@ export function buildTaskPacketLifecycleIndex(items) {
     return !primaryOwners || (primaryOwners.size === 1 && primaryOwners.has(ownerKey));
   }
 
-  for (const { item, taskKey, taskIndexEntry, ownerKey, primaryPaths, aliasPaths, allPaths } of indexedItems) {
+  function canUsePrimaryPathForTaskIndex(docPath, ownerKey) {
+    const primaryOwners = primaryOwnersByPath.get(docPath);
+    if (!primaryOwners || primaryOwners.size !== 1 || !primaryOwners.has(ownerKey)) {
+      return false;
+    }
+    const aliasOwners = aliasOwnersByPath.get(docPath);
+    return !aliasOwners || (aliasOwners.size === 1 && aliasOwners.has(ownerKey));
+  }
+
+  for (const { item, taskKey, taskIndexEntry, ownerKey, primaryPaths, aliasPaths } of indexedItems) {
     if (taskIndexEntry.review_authoritative) {
       for (const docPath of [
-        ...primaryPaths,
+        ...primaryPaths.filter((primaryPath) => canUsePrimaryPathForTaskIndex(primaryPath, ownerKey)),
         ...aliasPaths.filter((aliasPath) => canUseAliasPathForTaskIndex(aliasPath, ownerKey))
       ]) {
         const entry = {
@@ -378,7 +387,11 @@ export function buildTaskPacketLifecycleIndex(items) {
     };
     terminalItems.push(taskLifecycle);
 
-    for (const docPath of allPaths) {
+    const terminalPaths = [
+      ...primaryPaths.filter((primaryPath) => canUsePrimaryPathForTaskIndex(primaryPath, ownerKey)),
+      ...aliasPaths.filter((aliasPath) => canUseAliasPathForTaskIndex(aliasPath, ownerKey))
+    ];
+    for (const docPath of terminalPaths) {
       byPath.set(docPath, {
         ...taskLifecycle,
         path: docPath,

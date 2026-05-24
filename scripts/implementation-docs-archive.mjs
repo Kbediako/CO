@@ -15,6 +15,7 @@ import {
   toPosixPath
 } from './lib/docs-helpers.js';
 import {
+  buildTaskPacketLifecycleIndex,
   collectIndexedTaskPacketPaths,
   isTaskPacketLifecyclePath,
   isTerminalTaskStatus,
@@ -95,7 +96,7 @@ function normalizeRegistryTaskStatus(entry) {
   return null;
 }
 
-function retainedTerminalPacketEvidence(registryEntry, relativePath, terminalTaskPacketPaths) {
+function retainedTerminalPacketEvidence(registryEntry, relativePath, terminalLifecycleByPath) {
   const taskStatus = normalizeRegistryTaskStatus(registryEntry);
   if (taskStatus && isTerminalTaskStatus(taskStatus) && isTaskPacketLifecyclePath(relativePath)) {
     return {
@@ -103,9 +104,13 @@ function retainedTerminalPacketEvidence(registryEntry, relativePath, terminalTas
       task_status: taskStatus
     };
   }
-  if (terminalTaskPacketPaths.has(relativePath)) {
+  const terminalLifecycle = terminalLifecycleByPath.get(relativePath);
+  if (terminalLifecycle) {
     return {
-      retained_terminal_evidence: 'task_index_terminal'
+      retained_terminal_evidence: 'task_index_terminal',
+      task_key: terminalLifecycle.task_key,
+      task_id: terminalLifecycle.task_id,
+      source_issue: terminalLifecycle.source_issue
     };
   }
   return null;
@@ -588,6 +593,7 @@ async function main() {
 
   const tasksIndex = JSON.parse(tasksRaw);
   const items = Array.isArray(tasksIndex?.items) ? tasksIndex.items : [];
+  const taskLifecycleIndex = buildTaskPacketLifecycleIndex(items);
 
   const docRegexes = policy.docPatterns.map((pattern) => globToRegExp(pattern));
   const excludeSet = new Set(policy.excludePaths);
@@ -802,6 +808,10 @@ async function main() {
 
     const ageDays = computeAgeInDays(fallbackTerminalDate, today);
     for (const pathValue of indexedDocPaths) {
+      const terminalLifecycle = taskLifecycleIndex.byPath.get(pathValue);
+      if (!terminalLifecycle || terminalLifecycle.task_key !== taskKey) {
+        continue;
+      }
       terminalTaskPacketPaths.add(pathValue);
       if (excludeSet.has(pathValue)) {
         continue;
@@ -1110,7 +1120,7 @@ async function main() {
       continue;
     }
 
-    const retainedEvidence = retainedTerminalPacketEvidence(registryEntry, relativePath, terminalTaskPacketPaths);
+    const retainedEvidence = retainedTerminalPacketEvidence(registryEntry, relativePath, taskLifecycleIndex.byPath);
     if (isRetainedTerminalPacketStatus(status) && retainedEvidence) {
       report.skipped.push({
         path: relativePath,
@@ -1207,7 +1217,7 @@ async function main() {
       continue;
     }
 
-    const retainedEvidence = retainedTerminalPacketEvidence(registryEntry, normalizedRelativePath, terminalTaskPacketPaths);
+    const retainedEvidence = retainedTerminalPacketEvidence(registryEntry, normalizedRelativePath, taskLifecycleIndex.byPath);
     if (isRetainedTerminalPacketStatus(status) && retainedEvidence) {
       report.skipped.push({
         path: normalizedRelativePath,

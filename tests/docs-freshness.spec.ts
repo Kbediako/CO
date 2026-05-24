@@ -830,6 +830,68 @@ describe('docs freshness reporting', () => {
     expect(report.stale_entries[0]).not.toHaveProperty('last_review_source');
   });
 
+  it('does not use shared explicit task-index paths to mask stale registry rows', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docs-freshness-task-index-primary-collision-'));
+    createdDirs.push(repoRoot);
+    const docPath = 'docs/TECH_SPEC-shared-primary-fixture.md';
+
+    await Promise.all([
+      mkdir(join(repoRoot, 'docs'), { recursive: true }),
+      mkdir(join(repoRoot, 'tasks'), { recursive: true })
+    ]);
+    await writeFile(join(repoRoot, docPath), '# Shared explicit task packet\n', 'utf8');
+    await writeFile(
+      join(repoRoot, 'tasks', 'index.json'),
+      JSON.stringify(
+        {
+          items: [
+            {
+              id: '20260422-shared-primary-a',
+              status: 'in_progress',
+              last_review: reviewDateDaysAgo(1),
+              paths: { docs: docPath }
+            },
+            {
+              id: '20260423-shared-primary-b',
+              status: 'in_progress',
+              last_review: reviewDateDaysAgo(2),
+              paths: { docs: docPath }
+            }
+          ]
+        },
+        null,
+        2
+      ),
+      'utf8'
+    );
+    await writeDocsFreshnessFixture(repoRoot, {
+      registryEntries: [
+        {
+          path: docPath,
+          owner: 'Codex',
+          status: 'active',
+          last_review: reviewDateDaysAgo(31),
+          cadence_days: 30
+        }
+      ],
+      catalogPatterns: [{ glob: 'docs/TECH_SPEC-*.md', doc_class: 'task_packet' }]
+    });
+
+    const { report, hasFailures } = await runDocsFreshness(repoRoot, {
+      outRoot: join(repoRoot, 'out'),
+      taskId: 'fixture'
+    });
+
+    expect(hasFailures).toBe(true);
+    expect(report.totals.task_index_review_overrides).toBe(0);
+    expect(report.stale_entries).toEqual([
+      expect.objectContaining({
+        path: docPath
+      })
+    ]);
+    expect(report.stale_entries[0]).not.toHaveProperty('last_review_source');
+  });
+
   it('does not use colliding numeric task-key aliases to mask stale registry rows', async () => {
     const repoRoot = await mkdtemp(join(tmpdir(), 'docs-freshness-task-index-alias-collision-'));
     createdDirs.push(repoRoot);
@@ -888,6 +950,66 @@ describe('docs freshness reporting', () => {
       })
     ]);
     expect(report.stale_entries[0]).not.toHaveProperty('last_review_source');
+  });
+
+  it('does not use colliding terminal numeric aliases to mark unrelated packet rows terminal', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docs-freshness-terminal-alias-collision-'));
+    createdDirs.push(repoRoot);
+    const aliasPath = 'docs/PRD-shared-terminal-fixture.md';
+
+    await Promise.all([
+      mkdir(join(repoRoot, 'docs'), { recursive: true }),
+      mkdir(join(repoRoot, 'tasks'), { recursive: true })
+    ]);
+    await writeFile(join(repoRoot, aliasPath), '# Shared terminal packet PRD\n', 'utf8');
+    await writeFile(
+      join(repoRoot, 'tasks', 'index.json'),
+      JSON.stringify(
+        {
+          items: [
+            {
+              id: '20260422-1234-shared-terminal-fixture',
+              status: 'done',
+              completed_at: reviewDateDaysAgo(1)
+            },
+            {
+              id: '20260423-5678-shared-terminal-fixture',
+              status: 'done',
+              completed_at: reviewDateDaysAgo(2)
+            }
+          ]
+        },
+        null,
+        2
+      ),
+      'utf8'
+    );
+    await writeDocsFreshnessFixture(repoRoot, {
+      registryEntries: [
+        {
+          path: aliasPath,
+          owner: 'Codex',
+          status: 'active',
+          last_review: reviewDateDaysAgo(31),
+          cadence_days: 30
+        }
+      ],
+      catalogPatterns: [{ glob: 'docs/PRD-*.md', doc_class: 'task_packet' }]
+    });
+
+    const { report, hasFailures } = await runDocsFreshness(repoRoot, {
+      outRoot: join(repoRoot, 'out'),
+      taskId: 'fixture'
+    });
+
+    expect(hasFailures).toBe(true);
+    expect(report.totals.terminal_lifecycle_entries).toBe(0);
+    expect(report.totals.stale_entries).toBe(1);
+    expect(report.stale_entries).toEqual([
+      expect.objectContaining({
+        path: aliasPath
+      })
+    ]);
   });
 
   it('keeps non-eligible stale docs as blocking failures when rolling cohorts are enabled', async () => {
