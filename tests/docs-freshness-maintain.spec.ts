@@ -3700,12 +3700,13 @@ last_review: ${lastReview}
     const statusTerminalPath = 'tasks/tasks-1169-status-succeeded.md';
     const duplicateTerminalPath = 'tasks/tasks-1170-status-duplicate.md';
     const registryTerminalPath = 'tasks/tasks-1171-registry-terminal-pending-archive.md';
+    const registryRetainedTerminalPath = 'tasks/tasks-1172-registry-retained-terminal-packet.md';
     const decision = buildDocsFreshnessMaintenanceDecision(
       {
         totals: {
-          docs_scanned: 8,
-          registry_entries: 8,
-          stale_entries: 8,
+          docs_scanned: 9,
+          registry_entries: 9,
+          stale_entries: 9,
           rolling_cohort_entries: 0,
           terminal_lifecycle_entries: 1,
           missing_in_registry: 0,
@@ -3758,6 +3759,11 @@ last_review: ${lastReview}
             path: registryTerminalPath,
             task_number: '1171',
             registry_status: 'terminal_pending_archive'
+          }),
+          staleTaskPacketEntry({
+            path: registryRetainedTerminalPath,
+            task_number: '1172',
+            registry_status: 'retained_terminal_packet'
           })
         ],
         rolling_cohort_entries: [],

@@ -693,6 +693,47 @@ describe('spec-guard script', () => {
     expect(stdout.trim()).toContain('✅ Spec guard: OK');
   });
 
+  it('reports exact baseline cohort canonical owners instead of the global rolling owner', async () => {
+    const repo = await initRepository();
+    const staleReviewDate = reviewDateDaysAgo(31);
+    await writeDocsCatalog(
+      repo,
+      rollingFreshnessPolicy({
+        owner_issue: 'CO-579',
+        baseline_cohorts: [
+          {
+            id: 'co-568-may-19-spec-baseline',
+            last_review: staleReviewDate,
+            cadence_days: 30,
+            path_families: ['tasks/specs'],
+            task_number_range: { start: '0001', end: '0001' }
+          }
+        ],
+        canonical_owner_issues: [
+          {
+            canonical_owner_key: 'baseline_cohort_id:co-568-may-19-spec-baseline',
+            owner_issue: 'CO-568'
+          }
+        ]
+      })
+    );
+
+    await writeFile(
+      join(repo, 'tasks/specs/0001-initial.md'),
+      ['---', 'status: in_progress', `last_review: ${staleReviewDate}`, '---', '', 'Active spec.'].join('\n')
+    );
+
+    const { stdout } = await execFileAsync('node', [scriptPath], {
+      cwd: repo,
+      env: specGuardEnv()
+    });
+
+    expect(stdout).toContain('Spec guard rolling freshness cohort entries: 1');
+    expect(stdout).toContain('rolling cohort CO-568: 1 specs');
+    expect(stdout).not.toContain('rolling cohort CO-579: 1 specs');
+    expect(stdout.trim()).toContain('✅ Spec guard: OK');
+  });
+
   it('keeps undeclared same-class active specs as blocking failures', async () => {
     const repo = await initRepository();
     const staleReviewDate = reviewDateDaysAgo(31);

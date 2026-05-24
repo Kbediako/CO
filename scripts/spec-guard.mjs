@@ -1347,6 +1347,31 @@ function findMatchingBaselineCohort(entry, policy) {
   );
 }
 
+function canonicalOwnerKeyForBaselineCohortId(baselineCohortId) {
+  return baselineCohortId ? `baseline_cohort_id:${baselineCohortId}` : null;
+}
+
+function resolveRollingCohortOwnerIssue(policy, baselineCohortId) {
+  const canonicalOwnerKey = canonicalOwnerKeyForBaselineCohortId(baselineCohortId);
+  const canonicalOwner = canonicalOwnerKey
+    ? policy.canonical_owner_issues.find((entry) => entry.canonical_owner_key === canonicalOwnerKey)
+    : null;
+  if (canonicalOwner) {
+    return {
+      owner_issue: canonicalOwner.owner_issue,
+      configured_owner_issue: policy.owner_issue,
+      owner_resolution_source: 'rolling_freshness_policy.canonical_owner_issues',
+      canonical_owner_key: canonicalOwnerKey
+    };
+  }
+  return {
+    owner_issue: policy.owner_issue,
+    configured_owner_issue: policy.owner_issue,
+    owner_resolution_source: 'rolling_freshness_policy.owner_issue',
+    canonical_owner_key: canonicalOwnerKey
+  };
+}
+
 function applyRollingFreshnessPolicy(staleSpecs, docsCatalog) {
   const policy = normalizeRollingFreshnessPolicy(docsCatalog?.policies?.rolling_freshness_cohorts);
   if (!policy.enabled || !policy.is_valid || staleSpecs.length === 0) {
@@ -1392,17 +1417,20 @@ function applyRollingFreshnessPolicy(staleSpecs, docsCatalog) {
   }
 
   const rollingPaths = new Set(eligibleSpecs.map((entry) => entry.file));
-  const rollingCohorts = [...cohortsByKey.values()].map((entries) => ({
-    baseline_cohort_id: entries[0].baseline_cohort_id,
-    owner_issue: policy.owner_issue,
-    stale_entries: entries.length,
-    last_review: entries[0].last_review,
-    cadence_days: entries[0].cadence_days,
-    age_days: entries[0].age_days,
-    overdue_days: entries[0].overdue_days,
-    window_days: policy.window_days,
-    sample_paths: entries.slice(0, 5).map((entry) => entry.file)
-  }));
+  const rollingCohorts = [...cohortsByKey.values()].map((entries) => {
+    const first = entries[0];
+    return {
+      baseline_cohort_id: first.baseline_cohort_id,
+      ...resolveRollingCohortOwnerIssue(policy, first.baseline_cohort_id),
+      stale_entries: entries.length,
+      last_review: first.last_review,
+      cadence_days: first.cadence_days,
+      age_days: first.age_days,
+      overdue_days: first.overdue_days,
+      window_days: policy.window_days,
+      sample_paths: entries.slice(0, 5).map((entry) => entry.file)
+    };
+  });
 
   return {
     policy,
@@ -1634,6 +1662,7 @@ if (isDirectExecution()) {
 }
 
 export const specGuardInternalsForTests = {
+  canonicalOwnerKeyForBaselineCohortId,
   classifySpecPathFamily,
   detectFallbackTouchesFromDiff,
   extractMarkdownTableRows,
@@ -1641,5 +1670,6 @@ export const specGuardInternalsForTests = {
   parseFallbackDecisionRows,
   matchesDeclaredPath,
   normalizeSpecFilePath,
+  resolveRollingCohortOwnerIssue,
   validateFallbackDecisionRows
 };

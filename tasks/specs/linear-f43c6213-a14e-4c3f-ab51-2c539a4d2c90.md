@@ -11,7 +11,7 @@ related_action_plan: docs/ACTION_PLAN-linear-f43c6213-a14e-4c3f-ab51-2c539a4d2c9
 task_checklists:
   - tasks/tasks-linear-f43c6213-a14e-4c3f-ab51-2c539a4d2c90.md
 review_notes:
-  - 2026-05-16: Created from live CO-545 issue-context after shared root was verified clean current main at 4caee1d9f1b467f8e8ec63e2b54dec4e321310fd and isolated worktree `.workspaces/linear-f43c6213-a14e-4c3f-ab51-2c539a4d2c90` was created on branch `linear/co-545-clear-strict-spec-guard-baseline`.
+  - 2026-05-16: Created from live CO-545 issue-context after shared root was verified clean current main at 4caee1d9f1b467f8e8ec63e2b54dec4e321310fd and historical local worktree path .workspaces/linear-f43c6213-a14e-4c3f-ab51-2c539a4d2c90 was created on branch `linear/co-545-clear-strict-spec-guard-baseline`.
   - 2026-05-16: Pre-repair non-dry `MCP_RUNNER_TASK_ID=linear-f43c6213-a14e-4c3f-ab51-2c539a4d2c90 node scripts/spec-guard.mjs` reproduced exactly 51 Apr 14/15 stale `tasks/specs/**` rows: 1182..1213, 1219, and 18 UUID-backed `linear-*` specs.
   - 2026-05-16: Evidence review found every affected numbered row has a fully checked same-file task checklist, and every affected UUID-backed row live-resolves to Linear Done/completed; rows are reclassified inactive `done` without deleting specs, weakening `spec-guard`, or fabricating completion timestamps.
   - 2026-05-16: Post-repair `node scripts/spec-guard.mjs`, `npm run docs:check`, `git diff --check`, and diff-budget with explicit scope override passed; `npm run docs:freshness` was run and classified only broader pre-existing CO-522-owned `docs:freshness:maintain` debt.

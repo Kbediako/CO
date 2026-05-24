@@ -942,11 +942,13 @@ function isEligibleHistoricalEntry(entry, policy) {
 const NON_LIVE_POLICY_CAPACITY_REGISTRY_STATUSES = new Set([
   'archived',
   'preserved_historical_stub',
+  'retained_terminal_packet',
   'terminal_pending_archive'
 ]);
 const NON_LIVE_POLICY_CAPACITY_LIFECYCLE_STATES = new Set([
   'archived',
   'preserved_historical_stub',
+  'retained_terminal_packet',
   'terminal_pending_archive'
 ]);
 function isLivePolicyCapacityEntry(entry) {

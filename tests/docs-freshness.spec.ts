@@ -136,7 +136,10 @@ describe('docs freshness reporting', () => {
     const repoRoot = await mkdtemp(join(tmpdir(), 'docs-freshness-missing-catalog-'));
     createdDirs.push(repoRoot);
 
-    await mkdir(join(repoRoot, 'docs'), { recursive: true });
+    await Promise.all([
+      mkdir(join(repoRoot, 'docs'), { recursive: true }),
+      mkdir(join(repoRoot, 'tasks'), { recursive: true })
+    ]);
     await writeFile(join(repoRoot, 'README.md'), '# Front door\n', 'utf8');
     await writeFile(
       join(repoRoot, 'docs', 'docs-freshness-registry.json'),
@@ -171,7 +174,10 @@ describe('docs freshness reporting', () => {
     const repoRoot = await mkdtemp(join(tmpdir(), 'docs-freshness-catalog-'));
     createdDirs.push(repoRoot);
 
-    await mkdir(join(repoRoot, 'docs'), { recursive: true });
+    await Promise.all([
+      mkdir(join(repoRoot, 'docs'), { recursive: true }),
+      mkdir(join(repoRoot, 'tasks'), { recursive: true })
+    ]);
     await mkdir(join(repoRoot, 'tasks'), { recursive: true });
     await writeFile(join(repoRoot, 'README.md'), '# Front door\n', 'utf8');
     await writeFile(join(repoRoot, 'docs', 'README.md'), '# Repo guide\n', 'utf8');
@@ -238,7 +244,10 @@ describe('docs freshness reporting', () => {
     const repoRoot = await mkdtemp(join(tmpdir(), 'docs-freshness-uncatalogued-'));
     createdDirs.push(repoRoot);
 
-    await mkdir(join(repoRoot, 'docs'), { recursive: true });
+    await Promise.all([
+      mkdir(join(repoRoot, 'docs'), { recursive: true }),
+      mkdir(join(repoRoot, 'tasks'), { recursive: true })
+    ]);
     await writeFile(join(repoRoot, 'README.md'), '# Front door\n', 'utf8');
     await writeFile(join(repoRoot, 'docs', 'README.md'), '# Repo guide\n', 'utf8');
     await writeDocsFreshnessFixture(repoRoot, {
@@ -282,7 +291,10 @@ describe('docs freshness reporting', () => {
     const repoRoot = await mkdtemp(join(tmpdir(), 'docs-freshness-normalized-paths-'));
     createdDirs.push(repoRoot);
 
-    await mkdir(join(repoRoot, 'docs'), { recursive: true });
+    await Promise.all([
+      mkdir(join(repoRoot, 'docs'), { recursive: true }),
+      mkdir(join(repoRoot, 'tasks'), { recursive: true })
+    ]);
     await writeFile(join(repoRoot, 'README.md'), '# Front door\n', 'utf8');
     await writeFile(join(repoRoot, 'docs', 'README.md'), '# Repo guide\n', 'utf8');
     await writeDocsFreshnessFixture(repoRoot, {
@@ -407,6 +419,110 @@ describe('docs freshness reporting', () => {
     );
   });
 
+  it('accepts retained terminal packets without treating full packet content as archive stubs', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docs-freshness-retained-terminal-packet-'));
+    createdDirs.push(repoRoot);
+
+    const taskKey = 'linear-retained-terminal-packet';
+    const packetPath = `tasks/tasks-${taskKey}.md`;
+    await mkdir(join(repoRoot, 'tasks'), { recursive: true });
+    await writeFile(
+      join(repoRoot, packetPath),
+      '# Task Checklist\n\n- [ ] Historical unchecked item remains visible in the retained packet.\n',
+      'utf8'
+    );
+    await writeFile(
+      join(repoRoot, 'tasks', 'index.json'),
+      JSON.stringify(
+        {
+          items: [
+            {
+              id: `20260524-${taskKey}`,
+              key: taskKey,
+              status: 'done',
+              last_review: reviewDateDaysAgo(0),
+              paths: {
+                task: packetPath
+              }
+            }
+          ]
+        },
+        null,
+        2
+      ),
+      'utf8'
+    );
+    await writeDocsFreshnessFixture(repoRoot, {
+      registryEntries: [
+        {
+          path: packetPath,
+          status: 'retained_terminal_packet',
+          last_review: '2025-01-01',
+          cadence_days: 365,
+          retained_reason: 'Linear source issue is terminal; full packet retained for historical audit.'
+        }
+      ],
+      catalogPatterns: [{ glob: 'tasks/**/*.md', doc_class: 'task_packet' }]
+    });
+
+    const { report, hasFailures } = await runDocsFreshness(repoRoot, {
+      outRoot: join(repoRoot, 'out'),
+      taskId: 'fixture'
+    });
+
+    expect(hasFailures).toBe(false);
+    expect(report.totals.stale_entries).toBe(0);
+    expect(report.totals.terminal_lifecycle_entries).toBe(0);
+    expect(report.totals.retained_terminal_packet_entries).toBe(1);
+    expect(report.retained_terminal_packet_entries).toEqual([
+      expect.objectContaining({
+        path: packetPath,
+        registry_status: 'retained_terminal_packet',
+        lifecycle_state: 'retained_terminal_packet',
+        recommended_action: 'retain_terminal_packet_history',
+        retained_reason: 'Linear source issue is terminal; full packet retained for historical audit.',
+        task_key: taskKey,
+        status: 'done'
+      })
+    ]);
+  });
+
+  it('rejects retained terminal packets without terminal lifecycle evidence', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docs-freshness-retained-terminal-invalid-'));
+    createdDirs.push(repoRoot);
+
+    await mkdir(join(repoRoot, 'tasks'), { recursive: true });
+    await writeFile(join(repoRoot, 'tasks', 'tasks-active.md'), '# Active packet\n', 'utf8');
+    await writeDocsFreshnessFixture(repoRoot, {
+      registryEntries: [
+        {
+          path: 'tasks/tasks-active.md',
+          status: 'retained_terminal_packet',
+          last_review: '2025-01-01',
+          cadence_days: 365
+        }
+      ],
+      catalogPatterns: [{ glob: 'tasks/**/*.md', doc_class: 'task_packet' }]
+    });
+
+    const { report, hasFailures } = await runDocsFreshness(repoRoot, {
+      outRoot: join(repoRoot, 'out'),
+      taskId: 'fixture'
+    });
+
+    expect(hasFailures).toBe(true);
+    expect(report.invalid_entries).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          path: 'tasks/tasks-active.md',
+          issues: expect.arrayContaining([
+            'retained_terminal_packet requires terminal task lifecycle evidence'
+          ])
+        })
+      ])
+    );
+  });
+
   it('writes a class-separated markdown summary when requested', async () => {
     const repoRoot = await mkdtemp(join(tmpdir(), 'docs-freshness-summary-'));
     createdDirs.push(repoRoot);
@@ -504,7 +620,18 @@ describe('docs freshness reporting', () => {
     const repoRoot = await mkdtemp(join(tmpdir(), 'docs-freshness-rolling-cohort-'));
     createdDirs.push(repoRoot);
 
-    await writeRollingDocsFixture(repoRoot, { policy: rollingFreshnessPolicy({ canonical_owner_issues: [{ canonical_owner_key: 'fixture-owner', owner_issue: 'CO-320', require_live_owner_verification: true }] }) });
+    await writeRollingDocsFixture(repoRoot, {
+      policy: rollingFreshnessPolicy({
+        canonical_owner_issues: [
+          {
+            canonical_owner_key: 'baseline_cohort_id:fixture-rolling-baseline',
+            owner_issue: 'CO-568',
+            require_live_owner_verification: true
+          },
+          { canonical_owner_key: 'fixture-owner', owner_issue: 'CO-320', require_live_owner_verification: true }
+        ]
+      })
+    });
 
     const { report, hasFailures } = await runDocsFreshness(repoRoot, {
       outRoot: join(repoRoot, 'out'),
@@ -514,7 +641,15 @@ describe('docs freshness reporting', () => {
     expect(hasFailures).toBe(false);
     expect(report.totals.stale_entries).toBe(0);
     expect(report.totals.rolling_cohort_entries).toBe(1);
-    expect(report.rolling_freshness_policy.canonical_owner_issues[0]).toEqual(expect.objectContaining({ canonical_owner_key: 'fixture-owner', owner_issue: 'CO-320', require_live_owner_verification: true }));
+    expect(report.rolling_freshness_policy.canonical_owner_issues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          canonical_owner_key: 'baseline_cohort_id:fixture-rolling-baseline',
+          owner_issue: 'CO-568',
+          require_live_owner_verification: true
+        })
+      ])
+    );
     expect(report.rolling_cohort_entries).toEqual([
       expect.objectContaining({
         path: 'tasks/tasks-1234-example.md',
@@ -526,7 +661,10 @@ describe('docs freshness reporting', () => {
     expect(report.rolling_freshness_cohorts).toEqual([
       expect.objectContaining({
         baseline_cohort_id: 'fixture-rolling-baseline',
-        owner_issue: 'CO-175',
+        owner_issue: 'CO-568',
+        configured_owner_issue: 'CO-175',
+        canonical_owner_key: 'baseline_cohort_id:fixture-rolling-baseline',
+        owner_resolution_source: 'rolling_freshness_policy.canonical_owner_issues',
         stale_entries: 1,
         overdue_days: 1,
         lineage: expect.objectContaining({ task_number_range: '1234-1234' })
@@ -535,9 +673,343 @@ describe('docs freshness reporting', () => {
 
     const markdown = renderDocsFreshnessMarkdown(report);
     expect(markdown).toContain('## Rolling Freshness Cohorts');
-    expect(markdown).toContain('- Owner issue: CO-175');
+    expect(markdown).toContain('- Owner issue: CO-568');
     expect(markdown).toContain('- Rolling cohort entries: 1');
     expect(markdown).toContain('No drift detected across the current docs catalog.');
+  });
+
+  it('uses newer task index reviews for active task packet mirror freshness', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docs-freshness-task-index-effective-review-'));
+    createdDirs.push(repoRoot);
+    const docPath = 'docs/TECH_SPEC-linear-active-fixture.md';
+    const prdAliasPath = 'docs/PRD-active-fixture.md';
+    const taskPath = 'tasks/tasks-1234-active-fixture.md';
+    const registryReviewDate = reviewDateDaysAgo(31);
+    const taskIndexReviewDate = reviewDateDaysAgo(1);
+
+    await Promise.all([
+      mkdir(join(repoRoot, 'docs'), { recursive: true }),
+      mkdir(join(repoRoot, 'tasks'), { recursive: true })
+    ]);
+    await writeFile(join(repoRoot, docPath), '# Active task packet\n', 'utf8');
+    await writeFile(join(repoRoot, prdAliasPath), '# Active task packet PRD\n', 'utf8');
+    await writeFile(join(repoRoot, taskPath), '# Active task checklist\n', 'utf8');
+    await writeFile(
+      join(repoRoot, 'tasks', 'index.json'),
+      JSON.stringify(
+        {
+          items: [
+            {
+              id: '20260422-1234-active-fixture',
+              status: 'in_progress',
+              last_review: taskIndexReviewDate,
+              paths: {
+                docs: docPath,
+                task: taskPath
+              }
+            }
+          ]
+        },
+        null,
+        2
+      ),
+      'utf8'
+    );
+    await writeDocsFreshnessFixture(repoRoot, {
+      registryEntries: [
+        {
+          path: docPath,
+          owner: 'Codex',
+          status: 'active',
+          last_review: registryReviewDate,
+          cadence_days: 30
+        },
+        {
+          path: prdAliasPath,
+          owner: 'Codex',
+          status: 'active',
+          last_review: registryReviewDate,
+          cadence_days: 30
+        },
+        {
+          path: taskPath,
+          owner: 'Codex',
+          status: 'active',
+          last_review: taskIndexReviewDate,
+          cadence_days: 30
+        }
+      ],
+      catalogPatterns: [
+        { glob: 'docs/TECH_SPEC-*.md', doc_class: 'task_packet' },
+        { glob: 'docs/PRD-*.md', doc_class: 'task_packet' },
+        { glob: 'tasks/tasks-*.md', doc_class: 'task_packet' }
+      ]
+    });
+
+    const { report, hasFailures } = await runDocsFreshness(repoRoot, {
+      outRoot: join(repoRoot, 'out'),
+      taskId: 'fixture'
+    });
+
+    expect(hasFailures).toBe(false);
+    expect(report.totals.stale_entries).toBe(0);
+    expect(report.totals.task_index_review_overrides).toBe(2);
+    expect(report.stale_entries).toEqual([]);
+    expect(report.task_index_review_overrides).toEqual([
+      expect.objectContaining({
+        path: docPath,
+        last_review_source: 'tasks/index.json',
+        registry_last_review: registryReviewDate,
+        task_index_last_review: taskIndexReviewDate,
+        task_index_task_key: '1234-active-fixture',
+        registry_was_stale: true
+      }),
+      expect.objectContaining({
+        path: prdAliasPath,
+        last_review_source: 'tasks/index.json',
+        registry_last_review: registryReviewDate,
+        task_index_last_review: taskIndexReviewDate,
+        task_index_task_key: '1234-active-fixture',
+        registry_was_stale: true
+      })
+    ]);
+  });
+
+  it('does not use statusless task index reviews to mask stale registry rows', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docs-freshness-task-index-statusless-review-'));
+    createdDirs.push(repoRoot);
+    const docPath = 'docs/TECH_SPEC-statusless-fixture.md';
+
+    await Promise.all([
+      mkdir(join(repoRoot, 'docs'), { recursive: true }),
+      mkdir(join(repoRoot, 'tasks'), { recursive: true })
+    ]);
+    await writeFile(join(repoRoot, docPath), '# Statusless task packet\n', 'utf8');
+    await writeFile(
+      join(repoRoot, 'tasks', 'index.json'),
+      JSON.stringify(
+        {
+          items: [
+            {
+              id: '20260422-statusless-fixture',
+              last_review: reviewDateDaysAgo(1),
+              paths: { docs: docPath }
+            }
+          ]
+        },
+        null,
+        2
+      ),
+      'utf8'
+    );
+    await writeDocsFreshnessFixture(repoRoot, {
+      registryEntries: [
+        {
+          path: docPath,
+          owner: 'Codex',
+          status: 'active',
+          last_review: reviewDateDaysAgo(31),
+          cadence_days: 30
+        }
+      ],
+      catalogPatterns: [{ glob: 'docs/TECH_SPEC-*.md', doc_class: 'task_packet' }]
+    });
+
+    const { report, hasFailures } = await runDocsFreshness(repoRoot, {
+      outRoot: join(repoRoot, 'out'),
+      taskId: 'fixture'
+    });
+
+    expect(hasFailures).toBe(true);
+    expect(report.totals.task_index_review_overrides).toBe(0);
+    expect(report.stale_entries).toEqual([
+      expect.objectContaining({
+        path: docPath
+      })
+    ]);
+    expect(report.stale_entries[0]).not.toHaveProperty('last_review_source');
+  });
+
+  it('does not use shared explicit task-index paths to mask stale registry rows', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docs-freshness-task-index-primary-collision-'));
+    createdDirs.push(repoRoot);
+    const docPath = 'docs/TECH_SPEC-shared-primary-fixture.md';
+
+    await Promise.all([
+      mkdir(join(repoRoot, 'docs'), { recursive: true }),
+      mkdir(join(repoRoot, 'tasks'), { recursive: true })
+    ]);
+    await writeFile(join(repoRoot, docPath), '# Shared explicit task packet\n', 'utf8');
+    await writeFile(
+      join(repoRoot, 'tasks', 'index.json'),
+      JSON.stringify(
+        {
+          items: [
+            {
+              id: '20260422-shared-primary-a',
+              status: 'in_progress',
+              last_review: reviewDateDaysAgo(1),
+              paths: { docs: docPath }
+            },
+            {
+              id: '20260423-shared-primary-b',
+              status: 'in_progress',
+              last_review: reviewDateDaysAgo(2),
+              paths: { docs: docPath }
+            }
+          ]
+        },
+        null,
+        2
+      ),
+      'utf8'
+    );
+    await writeDocsFreshnessFixture(repoRoot, {
+      registryEntries: [
+        {
+          path: docPath,
+          owner: 'Codex',
+          status: 'active',
+          last_review: reviewDateDaysAgo(31),
+          cadence_days: 30
+        }
+      ],
+      catalogPatterns: [{ glob: 'docs/TECH_SPEC-*.md', doc_class: 'task_packet' }]
+    });
+
+    const { report, hasFailures } = await runDocsFreshness(repoRoot, {
+      outRoot: join(repoRoot, 'out'),
+      taskId: 'fixture'
+    });
+
+    expect(hasFailures).toBe(true);
+    expect(report.totals.task_index_review_overrides).toBe(0);
+    expect(report.stale_entries).toEqual([
+      expect.objectContaining({
+        path: docPath
+      })
+    ]);
+    expect(report.stale_entries[0]).not.toHaveProperty('last_review_source');
+  });
+
+  it('does not use colliding numeric task-key aliases to mask stale registry rows', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docs-freshness-task-index-alias-collision-'));
+    createdDirs.push(repoRoot);
+    const aliasPath = 'docs/PRD-shared-fixture.md';
+
+    await Promise.all([
+      mkdir(join(repoRoot, 'docs'), { recursive: true }),
+      mkdir(join(repoRoot, 'tasks'), { recursive: true })
+    ]);
+    await writeFile(join(repoRoot, aliasPath), '# Shared task packet PRD\n', 'utf8');
+    await writeFile(
+      join(repoRoot, 'tasks', 'index.json'),
+      JSON.stringify(
+        {
+          items: [
+            {
+              id: '20260422-1234-shared-fixture',
+              status: 'in_progress',
+              last_review: reviewDateDaysAgo(1)
+            },
+            {
+              id: '20260423-5678-shared-fixture',
+              status: 'in_progress',
+              last_review: reviewDateDaysAgo(2)
+            }
+          ]
+        },
+        null,
+        2
+      ),
+      'utf8'
+    );
+    await writeDocsFreshnessFixture(repoRoot, {
+      registryEntries: [
+        {
+          path: aliasPath,
+          owner: 'Codex',
+          status: 'active',
+          last_review: reviewDateDaysAgo(31),
+          cadence_days: 30
+        }
+      ],
+      catalogPatterns: [{ glob: 'docs/PRD-*.md', doc_class: 'task_packet' }]
+    });
+
+    const { report, hasFailures } = await runDocsFreshness(repoRoot, {
+      outRoot: join(repoRoot, 'out'),
+      taskId: 'fixture'
+    });
+
+    expect(hasFailures).toBe(true);
+    expect(report.totals.task_index_review_overrides).toBe(0);
+    expect(report.stale_entries).toEqual([
+      expect.objectContaining({
+        path: aliasPath
+      })
+    ]);
+    expect(report.stale_entries[0]).not.toHaveProperty('last_review_source');
+  });
+
+  it('does not use colliding terminal numeric aliases to mark unrelated packet rows terminal', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docs-freshness-terminal-alias-collision-'));
+    createdDirs.push(repoRoot);
+    const aliasPath = 'docs/PRD-shared-terminal-fixture.md';
+
+    await Promise.all([
+      mkdir(join(repoRoot, 'docs'), { recursive: true }),
+      mkdir(join(repoRoot, 'tasks'), { recursive: true })
+    ]);
+    await writeFile(join(repoRoot, aliasPath), '# Shared terminal packet PRD\n', 'utf8');
+    await writeFile(
+      join(repoRoot, 'tasks', 'index.json'),
+      JSON.stringify(
+        {
+          items: [
+            {
+              id: '20260422-1234-shared-terminal-fixture',
+              status: 'done',
+              completed_at: reviewDateDaysAgo(1)
+            },
+            {
+              id: '20260423-5678-shared-terminal-fixture',
+              status: 'done',
+              completed_at: reviewDateDaysAgo(2)
+            }
+          ]
+        },
+        null,
+        2
+      ),
+      'utf8'
+    );
+    await writeDocsFreshnessFixture(repoRoot, {
+      registryEntries: [
+        {
+          path: aliasPath,
+          owner: 'Codex',
+          status: 'active',
+          last_review: reviewDateDaysAgo(31),
+          cadence_days: 30
+        }
+      ],
+      catalogPatterns: [{ glob: 'docs/PRD-*.md', doc_class: 'task_packet' }]
+    });
+
+    const { report, hasFailures } = await runDocsFreshness(repoRoot, {
+      outRoot: join(repoRoot, 'out'),
+      taskId: 'fixture'
+    });
+
+    expect(hasFailures).toBe(true);
+    expect(report.totals.terminal_lifecycle_entries).toBe(0);
+    expect(report.totals.stale_entries).toBe(1);
+    expect(report.stale_entries).toEqual([
+      expect.objectContaining({
+        path: aliasPath
+      })
+    ]);
   });
 
   it('keeps non-eligible stale docs as blocking failures when rolling cohorts are enabled', async () => {

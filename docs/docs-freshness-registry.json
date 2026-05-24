@@ -1,7 +1,109 @@
 {
   "version": 1,
-  "generated_at": "2026-05-22",
+  "generated_at": "2026-05-24",
   "entries": [
+    {
+      "path": ".agent/task/linear-5634bf98-fe59-41f5-8623-60c9ef0b2993.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-24",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "5634bf98-fe59-41f5-8623-60c9ef0b2993",
+        "identifier": "CO-579",
+        "url": "https://linear.app/asabeko/issue/CO-579"
+      },
+      "doc_class": "task_mirror",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-24",
+      "next_review": "2026-06-23",
+      "notes": "CO-579 docs-first packet for replacing terminal CO-575 as docs:freshness:maintain global owner."
+    },
+    {
+      "path": "docs/ACTION_PLAN-linear-5634bf98-fe59-41f5-8623-60c9ef0b2993.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-24",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "5634bf98-fe59-41f5-8623-60c9ef0b2993",
+        "identifier": "CO-579",
+        "url": "https://linear.app/asabeko/issue/CO-579"
+      },
+      "doc_class": "task_packet",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-24",
+      "next_review": "2026-06-23",
+      "notes": "CO-579 docs-first packet for replacing terminal CO-575 as docs:freshness:maintain global owner."
+    },
+    {
+      "path": "docs/PRD-linear-5634bf98-fe59-41f5-8623-60c9ef0b2993.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-24",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "5634bf98-fe59-41f5-8623-60c9ef0b2993",
+        "identifier": "CO-579",
+        "url": "https://linear.app/asabeko/issue/CO-579"
+      },
+      "doc_class": "task_packet",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-24",
+      "next_review": "2026-06-23",
+      "notes": "CO-579 docs-first packet for replacing terminal CO-575 as docs:freshness:maintain global owner."
+    },
+    {
+      "path": "docs/TECH_SPEC-linear-5634bf98-fe59-41f5-8623-60c9ef0b2993.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-24",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "5634bf98-fe59-41f5-8623-60c9ef0b2993",
+        "identifier": "CO-579",
+        "url": "https://linear.app/asabeko/issue/CO-579"
+      },
+      "doc_class": "task_packet",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-24",
+      "next_review": "2026-06-23",
+      "notes": "CO-579 docs-first packet for replacing terminal CO-575 as docs:freshness:maintain global owner."
+    },
+    {
+      "path": "tasks/specs/linear-5634bf98-fe59-41f5-8623-60c9ef0b2993.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-24",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "5634bf98-fe59-41f5-8623-60c9ef0b2993",
+        "identifier": "CO-579",
+        "url": "https://linear.app/asabeko/issue/CO-579"
+      },
+      "doc_class": "active_spec",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-24",
+      "next_review": "2026-06-23",
+      "notes": "CO-579 docs-first packet for replacing terminal CO-575 as docs:freshness:maintain global owner."
+    },
+    {
+      "path": "tasks/tasks-linear-5634bf98-fe59-41f5-8623-60c9ef0b2993.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-24",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "5634bf98-fe59-41f5-8623-60c9ef0b2993",
+        "identifier": "CO-579",
+        "url": "https://linear.app/asabeko/issue/CO-579"
+      },
+      "doc_class": "task_mirror",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-24",
+      "next_review": "2026-06-23",
+      "notes": "CO-579 docs-first packet for replacing terminal CO-575 as docs:freshness:maintain global owner."
+    },
     {
       "path": ".agent/task/linear-7847b2be-ae34-4256-977f-f2c291f31938.md",
       "owner": "Codex (top-level agent), Review agent",
@@ -3811,9 +3913,11 @@
     {
       "path": ".agent/task/linear-033979b5-6903-4d5f-9c9b-41769aa69330.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-30",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-24",
+      "cadence_days": 365,
+      "notes": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-447 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract.",
+      "retained_reason": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-447 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract."
     },
     {
       "path": ".agent/task/linear-0354e9d0-84ee-4340-b098-a9c685c191b5.md",
@@ -4148,9 +4252,11 @@
     {
       "path": ".agent/task/linear-213f6858-ab77-40b9-b80a-f5e5bdde4b37.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-03",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-24",
+      "cadence_days": 365,
+      "notes": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-450 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract.",
+      "retained_reason": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-450 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract."
     },
     {
       "path": ".agent/task/linear-217c6584-bb47-486a-9765-f24e8ed84fc0.md",
@@ -4320,9 +4426,11 @@
     {
       "path": ".agent/task/linear-345cd50c-4962-4376-a7ca-1982ba311699.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-30",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-24",
+      "cadence_days": 365,
+      "notes": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-445 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract.",
+      "retained_reason": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-445 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract."
     },
     {
       "path": ".agent/task/linear-34b60caa-258b-4f18-8d67-cdad3f6352cf.md",
@@ -4726,9 +4834,11 @@
     {
       "path": ".agent/task/linear-552f2825-b9e0-4f14-afe0-21b072aa9bb5.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-30",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-24",
+      "cadence_days": 365,
+      "notes": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-446 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract.",
+      "retained_reason": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-446 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract."
     },
     {
       "path": ".agent/task/linear-5561a9a9-39dd-4ed4-99a0-896553327669.md",
@@ -4768,9 +4878,11 @@
     {
       "path": ".agent/task/linear-590e4e09-315a-4957-bb72-66b8322e86a6.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-01",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-24",
+      "cadence_days": 365,
+      "notes": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-472 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract.",
+      "retained_reason": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-472 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract."
     },
     {
       "path": ".agent/task/linear-59a75110-93e5-42f4-a2d2-31dcde884c91.md",
@@ -4811,9 +4923,11 @@
     {
       "path": ".agent/task/linear-5d677c44-06c1-43ca-9aac-5a74f96671b4.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-30",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-24",
+      "cadence_days": 365,
+      "notes": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-431 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract.",
+      "retained_reason": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-431 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract."
     },
     {
       "path": ".agent/task/linear-5d882b0c-d553-4d63-8d62-6f973090a13c.md",
@@ -5018,16 +5132,20 @@
     {
       "path": ".agent/task/linear-6d7e842c-b10a-42f5-a7e0-8a30a8dd9442.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-01",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-24",
+      "cadence_days": 365,
+      "notes": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-468 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract.",
+      "retained_reason": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-468 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract."
     },
     {
       "path": ".agent/task/linear-6df648e0-4a48-45a2-bdd3-aeaa9c1deb2b.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-30",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-24",
+      "cadence_days": 365,
+      "notes": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-444 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract.",
+      "retained_reason": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-444 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract."
     },
     {
       "path": ".agent/task/linear-6dfd5b1c-ee27-46e4-b31c-7742ea3bdaa3.md",
@@ -5299,9 +5417,11 @@
     {
       "path": ".agent/task/linear-8098459b-be08-4f9f-8e45-bd315fb4c9b9.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-30",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-24",
+      "cadence_days": 365,
+      "notes": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-408 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract.",
+      "retained_reason": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-408 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract."
     },
     {
       "path": ".agent/task/linear-80d4473e-e9c7-4d4d-9340-bc1193103a7d.md",
@@ -5672,9 +5792,11 @@
     {
       "path": ".agent/task/linear-9aedac3e-09df-4859-b818-b6f2d4dc8ccc.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-01",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-24",
+      "cadence_days": 365,
+      "notes": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-454 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract.",
+      "retained_reason": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-454 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract."
     },
     {
       "path": ".agent/task/linear-9b1440f0-a3af-4863-8bb5-2f8ea78bd02d.md",
@@ -6142,9 +6264,11 @@
     {
       "path": ".agent/task/linear-b78c98eb-8ed4-4e19-9099-81d5e34bb33c.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-30",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-24",
+      "cadence_days": 365,
+      "notes": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-430 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract.",
+      "retained_reason": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-430 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract."
     },
     {
       "path": ".agent/task/linear-b792b517-98e4-4518-9fb2-860996dd62c8.md",
@@ -6202,16 +6326,20 @@
     {
       "path": ".agent/task/linear-b9a1044e-03b0-49ef-8435-92840eaf90b9.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-30",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-24",
+      "cadence_days": 365,
+      "notes": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-429 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract.",
+      "retained_reason": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-429 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract."
     },
     {
       "path": ".agent/task/linear-b9e7583a-3051-40d3-a87f-0388faa9df61.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-30",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-24",
+      "cadence_days": 365,
+      "notes": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-441 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract.",
+      "retained_reason": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-441 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract."
     },
     {
       "path": ".agent/task/linear-bb472787-be60-44e3-ac83-a3c297dab470.md",
@@ -6244,9 +6372,11 @@
     {
       "path": ".agent/task/linear-bdfd9046-97b5-43bd-850f-b305558cdada.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-01",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-24",
+      "cadence_days": 365,
+      "notes": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-466 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract.",
+      "retained_reason": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-466 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract."
     },
     {
       "path": ".agent/task/linear-bea56fb8-c601-4554-8ece-0a63c5fd34bc.md",
@@ -6567,9 +6697,11 @@
     {
       "path": ".agent/task/linear-d412792b-9a2a-43d9-96dc-ca021e728d09.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-01",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-24",
+      "cadence_days": 365,
+      "notes": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-452 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract.",
+      "retained_reason": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-452 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract."
     },
     {
       "path": ".agent/task/linear-d43b6785-88d6-442b-a34e-2ad19d4f723a.md",
@@ -6588,16 +6720,20 @@
     {
       "path": ".agent/task/linear-d536879d-3ddc-47b0-ae37-0ab657af18ba.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-01",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-24",
+      "cadence_days": 365,
+      "notes": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-459 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract.",
+      "retained_reason": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-459 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract."
     },
     {
       "path": ".agent/task/linear-d78c6860-93f6-4936-b3ad-b40e8de8a566.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-30",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-24",
+      "cadence_days": 365,
+      "notes": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-427 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract.",
+      "retained_reason": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-427 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract."
     },
     {
       "path": ".agent/task/linear-d9c8d1b2-3b38-42ef-9087-556870e2d88f.md",
@@ -6665,9 +6801,11 @@
     {
       "path": ".agent/task/linear-dc2bb702-db1d-450c-be19-a98571289a21.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-30",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-24",
+      "cadence_days": 365,
+      "notes": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-428 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract.",
+      "retained_reason": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-428 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract."
     },
     {
       "path": ".agent/task/linear-dcfbd1cc-2b22-41dc-94c6-ce00c38258a2.md",
@@ -6952,9 +7090,11 @@
     {
       "path": ".agent/task/linear-f57f28e8-e876-4bff-9217-fc5e17ee030f.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-01",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-24",
+      "cadence_days": 365,
+      "notes": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-458 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract.",
+      "retained_reason": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-458 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract."
     },
     {
       "path": ".agent/task/linear-f667a32d-b8db-4717-8565-429409026f92.md",
@@ -10268,9 +10408,11 @@
     {
       "path": "docs/ACTION_PLAN-linear-033979b5-6903-4d5f-9c9b-41769aa69330.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-30",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-24",
+      "cadence_days": 365,
+      "notes": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-447 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract.",
+      "retained_reason": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-447 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract."
     },
     {
       "path": "docs/ACTION_PLAN-linear-0354e9d0-84ee-4340-b098-a9c685c191b5.md",
@@ -10298,7 +10440,7 @@
       "path": "docs/ACTION_PLAN-linear-0549b4a2-release-publish-workflow-fix.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-04-23",
+      "last_review": "2026-05-24",
       "cadence_days": 30
     },
     {
@@ -10619,9 +10761,11 @@
     {
       "path": "docs/ACTION_PLAN-linear-213f6858-ab77-40b9-b80a-f5e5bdde4b37.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-03",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-24",
+      "cadence_days": 365,
+      "notes": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-450 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract.",
+      "retained_reason": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-450 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract."
     },
     {
       "path": "docs/ACTION_PLAN-linear-217c6584-bb47-486a-9765-f24e8ed84fc0.md",
@@ -10791,9 +10935,11 @@
     {
       "path": "docs/ACTION_PLAN-linear-345cd50c-4962-4376-a7ca-1982ba311699.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-30",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-24",
+      "cadence_days": 365,
+      "notes": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-445 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract.",
+      "retained_reason": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-445 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract."
     },
     {
       "path": "docs/ACTION_PLAN-linear-34b60caa-258b-4f18-8d67-cdad3f6352cf.md",
@@ -10913,9 +11059,11 @@
     {
       "path": "docs/ACTION_PLAN-linear-3ed4e0c0-4a6a-428b-bf31-d6252f230377.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-30",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-24",
+      "cadence_days": 365,
+      "notes": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-443 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract.",
+      "retained_reason": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-443 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract."
     },
     {
       "path": "docs/ACTION_PLAN-linear-3f7dfd9d-e6dc-4e79-bd56-a2786a15c277.md",
@@ -11204,9 +11352,11 @@
     {
       "path": "docs/ACTION_PLAN-linear-552f2825-b9e0-4f14-afe0-21b072aa9bb5.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-30",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-24",
+      "cadence_days": 365,
+      "notes": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-446 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract.",
+      "retained_reason": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-446 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract."
     },
     {
       "path": "docs/ACTION_PLAN-linear-5561a9a9-39dd-4ed4-99a0-896553327669.md",
@@ -11246,9 +11396,11 @@
     {
       "path": "docs/ACTION_PLAN-linear-590e4e09-315a-4957-bb72-66b8322e86a6.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-01",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-24",
+      "cadence_days": 365,
+      "notes": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-472 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract.",
+      "retained_reason": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-472 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract."
     },
     {
       "path": "docs/ACTION_PLAN-linear-59a75110-93e5-42f4-a2d2-31dcde884c91.md",
@@ -11289,9 +11441,11 @@
     {
       "path": "docs/ACTION_PLAN-linear-5d677c44-06c1-43ca-9aac-5a74f96671b4.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-30",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-24",
+      "cadence_days": 365,
+      "notes": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-431 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract.",
+      "retained_reason": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-431 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract."
     },
     {
       "path": "docs/ACTION_PLAN-linear-5d882b0c-d553-4d63-8d62-6f973090a13c.md",
@@ -11503,16 +11657,20 @@
     {
       "path": "docs/ACTION_PLAN-linear-6d7e842c-b10a-42f5-a7e0-8a30a8dd9442.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-01",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-24",
+      "cadence_days": 365,
+      "notes": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-468 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract.",
+      "retained_reason": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-468 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract."
     },
     {
       "path": "docs/ACTION_PLAN-linear-6df648e0-4a48-45a2-bdd3-aeaa9c1deb2b.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-30",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-24",
+      "cadence_days": 365,
+      "notes": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-444 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract.",
+      "retained_reason": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-444 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract."
     },
     {
       "path": "docs/ACTION_PLAN-linear-6dfd5b1c-ee27-46e4-b31c-7742ea3bdaa3.md",
@@ -11665,7 +11823,7 @@
       "path": "docs/ACTION_PLAN-linear-75a26ef8-4cb7-4b6e-9335-85edae0fd9be.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-04-23",
+      "last_review": "2026-05-24",
       "cadence_days": 30
     },
     {
@@ -11784,9 +11942,11 @@
     {
       "path": "docs/ACTION_PLAN-linear-8098459b-be08-4f9f-8e45-bd315fb4c9b9.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-30",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-24",
+      "cadence_days": 365,
+      "notes": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-408 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract.",
+      "retained_reason": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-408 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract."
     },
     {
       "path": "docs/ACTION_PLAN-linear-80d4473e-e9c7-4d4d-9340-bc1193103a7d.md",
@@ -11927,9 +12087,11 @@
     {
       "path": "docs/ACTION_PLAN-linear-8bd36e2e-2e54-4c8d-ae79-7b1319fc6adc.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-01",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-24",
+      "cadence_days": 365,
+      "notes": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-461 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract.",
+      "retained_reason": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-461 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract."
     },
     {
       "path": "docs/ACTION_PLAN-linear-8c691f55-5277-443a-b5dd-1f3f548b1b6d.md",
@@ -12178,9 +12340,11 @@
     {
       "path": "docs/ACTION_PLAN-linear-9aedac3e-09df-4859-b818-b6f2d4dc8ccc.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-01",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-24",
+      "cadence_days": 365,
+      "notes": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-454 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract.",
+      "retained_reason": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-454 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract."
     },
     {
       "path": "docs/ACTION_PLAN-linear-9b1440f0-a3af-4863-8bb5-2f8ea78bd02d.md",
@@ -12224,7 +12388,7 @@
       "path": "docs/ACTION_PLAN-linear-9d8bb7c9-3ca1-422e-9cdf-ef90a4fbe7b7.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-04-23",
+      "last_review": "2026-05-24",
       "cadence_days": 30
     },
     {
@@ -12648,9 +12812,11 @@
     {
       "path": "docs/ACTION_PLAN-linear-b78c98eb-8ed4-4e19-9099-81d5e34bb33c.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-30",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-24",
+      "cadence_days": 365,
+      "notes": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-430 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract.",
+      "retained_reason": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-430 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract."
     },
     {
       "path": "docs/ACTION_PLAN-linear-b792b517-98e4-4518-9fb2-860996dd62c8.md",
@@ -12708,16 +12874,20 @@
     {
       "path": "docs/ACTION_PLAN-linear-b9a1044e-03b0-49ef-8435-92840eaf90b9.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-30",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-24",
+      "cadence_days": 365,
+      "notes": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-429 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract.",
+      "retained_reason": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-429 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract."
     },
     {
       "path": "docs/ACTION_PLAN-linear-b9e7583a-3051-40d3-a87f-0388faa9df61.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-30",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-24",
+      "cadence_days": 365,
+      "notes": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-441 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract.",
+      "retained_reason": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-441 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract."
     },
     {
       "path": "docs/ACTION_PLAN-linear-ba9a1c35-c8d1-4b76-aa33-4937502d1964.md",
@@ -12760,9 +12930,11 @@
     {
       "path": "docs/ACTION_PLAN-linear-bdfd9046-97b5-43bd-850f-b305558cdada.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-01",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-24",
+      "cadence_days": 365,
+      "notes": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-466 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract.",
+      "retained_reason": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-466 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract."
     },
     {
       "path": "docs/ACTION_PLAN-linear-bea56fb8-c601-4554-8ece-0a63c5fd34bc.md",
@@ -13076,9 +13248,11 @@
     {
       "path": "docs/ACTION_PLAN-linear-d412792b-9a2a-43d9-96dc-ca021e728d09.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-01",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-24",
+      "cadence_days": 365,
+      "notes": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-452 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract.",
+      "retained_reason": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-452 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract."
     },
     {
       "path": "docs/ACTION_PLAN-linear-d43b6785-88d6-442b-a34e-2ad19d4f723a.md",
@@ -13097,16 +13271,20 @@
     {
       "path": "docs/ACTION_PLAN-linear-d536879d-3ddc-47b0-ae37-0ab657af18ba.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-01",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-24",
+      "cadence_days": 365,
+      "notes": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-459 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract.",
+      "retained_reason": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-459 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract."
     },
     {
       "path": "docs/ACTION_PLAN-linear-d78c6860-93f6-4936-b3ad-b40e8de8a566.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-30",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-24",
+      "cadence_days": 365,
+      "notes": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-427 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract.",
+      "retained_reason": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-427 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract."
     },
     {
       "path": "docs/ACTION_PLAN-linear-d9c8d1b2-3b38-42ef-9087-556870e2d88f.md",
@@ -13181,9 +13359,11 @@
     {
       "path": "docs/ACTION_PLAN-linear-dc2bb702-db1d-450c-be19-a98571289a21.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-30",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-24",
+      "cadence_days": 365,
+      "notes": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-428 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract.",
+      "retained_reason": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-428 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract."
     },
     {
       "path": "docs/ACTION_PLAN-linear-dcfbd1cc-2b22-41dc-94c6-ce00c38258a2.md",
@@ -13461,9 +13641,11 @@
     {
       "path": "docs/ACTION_PLAN-linear-f57f28e8-e876-4bff-9217-fc5e17ee030f.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-01",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-24",
+      "cadence_days": 365,
+      "notes": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-458 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract.",
+      "retained_reason": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-458 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract."
     },
     {
       "path": "docs/ACTION_PLAN-linear-f667a32d-b8db-4717-8565-429409026f92.md",
@@ -16780,9 +16962,9 @@
     {
       "path": "docs/findings/linear-47c4ff7d-ff57-44b6-9bcd-d09640be140a-docs-freshness-classification.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-22",
-      "cadence_days": 30
+      "status": "archived",
+      "last_review": "2026-05-18",
+      "cadence_days": 365
     },
     {
       "path": "docs/findings/linear-5348c2fb-8897-48e3-a848-7831778b1b00-docs-freshness-classification.md",
@@ -20095,9 +20277,11 @@
     {
       "path": "docs/PRD-linear-033979b5-6903-4d5f-9c9b-41769aa69330.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-30",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-24",
+      "cadence_days": 365,
+      "notes": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-447 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract.",
+      "retained_reason": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-447 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract."
     },
     {
       "path": "docs/PRD-linear-0354e9d0-84ee-4340-b098-a9c685c191b5.md",
@@ -20125,7 +20309,7 @@
       "path": "docs/PRD-linear-0549b4a2-release-publish-workflow-fix.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-04-23",
+      "last_review": "2026-05-24",
       "cadence_days": 30
     },
     {
@@ -20446,9 +20630,11 @@
     {
       "path": "docs/PRD-linear-213f6858-ab77-40b9-b80a-f5e5bdde4b37.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-03",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-24",
+      "cadence_days": 365,
+      "notes": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-450 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract.",
+      "retained_reason": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-450 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract."
     },
     {
       "path": "docs/PRD-linear-217c6584-bb47-486a-9765-f24e8ed84fc0.md",
@@ -20618,9 +20804,11 @@
     {
       "path": "docs/PRD-linear-345cd50c-4962-4376-a7ca-1982ba311699.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-30",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-24",
+      "cadence_days": 365,
+      "notes": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-445 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract.",
+      "retained_reason": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-445 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract."
     },
     {
       "path": "docs/PRD-linear-34b60caa-258b-4f18-8d67-cdad3f6352cf.md",
@@ -20740,9 +20928,11 @@
     {
       "path": "docs/PRD-linear-3ed4e0c0-4a6a-428b-bf31-d6252f230377.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-30",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-24",
+      "cadence_days": 365,
+      "notes": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-443 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract.",
+      "retained_reason": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-443 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract."
     },
     {
       "path": "docs/PRD-linear-3f7dfd9d-e6dc-4e79-bd56-a2786a15c277.md",
@@ -21031,9 +21221,11 @@
     {
       "path": "docs/PRD-linear-552f2825-b9e0-4f14-afe0-21b072aa9bb5.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-30",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-24",
+      "cadence_days": 365,
+      "notes": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-446 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract.",
+      "retained_reason": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-446 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract."
     },
     {
       "path": "docs/PRD-linear-5561a9a9-39dd-4ed4-99a0-896553327669.md",
@@ -21073,9 +21265,11 @@
     {
       "path": "docs/PRD-linear-590e4e09-315a-4957-bb72-66b8322e86a6.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-01",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-24",
+      "cadence_days": 365,
+      "notes": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-472 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract.",
+      "retained_reason": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-472 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract."
     },
     {
       "path": "docs/PRD-linear-59a75110-93e5-42f4-a2d2-31dcde884c91.md",
@@ -21116,9 +21310,11 @@
     {
       "path": "docs/PRD-linear-5d677c44-06c1-43ca-9aac-5a74f96671b4.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-30",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-24",
+      "cadence_days": 365,
+      "notes": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-431 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract.",
+      "retained_reason": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-431 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract."
     },
     {
       "path": "docs/PRD-linear-5d882b0c-d553-4d63-8d62-6f973090a13c.md",
@@ -21330,16 +21526,20 @@
     {
       "path": "docs/PRD-linear-6d7e842c-b10a-42f5-a7e0-8a30a8dd9442.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-01",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-24",
+      "cadence_days": 365,
+      "notes": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-468 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract.",
+      "retained_reason": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-468 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract."
     },
     {
       "path": "docs/PRD-linear-6df648e0-4a48-45a2-bdd3-aeaa9c1deb2b.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-30",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-24",
+      "cadence_days": 365,
+      "notes": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-444 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract.",
+      "retained_reason": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-444 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract."
     },
     {
       "path": "docs/PRD-linear-6dfd5b1c-ee27-46e4-b31c-7742ea3bdaa3.md",
@@ -21611,9 +21811,11 @@
     {
       "path": "docs/PRD-linear-8098459b-be08-4f9f-8e45-bd315fb4c9b9.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-30",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-24",
+      "cadence_days": 365,
+      "notes": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-408 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract.",
+      "retained_reason": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-408 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract."
     },
     {
       "path": "docs/PRD-linear-80d4473e-e9c7-4d4d-9340-bc1193103a7d.md",
@@ -21754,9 +21956,11 @@
     {
       "path": "docs/PRD-linear-8bd36e2e-2e54-4c8d-ae79-7b1319fc6adc.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-01",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-24",
+      "cadence_days": 365,
+      "notes": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-461 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract.",
+      "retained_reason": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-461 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract."
     },
     {
       "path": "docs/PRD-linear-8c691f55-5277-443a-b5dd-1f3f548b1b6d.md",
@@ -21990,9 +22194,11 @@
     {
       "path": "docs/PRD-linear-9aedac3e-09df-4859-b818-b6f2d4dc8ccc.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-01",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-24",
+      "cadence_days": 365,
+      "notes": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-454 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract.",
+      "retained_reason": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-454 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract."
     },
     {
       "path": "docs/PRD-linear-9b1440f0-a3af-4863-8bb5-2f8ea78bd02d.md",
@@ -22461,9 +22667,11 @@
     {
       "path": "docs/PRD-linear-b78c98eb-8ed4-4e19-9099-81d5e34bb33c.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-30",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-24",
+      "cadence_days": 365,
+      "notes": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-430 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract.",
+      "retained_reason": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-430 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract."
     },
     {
       "path": "docs/PRD-linear-b792b517-98e4-4518-9fb2-860996dd62c8.md",
@@ -22521,16 +22729,20 @@
     {
       "path": "docs/PRD-linear-b9a1044e-03b0-49ef-8435-92840eaf90b9.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-30",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-24",
+      "cadence_days": 365,
+      "notes": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-429 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract.",
+      "retained_reason": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-429 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract."
     },
     {
       "path": "docs/PRD-linear-b9e7583a-3051-40d3-a87f-0388faa9df61.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-30",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-24",
+      "cadence_days": 365,
+      "notes": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-441 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract.",
+      "retained_reason": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-441 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract."
     },
     {
       "path": "docs/PRD-linear-ba9a1c35-c8d1-4b76-aa33-4937502d1964.md",
@@ -22573,9 +22785,11 @@
     {
       "path": "docs/PRD-linear-bdfd9046-97b5-43bd-850f-b305558cdada.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-01",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-24",
+      "cadence_days": 365,
+      "notes": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-466 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract.",
+      "retained_reason": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-466 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract."
     },
     {
       "path": "docs/PRD-linear-bea56fb8-c601-4554-8ece-0a63c5fd34bc.md",
@@ -22889,9 +23103,11 @@
     {
       "path": "docs/PRD-linear-d412792b-9a2a-43d9-96dc-ca021e728d09.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-01",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-24",
+      "cadence_days": 365,
+      "notes": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-452 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract.",
+      "retained_reason": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-452 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract."
     },
     {
       "path": "docs/PRD-linear-d43b6785-88d6-442b-a34e-2ad19d4f723a.md",
@@ -22910,16 +23126,20 @@
     {
       "path": "docs/PRD-linear-d536879d-3ddc-47b0-ae37-0ab657af18ba.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-01",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-24",
+      "cadence_days": 365,
+      "notes": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-459 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract.",
+      "retained_reason": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-459 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract."
     },
     {
       "path": "docs/PRD-linear-d78c6860-93f6-4936-b3ad-b40e8de8a566.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-30",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-24",
+      "cadence_days": 365,
+      "notes": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-427 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract.",
+      "retained_reason": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-427 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract."
     },
     {
       "path": "docs/PRD-linear-d9c8d1b2-3b38-42ef-9087-556870e2d88f.md",
@@ -22994,9 +23214,11 @@
     {
       "path": "docs/PRD-linear-dc2bb702-db1d-450c-be19-a98571289a21.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-30",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-24",
+      "cadence_days": 365,
+      "notes": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-428 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract.",
+      "retained_reason": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-428 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract."
     },
     {
       "path": "docs/PRD-linear-dcfbd1cc-2b22-41dc-94c6-ce00c38258a2.md",
@@ -23274,9 +23496,11 @@
     {
       "path": "docs/PRD-linear-f57f28e8-e876-4bff-9217-fc5e17ee030f.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-01",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-24",
+      "cadence_days": 365,
+      "notes": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-458 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract.",
+      "retained_reason": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-458 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract."
     },
     {
       "path": "docs/PRD-linear-f667a32d-b8db-4717-8565-429409026f92.md",
@@ -26990,9 +27214,11 @@
     {
       "path": "docs/TECH_SPEC-linear-033979b5-6903-4d5f-9c9b-41769aa69330.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-30",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-24",
+      "cadence_days": 365,
+      "notes": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-447 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract.",
+      "retained_reason": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-447 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract."
     },
     {
       "path": "docs/TECH_SPEC-linear-0354e9d0-84ee-4340-b098-a9c685c191b5.md",
@@ -27020,7 +27246,7 @@
       "path": "docs/TECH_SPEC-linear-0549b4a2-release-publish-workflow-fix.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-04-23",
+      "last_review": "2026-05-24",
       "cadence_days": 30
     },
     {
@@ -27334,9 +27560,11 @@
     {
       "path": "docs/TECH_SPEC-linear-213f6858-ab77-40b9-b80a-f5e5bdde4b37.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-03",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-24",
+      "cadence_days": 365,
+      "notes": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-450 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract.",
+      "retained_reason": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-450 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract."
     },
     {
       "path": "docs/TECH_SPEC-linear-217c6584-bb47-486a-9765-f24e8ed84fc0.md",
@@ -27506,9 +27734,11 @@
     {
       "path": "docs/TECH_SPEC-linear-345cd50c-4962-4376-a7ca-1982ba311699.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-30",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-24",
+      "cadence_days": 365,
+      "notes": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-445 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract.",
+      "retained_reason": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-445 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract."
     },
     {
       "path": "docs/TECH_SPEC-linear-34b60caa-258b-4f18-8d67-cdad3f6352cf.md",
@@ -27628,9 +27858,11 @@
     {
       "path": "docs/TECH_SPEC-linear-3ed4e0c0-4a6a-428b-bf31-d6252f230377.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-30",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-24",
+      "cadence_days": 365,
+      "notes": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-443 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract.",
+      "retained_reason": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-443 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract."
     },
     {
       "path": "docs/TECH_SPEC-linear-3f7dfd9d-e6dc-4e79-bd56-a2786a15c277.md",
@@ -27912,9 +28144,11 @@
     {
       "path": "docs/TECH_SPEC-linear-552f2825-b9e0-4f14-afe0-21b072aa9bb5.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-30",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-24",
+      "cadence_days": 365,
+      "notes": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-446 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract.",
+      "retained_reason": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-446 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract."
     },
     {
       "path": "docs/TECH_SPEC-linear-5561a9a9-39dd-4ed4-99a0-896553327669.md",
@@ -27954,9 +28188,11 @@
     {
       "path": "docs/TECH_SPEC-linear-590e4e09-315a-4957-bb72-66b8322e86a6.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-01",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-24",
+      "cadence_days": 365,
+      "notes": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-472 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract.",
+      "retained_reason": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-472 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract."
     },
     {
       "path": "docs/TECH_SPEC-linear-59a75110-93e5-42f4-a2d2-31dcde884c91.md",
@@ -27997,9 +28233,11 @@
     {
       "path": "docs/TECH_SPEC-linear-5d677c44-06c1-43ca-9aac-5a74f96671b4.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-30",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-24",
+      "cadence_days": 365,
+      "notes": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-431 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract.",
+      "retained_reason": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-431 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract."
     },
     {
       "path": "docs/TECH_SPEC-linear-5d882b0c-d553-4d63-8d62-6f973090a13c.md",
@@ -28190,16 +28428,20 @@
     {
       "path": "docs/TECH_SPEC-linear-6d7e842c-b10a-42f5-a7e0-8a30a8dd9442.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-01",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-24",
+      "cadence_days": 365,
+      "notes": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-468 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract.",
+      "retained_reason": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-468 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract."
     },
     {
       "path": "docs/TECH_SPEC-linear-6df648e0-4a48-45a2-bdd3-aeaa9c1deb2b.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-30",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-24",
+      "cadence_days": 365,
+      "notes": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-444 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract.",
+      "retained_reason": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-444 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract."
     },
     {
       "path": "docs/TECH_SPEC-linear-6dfd5b1c-ee27-46e4-b31c-7742ea3bdaa3.md",
@@ -28471,9 +28713,11 @@
     {
       "path": "docs/TECH_SPEC-linear-8098459b-be08-4f9f-8e45-bd315fb4c9b9.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-30",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-24",
+      "cadence_days": 365,
+      "notes": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-408 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract.",
+      "retained_reason": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-408 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract."
     },
     {
       "path": "docs/TECH_SPEC-linear-80d4473e-e9c7-4d4d-9340-bc1193103a7d.md",
@@ -28614,9 +28858,11 @@
     {
       "path": "docs/TECH_SPEC-linear-8bd36e2e-2e54-4c8d-ae79-7b1319fc6adc.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-01",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-24",
+      "cadence_days": 365,
+      "notes": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-461 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract.",
+      "retained_reason": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-461 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract."
     },
     {
       "path": "docs/TECH_SPEC-linear-8c691f55-5277-443a-b5dd-1f3f548b1b6d.md",
@@ -28843,9 +29089,11 @@
     {
       "path": "docs/TECH_SPEC-linear-9aedac3e-09df-4859-b818-b6f2d4dc8ccc.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-01",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-24",
+      "cadence_days": 365,
+      "notes": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-454 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract.",
+      "retained_reason": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-454 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract."
     },
     {
       "path": "docs/TECH_SPEC-linear-9b1440f0-a3af-4863-8bb5-2f8ea78bd02d.md",
@@ -29313,9 +29561,11 @@
     {
       "path": "docs/TECH_SPEC-linear-b78c98eb-8ed4-4e19-9099-81d5e34bb33c.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-30",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-24",
+      "cadence_days": 365,
+      "notes": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-430 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract.",
+      "retained_reason": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-430 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract."
     },
     {
       "path": "docs/TECH_SPEC-linear-b792b517-98e4-4518-9fb2-860996dd62c8.md",
@@ -29373,16 +29623,20 @@
     {
       "path": "docs/TECH_SPEC-linear-b9a1044e-03b0-49ef-8435-92840eaf90b9.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-30",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-24",
+      "cadence_days": 365,
+      "notes": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-429 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract.",
+      "retained_reason": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-429 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract."
     },
     {
       "path": "docs/TECH_SPEC-linear-b9e7583a-3051-40d3-a87f-0388faa9df61.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-30",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-24",
+      "cadence_days": 365,
+      "notes": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-441 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract.",
+      "retained_reason": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-441 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract."
     },
     {
       "path": "docs/TECH_SPEC-linear-ba9a1c35-c8d1-4b76-aa33-4937502d1964.md",
@@ -29425,9 +29679,11 @@
     {
       "path": "docs/TECH_SPEC-linear-bdfd9046-97b5-43bd-850f-b305558cdada.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-01",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-24",
+      "cadence_days": 365,
+      "notes": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-466 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract.",
+      "retained_reason": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-466 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract."
     },
     {
       "path": "docs/TECH_SPEC-linear-bea56fb8-c601-4554-8ece-0a63c5fd34bc.md",
@@ -29711,9 +29967,11 @@
     {
       "path": "docs/TECH_SPEC-linear-d412792b-9a2a-43d9-96dc-ca021e728d09.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-01",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-24",
+      "cadence_days": 365,
+      "notes": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-452 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract.",
+      "retained_reason": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-452 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract."
     },
     {
       "path": "docs/TECH_SPEC-linear-d43b6785-88d6-442b-a34e-2ad19d4f723a.md",
@@ -29732,16 +29990,20 @@
     {
       "path": "docs/TECH_SPEC-linear-d536879d-3ddc-47b0-ae37-0ab657af18ba.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-01",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-24",
+      "cadence_days": 365,
+      "notes": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-459 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract.",
+      "retained_reason": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-459 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract."
     },
     {
       "path": "docs/TECH_SPEC-linear-d78c6860-93f6-4936-b3ad-b40e8de8a566.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-30",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-24",
+      "cadence_days": 365,
+      "notes": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-427 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract.",
+      "retained_reason": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-427 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract."
     },
     {
       "path": "docs/TECH_SPEC-linear-d9c8d1b2-3b38-42ef-9087-556870e2d88f.md",
@@ -29816,9 +30078,11 @@
     {
       "path": "docs/TECH_SPEC-linear-dc2bb702-db1d-450c-be19-a98571289a21.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-30",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-24",
+      "cadence_days": 365,
+      "notes": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-428 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract.",
+      "retained_reason": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-428 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract."
     },
     {
       "path": "docs/TECH_SPEC-linear-dcfbd1cc-2b22-41dc-94c6-ce00c38258a2.md",
@@ -30082,9 +30346,11 @@
     {
       "path": "docs/TECH_SPEC-linear-f57f28e8-e876-4bff-9217-fc5e17ee030f.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-01",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-24",
+      "cadence_days": 365,
+      "notes": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-458 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract.",
+      "retained_reason": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-458 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract."
     },
     {
       "path": "docs/TECH_SPEC-linear-f667a32d-b8db-4717-8565-429409026f92.md",
@@ -30601,7 +30867,7 @@
       "path": "skills/codex-orchestrator/SKILL.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-05-01",
+      "last_review": "2026-05-24",
       "cadence_days": 30
     },
     {
@@ -30868,10 +31134,11 @@
     {
       "path": "tasks/index.json",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-19",
-      "cadence_days": 90,
-      "next_review": "2026-08-17"
+      "status": "archived",
+      "last_review": "2026-05-24",
+      "cadence_days": 365,
+      "next_review": "2026-08-17",
+      "notes": "2026-05-24: CO-579 terminal lifecycle review: live Linear issue-context verified CO-458 is Done/completed; reclassified this spec inactive done instead of refreshing active pre-expiry metadata."
     },
     {
       "path": "tasks/multi-instance-autonomy-upgrade.md",
@@ -34154,9 +34421,11 @@
     {
       "path": "tasks/specs/linear-033979b5-6903-4d5f-9c9b-41769aa69330.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-30",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-24",
+      "cadence_days": 365,
+      "notes": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-447 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract.",
+      "retained_reason": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-447 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract."
     },
     {
       "path": "tasks/specs/linear-0354e9d0-84ee-4340-b098-a9c685c191b5.md",
@@ -34497,9 +34766,11 @@
     {
       "path": "tasks/specs/linear-213f6858-ab77-40b9-b80a-f5e5bdde4b37.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-03",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-24",
+      "cadence_days": 365,
+      "notes": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-450 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract.",
+      "retained_reason": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-450 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract."
     },
     {
       "path": "tasks/specs/linear-217c6584-bb47-486a-9765-f24e8ed84fc0.md",
@@ -34667,9 +34938,11 @@
     {
       "path": "tasks/specs/linear-345cd50c-4962-4376-a7ca-1982ba311699.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-30",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-24",
+      "cadence_days": 365,
+      "notes": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-445 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract.",
+      "retained_reason": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-445 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract."
     },
     {
       "path": "tasks/specs/linear-34b60caa-258b-4f18-8d67-cdad3f6352cf.md",
@@ -34788,9 +35061,11 @@
     {
       "path": "tasks/specs/linear-3ed4e0c0-4a6a-428b-bf31-d6252f230377.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-30",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-24",
+      "cadence_days": 365,
+      "notes": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-443 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract.",
+      "retained_reason": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-443 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract."
     },
     {
       "path": "tasks/specs/linear-3f7dfd9d-e6dc-4e79-bd56-a2786a15c277.md",
@@ -35086,9 +35361,11 @@
     {
       "path": "tasks/specs/linear-552f2825-b9e0-4f14-afe0-21b072aa9bb5.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-30",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-24",
+      "cadence_days": 365,
+      "notes": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-446 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract.",
+      "retained_reason": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-446 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract."
     },
     {
       "path": "tasks/specs/linear-5561a9a9-39dd-4ed4-99a0-896553327669.md",
@@ -35128,9 +35405,11 @@
     {
       "path": "tasks/specs/linear-590e4e09-315a-4957-bb72-66b8322e86a6.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-01",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-24",
+      "cadence_days": 365,
+      "notes": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-472 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract.",
+      "retained_reason": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-472 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract."
     },
     {
       "path": "tasks/specs/linear-59a75110-93e5-42f4-a2d2-31dcde884c91.md",
@@ -35170,9 +35449,11 @@
     {
       "path": "tasks/specs/linear-5d677c44-06c1-43ca-9aac-5a74f96671b4.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-30",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-24",
+      "cadence_days": 365,
+      "notes": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-431 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract.",
+      "retained_reason": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-431 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract."
     },
     {
       "path": "tasks/specs/linear-5d882b0c-d553-4d63-8d62-6f973090a13c.md",
@@ -35387,16 +35668,20 @@
     {
       "path": "tasks/specs/linear-6d7e842c-b10a-42f5-a7e0-8a30a8dd9442.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-01",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-24",
+      "cadence_days": 365,
+      "notes": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-468 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract.",
+      "retained_reason": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-468 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract."
     },
     {
       "path": "tasks/specs/linear-6df648e0-4a48-45a2-bdd3-aeaa9c1deb2b.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-30",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-24",
+      "cadence_days": 365,
+      "notes": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-444 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract.",
+      "retained_reason": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-444 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract."
     },
     {
       "path": "tasks/specs/linear-6dfd5b1c-ee27-46e4-b31c-7742ea3bdaa3.md",
@@ -35668,9 +35953,11 @@
     {
       "path": "tasks/specs/linear-8098459b-be08-4f9f-8e45-bd315fb4c9b9.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-30",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-24",
+      "cadence_days": 365,
+      "notes": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-408 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract.",
+      "retained_reason": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-408 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract."
     },
     {
       "path": "tasks/specs/linear-80d4473e-e9c7-4d4d-9340-bc1193103a7d.md",
@@ -35812,9 +36099,11 @@
     {
       "path": "tasks/specs/linear-8bd36e2e-2e54-4c8d-ae79-7b1319fc6adc.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-01",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-24",
+      "cadence_days": 365,
+      "notes": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-461 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract.",
+      "retained_reason": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-461 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract."
     },
     {
       "path": "tasks/specs/linear-8c691f55-5277-443a-b5dd-1f3f548b1b6d.md",
@@ -36064,9 +36353,11 @@
     {
       "path": "tasks/specs/linear-9aedac3e-09df-4859-b818-b6f2d4dc8ccc.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-01",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-24",
+      "cadence_days": 365,
+      "notes": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-454 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract.",
+      "retained_reason": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-454 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract."
     },
     {
       "path": "tasks/specs/linear-9b1440f0-a3af-4863-8bb5-2f8ea78bd02d.md",
@@ -36523,9 +36814,11 @@
     {
       "path": "tasks/specs/linear-b78c98eb-8ed4-4e19-9099-81d5e34bb33c.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-30",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-24",
+      "cadence_days": 365,
+      "notes": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-430 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract.",
+      "retained_reason": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-430 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract."
     },
     {
       "path": "tasks/specs/linear-b792b517-98e4-4518-9fb2-860996dd62c8.md",
@@ -36583,16 +36876,20 @@
     {
       "path": "tasks/specs/linear-b9a1044e-03b0-49ef-8435-92840eaf90b9.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-30",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-24",
+      "cadence_days": 365,
+      "notes": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-429 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract.",
+      "retained_reason": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-429 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract."
     },
     {
       "path": "tasks/specs/linear-b9e7583a-3051-40d3-a87f-0388faa9df61.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-30",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-24",
+      "cadence_days": 365,
+      "notes": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-441 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract.",
+      "retained_reason": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-441 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract."
     },
     {
       "path": "tasks/specs/linear-ba9a1c35-c8d1-4b76-aa33-4937502d1964-co-status-prune-terminal-released-issues.md",
@@ -36633,9 +36930,11 @@
     {
       "path": "tasks/specs/linear-bdfd9046-97b5-43bd-850f-b305558cdada.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-01",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-24",
+      "cadence_days": 365,
+      "notes": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-466 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract.",
+      "retained_reason": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-466 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract."
     },
     {
       "path": "tasks/specs/linear-bea56fb8-c601-4554-8ece-0a63c5fd34bc.md",
@@ -36951,9 +37250,11 @@
     {
       "path": "tasks/specs/linear-d412792b-9a2a-43d9-96dc-ca021e728d09.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-01",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-24",
+      "cadence_days": 365,
+      "notes": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-452 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract.",
+      "retained_reason": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-452 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract."
     },
     {
       "path": "tasks/specs/linear-d43b6785-88d6-442b-a34e-2ad19d4f723a.md",
@@ -36972,16 +37273,20 @@
     {
       "path": "tasks/specs/linear-d536879d-3ddc-47b0-ae37-0ab657af18ba.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-01",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-24",
+      "cadence_days": 365,
+      "notes": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-459 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract.",
+      "retained_reason": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-459 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract."
     },
     {
       "path": "tasks/specs/linear-d78c6860-93f6-4936-b3ad-b40e8de8a566.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-30",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-24",
+      "cadence_days": 365,
+      "notes": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-427 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract.",
+      "retained_reason": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-427 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract."
     },
     {
       "path": "tasks/specs/linear-d9c8d1b2-3b38-42ef-9087-556870e2d88f.md",
@@ -37059,9 +37364,11 @@
     {
       "path": "tasks/specs/linear-dc2bb702-db1d-450c-be19-a98571289a21.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-30",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-24",
+      "cadence_days": 365,
+      "notes": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-428 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract.",
+      "retained_reason": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-428 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract."
     },
     {
       "path": "tasks/specs/linear-dcfbd1cc-2b22-41dc-94c6-ce00c38258a2.md",
@@ -37340,9 +37647,11 @@
     {
       "path": "tasks/specs/linear-f57f28e8-e876-4bff-9217-fc5e17ee030f.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-01",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-24",
+      "cadence_days": 365,
+      "notes": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-458 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract.",
+      "retained_reason": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-458 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract."
     },
     {
       "path": "tasks/specs/linear-f667a32d-b8db-4717-8565-429409026f92.md",
@@ -41013,9 +41322,11 @@
     {
       "path": "tasks/tasks-linear-033979b5-6903-4d5f-9c9b-41769aa69330.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-30",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-24",
+      "cadence_days": 365,
+      "notes": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-447 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract.",
+      "retained_reason": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-447 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract."
     },
     {
       "path": "tasks/tasks-linear-0354e9d0-84ee-4340-b098-a9c685c191b5.md",
@@ -41043,7 +41354,7 @@
       "path": "tasks/tasks-linear-0549b4a2-56b1-4164-b65a-73fd2ba7d9e8.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-04-23",
+      "last_review": "2026-05-24",
       "cadence_days": 30
     },
     {
@@ -41364,9 +41675,11 @@
     {
       "path": "tasks/tasks-linear-213f6858-ab77-40b9-b80a-f5e5bdde4b37.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-03",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-24",
+      "cadence_days": 365,
+      "notes": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-450 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract.",
+      "retained_reason": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-450 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract."
     },
     {
       "path": "tasks/tasks-linear-217c6584-bb47-486a-9765-f24e8ed84fc0.md",
@@ -41536,9 +41849,11 @@
     {
       "path": "tasks/tasks-linear-345cd50c-4962-4376-a7ca-1982ba311699.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-30",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-24",
+      "cadence_days": 365,
+      "notes": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-445 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract.",
+      "retained_reason": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-445 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract."
     },
     {
       "path": "tasks/tasks-linear-34b60caa-258b-4f18-8d67-cdad3f6352cf.md",
@@ -41658,9 +41973,11 @@
     {
       "path": "tasks/tasks-linear-3ed4e0c0-4a6a-428b-bf31-d6252f230377.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-30",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-24",
+      "cadence_days": 365,
+      "notes": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-443 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract.",
+      "retained_reason": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-443 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract."
     },
     {
       "path": "tasks/tasks-linear-3f7dfd9d-e6dc-4e79-bd56-a2786a15c277.md",
@@ -41957,9 +42274,11 @@
     {
       "path": "tasks/tasks-linear-552f2825-b9e0-4f14-afe0-21b072aa9bb5.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-30",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-24",
+      "cadence_days": 365,
+      "notes": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-446 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract.",
+      "retained_reason": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-446 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract."
     },
     {
       "path": "tasks/tasks-linear-5561a9a9-39dd-4ed4-99a0-896553327669.md",
@@ -41999,9 +42318,11 @@
     {
       "path": "tasks/tasks-linear-590e4e09-315a-4957-bb72-66b8322e86a6.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-01",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-24",
+      "cadence_days": 365,
+      "notes": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-472 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract.",
+      "retained_reason": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-472 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract."
     },
     {
       "path": "tasks/tasks-linear-59a75110-93e5-42f4-a2d2-31dcde884c91.md",
@@ -42042,9 +42363,11 @@
     {
       "path": "tasks/tasks-linear-5d677c44-06c1-43ca-9aac-5a74f96671b4.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-30",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-24",
+      "cadence_days": 365,
+      "notes": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-431 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract.",
+      "retained_reason": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-431 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract."
     },
     {
       "path": "tasks/tasks-linear-5d882b0c-d553-4d63-8d62-6f973090a13c.md",
@@ -42256,16 +42579,20 @@
     {
       "path": "tasks/tasks-linear-6d7e842c-b10a-42f5-a7e0-8a30a8dd9442.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-01",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-24",
+      "cadence_days": 365,
+      "notes": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-468 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract.",
+      "retained_reason": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-468 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract."
     },
     {
       "path": "tasks/tasks-linear-6df648e0-4a48-45a2-bdd3-aeaa9c1deb2b.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-30",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-24",
+      "cadence_days": 365,
+      "notes": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-444 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract.",
+      "retained_reason": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-444 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract."
     },
     {
       "path": "tasks/tasks-linear-6dfd5b1c-ee27-46e4-b31c-7742ea3bdaa3.md",
@@ -42537,9 +42864,11 @@
     {
       "path": "tasks/tasks-linear-8098459b-be08-4f9f-8e45-bd315fb4c9b9.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-30",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-24",
+      "cadence_days": 365,
+      "notes": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-408 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract.",
+      "retained_reason": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-408 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract."
     },
     {
       "path": "tasks/tasks-linear-80d4473e-e9c7-4d4d-9340-bc1193103a7d.md",
@@ -42680,9 +43009,11 @@
     {
       "path": "tasks/tasks-linear-8bd36e2e-2e54-4c8d-ae79-7b1319fc6adc.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-01",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-24",
+      "cadence_days": 365,
+      "notes": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-461 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract.",
+      "retained_reason": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-461 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract."
     },
     {
       "path": "tasks/tasks-linear-8c691f55-5277-443a-b5dd-1f3f548b1b6d.md",
@@ -42931,9 +43262,11 @@
     {
       "path": "tasks/tasks-linear-9aedac3e-09df-4859-b818-b6f2d4dc8ccc.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-01",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-24",
+      "cadence_days": 365,
+      "notes": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-454 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract.",
+      "retained_reason": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-454 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract."
     },
     {
       "path": "tasks/tasks-linear-9b1440f0-a3af-4863-8bb5-2f8ea78bd02d.md",
@@ -43401,9 +43734,11 @@
     {
       "path": "tasks/tasks-linear-b78c98eb-8ed4-4e19-9099-81d5e34bb33c.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-30",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-24",
+      "cadence_days": 365,
+      "notes": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-430 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract.",
+      "retained_reason": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-430 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract."
     },
     {
       "path": "tasks/tasks-linear-b792b517-98e4-4518-9fb2-860996dd62c8.md",
@@ -43461,16 +43796,20 @@
     {
       "path": "tasks/tasks-linear-b9a1044e-03b0-49ef-8435-92840eaf90b9.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-30",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-24",
+      "cadence_days": 365,
+      "notes": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-429 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract.",
+      "retained_reason": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-429 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract."
     },
     {
       "path": "tasks/tasks-linear-b9e7583a-3051-40d3-a87f-0388faa9df61.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-30",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-24",
+      "cadence_days": 365,
+      "notes": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-441 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract.",
+      "retained_reason": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-441 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract."
     },
     {
       "path": "tasks/tasks-linear-ba9a1c35-c8d1-4b76-aa33-4937502d1964.md",
@@ -43513,9 +43852,11 @@
     {
       "path": "tasks/tasks-linear-bdfd9046-97b5-43bd-850f-b305558cdada.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-01",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-24",
+      "cadence_days": 365,
+      "notes": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-466 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract.",
+      "retained_reason": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-466 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract."
     },
     {
       "path": "tasks/tasks-linear-bea56fb8-c601-4554-8ece-0a63c5fd34bc.md",
@@ -43836,9 +44177,11 @@
     {
       "path": "tasks/tasks-linear-d412792b-9a2a-43d9-96dc-ca021e728d09.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-01",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-24",
+      "cadence_days": 365,
+      "notes": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-452 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract.",
+      "retained_reason": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-452 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract."
     },
     {
       "path": "tasks/tasks-linear-d43b6785-88d6-442b-a34e-2ad19d4f723a.md",
@@ -43857,16 +44200,20 @@
     {
       "path": "tasks/tasks-linear-d536879d-3ddc-47b0-ae37-0ab657af18ba.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-01",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-24",
+      "cadence_days": 365,
+      "notes": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-459 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract.",
+      "retained_reason": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-459 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract."
     },
     {
       "path": "tasks/tasks-linear-d78c6860-93f6-4936-b3ad-b40e8de8a566.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-30",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-24",
+      "cadence_days": 365,
+      "notes": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-427 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract.",
+      "retained_reason": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-427 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract."
     },
     {
       "path": "tasks/tasks-linear-d9c8d1b2-3b38-42ef-9087-556870e2d88f.md",
@@ -43941,9 +44288,11 @@
     {
       "path": "tasks/tasks-linear-dc2bb702-db1d-450c-be19-a98571289a21.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-30",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-24",
+      "cadence_days": 365,
+      "notes": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-428 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract.",
+      "retained_reason": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-428 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract."
     },
     {
       "path": "tasks/tasks-linear-dcfbd1cc-2b22-41dc-94c6-ce00c38258a2.md",
@@ -44228,9 +44577,11 @@
     {
       "path": "tasks/tasks-linear-f57f28e8-e876-4bff-9217-fc5e17ee030f.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-01",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-24",
+      "cadence_days": 365,
+      "notes": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-458 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract.",
+      "retained_reason": "CO-579 terminal lifecycle review: live Linear issue-context verified CO-458 is Done/completed; full packet is retained as terminal history, not archived, because local archive-stub/checklist safety is a separate contract."
     },
     {
       "path": "tasks/tasks-linear-f667a32d-b8db-4717-8565-429409026f92.md",
