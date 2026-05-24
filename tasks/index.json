@@ -1863,8 +1863,8 @@
       "owners": [
         "Codex"
       ],
-      "status": "review_handoff_prep",
-      "last_review": "2026-05-18",
+      "status": "rework_in_progress",
+      "last_review": "2026-05-24",
       "approvals": {
         "issue_context": {
           "reviewer": "CO provider worker",
@@ -1877,10 +1877,16 @@
           "date": "2026-05-18",
           "status": "created_for_fallback_decision_evidence",
           "summary": "Created the CO-555 docs-first packet for terminal retryable/resumable provider-intake claims, preserving inactive retained audit evidence while removing terminal active-WIP authority."
+        },
+        "rework_scope": {
+          "reviewer": "CO top-level orchestrator with GPT Pro consult",
+          "date": "2026-05-24",
+          "status": "root_cause_rework_required",
+          "summary": "CO-534 recurrence showed cached terminal Duplicate metadata and newer CO-555 Rework updates can still lose to stale retry/resumable run metadata; rework expands CO-555 to cached-terminal release, terminal-aware retry scheduling, and stale failed-run freshness."
         }
       },
       "validation": {
-        "status": "implemented_review_clean_ready_review_pending",
+        "status": "rework_pr_update_pending",
         "passed": [
           "live issue-context",
           "Ready -> In Progress transition",
@@ -1893,7 +1899,36 @@
           "manifest-backed standalone review clean with valid contract",
           "explicit elegance/minimality pass",
           "PR #834 opened and attached",
-          "post-origin/main-merge validation rerun"
+          "post-origin/main-merge validation rerun",
+          "2026-05-24 CO-534 recurrence docs packet refresh",
+          "cached Duplicate terminal rehydrate regression",
+          "terminal-aware retry queue scheduling regression",
+          "newer Rework issue supersedes stale failed run direct-acceptance regression",
+          "newer Rework issue supersedes stale failed run poll/refresh regression",
+          "P1 poll-path review finding fixed with claim freshness and Rework-scoped stale-run reclaim",
+          "P2 claim-cache review finding reproduced with absent/stale retained claim-cache regressions",
+          "P1 queued-run review finding reproduced with due retry-dispatch queued-run protection regression",
+          "post-claim-cache focused regression slice",
+          "post-queued-run focused due-retry regression slice",
+          "post-claim-cache full validation floor",
+          "post-fix focused recurrence test slice",
+          "post-fix full ProviderIssueHandoff regression",
+          "post-fix npm run build",
+          "post-fix npm run lint",
+          "post-fix npm run test",
+          "post-fix npm run docs:check",
+          "post-fix npm run docs:freshness",
+          "post-fix npm run repo:stewardship",
+          "post-fix spec guard dry-run",
+          "post-fix diff budget",
+          "post-fix git diff --check",
+          "post-fix docs-freshness-maintain",
+          "post-fix delegation guard override",
+          "post-fix pack smoke",
+          "post-queued-run full validation floor",
+          "enforced standalone review clean after queued-run review feedback",
+          "explicit elegance/minimality pass after queued-run review feedback",
+          "current-main docs:freshness handoff blocker cleared with blocks_handoff=false"
         ],
         "pending": [
           "CodeRabbit re-review acknowledgement",

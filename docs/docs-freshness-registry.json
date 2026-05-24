@@ -6037,7 +6037,7 @@
       "path": ".agent/task/linear-a91cfc38-be9e-496f-90bd-5cb2625763a5.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-05-18",
+      "last_review": "2026-05-24",
       "cadence_days": 30,
       "source_issue": {
         "id": "a91cfc38-be9e-496f-90bd-5cb2625763a5",
@@ -6047,7 +6047,7 @@
       "doc_class": "task_mirror",
       "lifecycle_state": "active",
       "created_at": "2026-05-18",
-      "next_review": "2026-06-17"
+      "next_review": "2026-06-23"
     },
     {
       "path": ".agent/task/linear-aa075f78-940e-423b-a886-6f0f8012ae18.md",
@@ -12585,7 +12585,7 @@
       "path": "docs/ACTION_PLAN-linear-a91cfc38-be9e-496f-90bd-5cb2625763a5.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-05-18",
+      "last_review": "2026-05-24",
       "cadence_days": 30,
       "source_issue": {
         "id": "a91cfc38-be9e-496f-90bd-5cb2625763a5",
@@ -12595,7 +12595,7 @@
       "doc_class": "task_packet",
       "lifecycle_state": "active",
       "created_at": "2026-05-18",
-      "next_review": "2026-06-17"
+      "next_review": "2026-06-23"
     },
     {
       "path": "docs/ACTION_PLAN-linear-aa075f78-940e-423b-a886-6f0f8012ae18.md",
@@ -22439,7 +22439,7 @@
       "path": "docs/PRD-linear-a91cfc38-be9e-496f-90bd-5cb2625763a5.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-05-18",
+      "last_review": "2026-05-24",
       "cadence_days": 30,
       "source_issue": {
         "id": "a91cfc38-be9e-496f-90bd-5cb2625763a5",
@@ -22449,7 +22449,7 @@
       "doc_class": "task_packet",
       "lifecycle_state": "active",
       "created_at": "2026-05-18",
-      "next_review": "2026-06-17"
+      "next_review": "2026-06-23"
     },
     {
       "path": "docs/PRD-linear-aa075f78-940e-423b-a886-6f0f8012ae18.md",
@@ -29334,7 +29334,7 @@
       "path": "docs/TECH_SPEC-linear-a91cfc38-be9e-496f-90bd-5cb2625763a5.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-05-18",
+      "last_review": "2026-05-24",
       "cadence_days": 30,
       "source_issue": {
         "id": "a91cfc38-be9e-496f-90bd-5cb2625763a5",
@@ -29344,7 +29344,7 @@
       "doc_class": "task_packet",
       "lifecycle_state": "active",
       "created_at": "2026-05-18",
-      "next_review": "2026-06-17"
+      "next_review": "2026-06-23"
     },
     {
       "path": "docs/TECH_SPEC-linear-aa075f78-940e-423b-a886-6f0f8012ae18.md",
@@ -36592,7 +36592,7 @@
       "path": "tasks/specs/linear-a91cfc38-be9e-496f-90bd-5cb2625763a5.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-05-18",
+      "last_review": "2026-05-24",
       "cadence_days": 30,
       "source_issue": {
         "id": "a91cfc38-be9e-496f-90bd-5cb2625763a5",
@@ -36602,7 +36602,7 @@
       "doc_class": "task_packet",
       "lifecycle_state": "active",
       "created_at": "2026-05-18",
-      "next_review": "2026-06-17"
+      "next_review": "2026-06-23"
     },
     {
       "path": "tasks/specs/linear-aa075f78-940e-423b-a886-6f0f8012ae18.md",
@@ -43507,7 +43507,7 @@
       "path": "tasks/tasks-linear-a91cfc38-be9e-496f-90bd-5cb2625763a5.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-05-18",
+      "last_review": "2026-05-24",
       "cadence_days": 30,
       "source_issue": {
         "id": "a91cfc38-be9e-496f-90bd-5cb2625763a5",
@@ -43517,7 +43517,7 @@
       "doc_class": "task_packet",
       "lifecycle_state": "active",
       "created_at": "2026-05-18",
-      "next_review": "2026-06-17"
+      "next_review": "2026-06-23"
     },
     {
       "path": "tasks/tasks-linear-aa075f78-940e-423b-a886-6f0f8012ae18.md",

@@ -2,10 +2,12 @@
 
 ## Summary
 - Goal: stop terminal retryable/resumable provider-intake claims from consuming active WIP or retry capacity after live Linear truth is terminal.
-- Scope: provider-intake active/retry classification, provider issue rehydration release, runtime/selected-run projections, focused tests, docs packet, review, and PR handoff.
+- Scope: provider-intake active/retry classification, cached and live provider issue rehydration release, stale failed-run freshness, runtime/selected-run projections, focused tests, docs packet, review, and PR handoff.
 - Assumptions:
   - CO-512 is an incident exemplar, not an identifier to special-case.
   - Terminal issue metadata attached to claims is authoritative when present.
+  - Fresh Linear metadata is preferred when available, but cached terminal metadata must still prevent retry resurrection when refresh is disabled or unavailable.
+  - Newer active Linear updates are authoritative over older failed/resume-eligible run metadata.
   - Retained terminal run metadata remains useful audit evidence but must be inactive.
 
 ## Issue Readiness Gate
@@ -18,10 +20,18 @@
   - `issue_state_type=completed`
   - `active_issue_identifiers`
   - terminal Linear truth
+  - cached terminal issue metadata
+  - stale failed run
+  - `run_id`
+  - `run_manifest_path`
   - no manual state edits
 - Not done if:
   - terminal retryable/resumable claims remain in active WIP or retry counts
   - rehydration restores terminal issues as active retry claims
+  - cached terminal issue metadata cannot release without a fresh Linear fetch
+  - stale retry timers or older failed runs keep terminal or freshly reworked issues retry-visible
+  - absent or stale retained claim metadata can let an older failed run outvote a newer `Rework` issue update
+  - due retry dispatch can treat queued/latest active runs as stale and launch duplicates
   - only a single projection hides the row
   - non-terminal retry/resumable workers stop counting as active
 - Pre-implementation issue-quality review:
@@ -47,11 +57,13 @@
 - Non-expiring rationale: retained audit evidence is durable operator traceability, not temporary compatibility debt; remove only after a reviewed archival replacement preserves equivalent evidence.
 
 ## Milestones & Sequencing
+0. Rework recurrence packet: refresh docs for the 2026-05-24 CO-534/CO-555 recurrence, confirm GPT Pro/root-cause guidance, and expand tests before code.
 1. Read live CO-555 issue-context, move Ready to In Progress, create/update exactly one workpad, and record one parallelization decision.
 2. Launch bounded same-issue tests child lane and keep parent source implementation ownership.
 3. Inspect provider-intake active/retry predicates, rehydration, runtime, and selected-run projections.
 4. Add CO-512-shaped terminal retry regression and non-terminal retry guard coverage.
 5. Implement terminal issue-state precedence and terminal rehydration release behavior.
+5a. Implement cached-terminal rehydrate release, terminal-aware retry queue scheduling, and stale failed-run recency checks for active issue reclaim.
 6. Run focused tests, full provider-worker validation floor, standalone review, and explicit elegance pass.
 7. Merge latest `origin/main`, rerun required gates after the merge, push, and reopen/update the PR.
 8. Attach PR, run `pr ready-review`, refresh workpad, and move to `In Review` only after clean evidence.
@@ -65,6 +77,13 @@
 ## Validation
 - Checks / tests:
   - focused provider-intake and provider-handoff terminal retry regressions
+  - cached terminal `Duplicate`/duplicate rehydrate regression with refresh disabled/unavailable
+  - cached terminal `Duplicate`/duplicate rehydrate regression with stale `run_id`/`run_manifest_path`
+  - retry queue terminal-suppression regression for stale retry fields
+  - newer active `Rework` issue update regression that ignores older failed/resume-eligible runs for retry rehydration, including absent/stale retained claim-cache cases
+  - poll/refresh-path `Rework` issue update regression that ignores older failed/resume-eligible runs without relaunching generic non-Rework failed proof diagnostics
+  - due retry-dispatch `Rework` issue update regression that starts fresh instead of preserving or resuming stale failed-run retry WIP
+  - due retry-dispatch queued-run protection regression that does not start a duplicate worker
   - full `ProviderIssueHandoff` coverage after review feedback
   - delegation guard, spec guard, build, lint, test, docs gates, repo stewardship, diff budget, pack smoke
   - manifest-backed standalone review and explicit elegance pass
