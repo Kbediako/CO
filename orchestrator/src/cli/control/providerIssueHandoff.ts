@@ -6445,7 +6445,8 @@ export function createProviderIssueHandoffService(
                   trackedIssue: resolution.trackedIssue,
                   reason: 'provider_issue_refresh_start_launched',
                   previousRun: latestRunStaleForTrackedIssue ? null : latestRun,
-                  clearRetryOnSuccessfulStart: latestRunStaleForTrackedIssue
+                  clearRetryOnSuccessfulStart: latestRunStaleForTrackedIssue,
+                  excludeCurrentClaimFromAdmission: latestRunStaleForTrackedIssue
                 });
                 if (shouldCountProviderAdmissionResultForPollBudget(handoffResult)) {
                   noteOccupiedPollDispatchSlot(
@@ -6478,7 +6479,8 @@ export function createProviderIssueHandoffService(
               trackedIssue: resolution.trackedIssue,
               reason: 'provider_issue_refresh_start_launched',
               previousRun: latestRunStaleForTrackedIssue ? null : latestRun,
-              clearRetryOnSuccessfulStart: latestRunStaleForTrackedIssue
+              clearRetryOnSuccessfulStart: latestRunStaleForTrackedIssue,
+              excludeCurrentClaimFromAdmission: latestRunStaleForTrackedIssue
             });
             if (shouldCountProviderAdmissionResultForPollBudget(handoffResult)) {
               noteOccupiedPollDispatchSlot(

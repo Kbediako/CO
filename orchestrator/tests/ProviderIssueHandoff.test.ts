@@ -48024,6 +48024,7 @@ describe('createProviderIssueHandoffService', () => {
       worker_host: null,
       launch_source: null,
       launch_token: null,
+      launch_started_at: null,
       retry_queued: null,
       retry_attempt: null,
       retry_due_at: null,
@@ -48033,6 +48034,7 @@ describe('createProviderIssueHandoffService', () => {
       issue_identifier: 'CO-555',
       state: 'accepted',
       run_id: null,
+      launch_started_at: null,
       retry_queued: null
     });
   });
