@@ -39,7 +39,7 @@
           "status": "clean-success",
           "telemetry": ".runs/linear-5634bf98-fe59-41f5-8623-60c9ef0b2993/cli/2026-05-23T23-47-35-355Z-d6ade73d/review/telemetry.json",
           "contract": ".runs/linear-5634bf98-fe59-41f5-8623-60c9ef0b2993/cli/2026-05-23T23-47-35-355Z-d6ade73d/review/contract.json",
-          "summary": "Final enforced gpt-5.5/xhigh standalone review rerun succeeded with review_verdict=clean, contract_validation.status=valid, contract_overall_verdict=clean, and finding_count=0 after frontmatter, spec-guard owner-resolution, and task-index override audit rework."
+          "summary": "Final enforced gpt-5.5/xhigh standalone review completed clean after the retained_terminal_packet archive evidence gate: telemetry reports status=succeeded, review_outcome=clean-success, review_verdict=clean, contract_validation.status=valid, contract_overall_verdict=clean, and finding_count=0."
         }
       },
       "validation": {
@@ -51,19 +51,23 @@
           "node scripts/spec-guard.mjs --dry-run",
           "npx vitest run tests/spec-guard.spec.ts",
           "npx vitest run tests/docs-freshness.spec.ts --testNamePattern \"uses newer task index reviews\"",
-          "npx vitest run tests/docs-freshness.spec.ts",
-          "npx vitest run tests/docs-freshness.spec.ts tests/docs-freshness-maintain.spec.ts",
+          "npx vitest run tests/implementation-docs-archive.spec.ts tests/docs-freshness.spec.ts tests/docs-freshness-maintain.spec.ts: 156 tests passed including the nonterminal stray retained_terminal_packet archive regression",
+          "IMPLEMENTATION_DOCS_ARCHIVE_BASE_REF=HEAD node scripts/implementation-docs-archive.mjs --dry-run: archived=0, skipped=4586, stray_candidates=24, retained_terminal_packet skips=124, action_required=false",
           "npm run docs:check",
-          "npm run docs:freshness",
-          "node scripts/docs-freshness-maintain.mjs --check --format json",
+          "npm run docs:freshness: 5601 docs, 5605 registry entries, 124 retained terminal packet entries, 402 task-index review overrides, 101 rolling entries",
+          "node scripts/docs-freshness-maintain.mjs --check --format json: pass_with_owned_rolling_debt, terminal_lifecycle_entries=0, spec_guard_pre_expiry_entries=0",
           "npm run build",
           "npm run lint",
-          "npm run test",
-          "npm run repo:stewardship",
-          "node scripts/diff-budget.mjs with explicit CO-579 scope override",
-          "npm run pack:smoke",
-          "final enforced standalone review rerun: clean-success, clean verdict, valid clean contract, finding_count=0",
-          "unrelated pre-expiry spec refresh withdrawn so stale fallback windows remain visible to owning lanes"
+          "npm run test: 367 files and 6274 tests passed",
+          "npm run repo:stewardship: 6756 tracked files, 0 action-required",
+          "node scripts/diff-budget.mjs with explicit CO-579 retained-terminal evidence-gated archive-protection scope override",
+          "npm run pack:smoke: passed",
+          "fifth enforced standalone review rerun: findings P3 docs-catalog declaration drift, fixed in scripts/lib/docs-catalog.d.ts",
+          "21 pre-expiry source issues verified Done/completed via live Linear issue-context and reclassified inactive done with retained_terminal_packet registry rows",
+          "node scripts/delegation-guard.mjs with explicit non-synthetic-child override after app-level gpt-5.5/GPT Pro review and quota hygiene cleanup",
+          "codex-orchestrator hygiene quota --format json: latest zero-model audit observed model_calls=0, process_inventory.quota_burning_count=0, process_inventory.unowned_quota_burning_count=0; degraded findings are stale co-status/control-host endpoint state plus unconfirmed CO-555 provider-intake claim state",
+          "sixth enforced standalone review rerun: findings P2 stray retained_terminal_packet archive skip lacked terminal lifecycle evidence, fixed in scripts/implementation-docs-archive.mjs and tests/implementation-docs-archive.spec.ts",
+          "final enforced gpt-5.5/xhigh standalone review: clean-success, valid contract, overall clean, finding_count=0"
         ],
         "pending": [
           "PR lifecycle",
@@ -87,9 +91,10 @@
       },
       "notes": {
         "co580_follow_up": "CO-580 created and linked for shared docs freshness lifecycle resolver and owner-finalizer refactor.",
-        "docs_freshness_maintain": "latest validation pending after P1 rework and scope narrowing",
-        "review_rework": "First enforced standalone review previously found P2 malformed review_notes frontmatter in a proactive pre-expiry sweep; that sweep is now withdrawn from CO-579 after guard evidence showed it would hide unrelated stale fallback windows. Second enforced review hit bounded-success contract failure while repeatedly inspecting spec-guard; parent fixed the real gap so spec-guard rolling cohort summaries also resolve exact baseline cohort canonical owners instead of collapsing to CO-579. Third enforced review found P2 missing report-level audit data for task-index review overrides that clear stale registry drift; CO-579 now emits task_index_review_overrides and regression coverage. Current PR P1 rework restricts task-index override authority to active task-index entries and unambiguous historical aliases.",
-        "admission_recheck": "Shared-root co-status after owner verification reports running=0, retrying=1, issues=1, max_allowed=3, with only CO-555 active-like in Rework on PR #834; CO-527 is Backlog with no PR and is not consuming active WIP."
+        "docs_freshness_maintain": "latest validation passed after retained terminal packet lifecycle reclassification",
+        "review_rework": "First enforced standalone review previously found P2 malformed review_notes frontmatter in a proactive pre-expiry sweep; CO-579 now handles the cohort from live Linear truth instead of active date-refreshes by reclassifying the verified Done/completed source specs inactive done and marking full packet registry rows retained_terminal_packet instead of false archive stubs. Second enforced review hit bounded-success contract failure while repeatedly inspecting spec-guard; parent fixed the real gap so spec-guard rolling cohort summaries also resolve exact baseline cohort canonical owners instead of collapsing to CO-579. Third enforced review found P2 missing report-level audit data for task-index review overrides that clear stale registry drift; CO-579 now emits task_index_review_overrides and regression coverage. Fourth enforced review found P1 implementation-docs archive could still stub retained packets and P2 duplicate CO-445 review_notes; CO-579 now skips retained_terminal_packet rows in archive automation and preserves both review_notes under one key. Fifth enforced review found P3 docs-catalog declaration drift; scripts/lib/docs-catalog.d.ts now includes retained_terminal_packet_entries. Sixth enforced review found P2 stray retained_terminal_packet archive skips trusted status without terminal lifecycle evidence; implementation-docs archive now requires task-index or registry task-status terminal evidence and archives nonterminal stray rows when otherwise eligible.",
+        "admission_recheck": "Shared-root co-status after owner verification reports running=0, retrying=1, issues=1, max_allowed=3, with only CO-555 active-like in Rework on PR #834; CO-527 is Backlog with no PR and is not consuming active WIP.",
+        "quota_hygiene_20260524": "Zero-model quota hygiene initially found six unowned quota-burning codex exec audit processes under /Users/kbediako/Code/CO; parent terminated the stale process groups and reran hygiene with quota_burning_count=0 and unowned_quota_burning_count=0."
       }
     },
     {
@@ -4873,8 +4878,8 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-05-01",
-      "status": "in_progress",
+      "last_review": "2026-05-24",
+      "status": "done",
       "evidence": [
         "docs/PRD-linear-d536879d-3ddc-47b0-ae37-0ab657af18ba.md",
         "docs/TECH_SPEC-linear-d536879d-3ddc-47b0-ae37-0ab657af18ba.md",
@@ -4900,6 +4905,12 @@
         "task": "tasks/tasks-linear-d536879d-3ddc-47b0-ae37-0ab657af18ba.md",
         "agent_task": ".agent/task/linear-d536879d-3ddc-47b0-ae37-0ab657af18ba.md",
         "docs": "docs/TECH_SPEC-linear-d536879d-3ddc-47b0-ae37-0ab657af18ba.md"
+      },
+      "validation": {
+        "status": "done"
+      },
+      "notes": {
+        "terminal_lifecycle_review": "2026-05-24: CO-579 terminal lifecycle review: live Linear issue-context verified CO-459 is Done/completed; reclassified this spec inactive done instead of refreshing active pre-expiry metadata."
       }
     },
     {
@@ -5058,8 +5069,8 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-05-03",
-      "status": "in_progress",
+      "last_review": "2026-05-24",
+      "status": "done",
       "evidence": [
         "docs/PRD-linear-213f6858-ab77-40b9-b80a-f5e5bdde4b37.md",
         "docs/TECH_SPEC-linear-213f6858-ab77-40b9-b80a-f5e5bdde4b37.md",
@@ -5125,6 +5136,12 @@
         "task": "tasks/tasks-linear-213f6858-ab77-40b9-b80a-f5e5bdde4b37.md",
         "agent_task": ".agent/task/linear-213f6858-ab77-40b9-b80a-f5e5bdde4b37.md",
         "docs": "docs/TECH_SPEC-linear-213f6858-ab77-40b9-b80a-f5e5bdde4b37.md"
+      },
+      "validation": {
+        "status": "done"
+      },
+      "notes": {
+        "terminal_lifecycle_review": "2026-05-24: CO-579 terminal lifecycle review: live Linear issue-context verified CO-450 is Done/completed; reclassified this spec inactive done instead of refreshing active pre-expiry metadata."
       }
     },
     {
@@ -5350,8 +5367,8 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-05-01",
-      "status": "in_progress",
+      "last_review": "2026-05-24",
+      "status": "done",
       "evidence": [
         "docs/PRD-linear-6d7e842c-b10a-42f5-a7e0-8a30a8dd9442.md",
         "docs/TECH_SPEC-linear-6d7e842c-b10a-42f5-a7e0-8a30a8dd9442.md",
@@ -5379,6 +5396,12 @@
         "task": "tasks/tasks-linear-6d7e842c-b10a-42f5-a7e0-8a30a8dd9442.md",
         "agent_task": ".agent/task/linear-6d7e842c-b10a-42f5-a7e0-8a30a8dd9442.md",
         "docs": "docs/TECH_SPEC-linear-6d7e842c-b10a-42f5-a7e0-8a30a8dd9442.md"
+      },
+      "validation": {
+        "status": "done"
+      },
+      "notes": {
+        "terminal_lifecycle_review": "2026-05-24: CO-579 terminal lifecycle review: live Linear issue-context verified CO-468 is Done/completed; reclassified this spec inactive done instead of refreshing active pre-expiry metadata."
       }
     },
     {
@@ -5670,8 +5693,8 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-05-01",
-      "status": "in_progress",
+      "last_review": "2026-05-24",
+      "status": "done",
       "evidence": [
         "docs/PRD-linear-8bd36e2e-2e54-4c8d-ae79-7b1319fc6adc.md",
         "docs/TECH_SPEC-linear-8bd36e2e-2e54-4c8d-ae79-7b1319fc6adc.md",
@@ -5706,6 +5729,12 @@
         "docs": "docs/TECH_SPEC-linear-8bd36e2e-2e54-4c8d-ae79-7b1319fc6adc.md",
         "prd": "docs/PRD-linear-8bd36e2e-2e54-4c8d-ae79-7b1319fc6adc.md",
         "action_plan": "docs/ACTION_PLAN-linear-8bd36e2e-2e54-4c8d-ae79-7b1319fc6adc.md"
+      },
+      "validation": {
+        "status": "done"
+      },
+      "notes": {
+        "terminal_lifecycle_review": "2026-05-24: CO-579 terminal lifecycle review: live Linear issue-context verified CO-461 is Done/completed; reclassified this spec inactive done instead of refreshing active pre-expiry metadata."
       }
     },
     {
@@ -5778,8 +5807,8 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-05-01",
-      "status": "in_progress",
+      "last_review": "2026-05-24",
+      "status": "done",
       "evidence": [
         "docs/PRD-linear-590e4e09-315a-4957-bb72-66b8322e86a6.md",
         "docs/TECH_SPEC-linear-590e4e09-315a-4957-bb72-66b8322e86a6.md",
@@ -5815,6 +5844,12 @@
         "task": "tasks/tasks-linear-590e4e09-315a-4957-bb72-66b8322e86a6.md",
         "agent_task": ".agent/task/linear-590e4e09-315a-4957-bb72-66b8322e86a6.md",
         "docs": "docs/TECH_SPEC-linear-590e4e09-315a-4957-bb72-66b8322e86a6.md"
+      },
+      "validation": {
+        "status": "done"
+      },
+      "notes": {
+        "terminal_lifecycle_review": "2026-05-24: CO-579 terminal lifecycle review: live Linear issue-context verified CO-472 is Done/completed; reclassified this spec inactive done instead of refreshing active pre-expiry metadata."
       }
     },
     {
@@ -5825,8 +5860,8 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-05-01",
-      "status": "in_progress",
+      "last_review": "2026-05-24",
+      "status": "done",
       "evidence": [
         "docs/PRD-linear-bdfd9046-97b5-43bd-850f-b305558cdada.md",
         "docs/TECH_SPEC-linear-bdfd9046-97b5-43bd-850f-b305558cdada.md",
@@ -5868,6 +5903,12 @@
         "task": "tasks/tasks-linear-bdfd9046-97b5-43bd-850f-b305558cdada.md",
         "agent_task": ".agent/task/linear-bdfd9046-97b5-43bd-850f-b305558cdada.md",
         "docs": "docs/TECH_SPEC-linear-bdfd9046-97b5-43bd-850f-b305558cdada.md"
+      },
+      "validation": {
+        "status": "done"
+      },
+      "notes": {
+        "terminal_lifecycle_review": "2026-05-24: CO-579 terminal lifecycle review: live Linear issue-context verified CO-466 is Done/completed; reclassified this spec inactive done instead of refreshing active pre-expiry metadata."
       }
     },
     {
@@ -5878,8 +5919,8 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-05-01",
-      "status": "in_progress",
+      "last_review": "2026-05-24",
+      "status": "done",
       "evidence": [
         "docs/PRD-linear-f57f28e8-e876-4bff-9217-fc5e17ee030f.md",
         "docs/ACTION_PLAN-linear-f57f28e8-e876-4bff-9217-fc5e17ee030f.md",
@@ -5907,6 +5948,12 @@
         "docs": "docs/TECH_SPEC-linear-f57f28e8-e876-4bff-9217-fc5e17ee030f.md",
         "prd": "docs/PRD-linear-f57f28e8-e876-4bff-9217-fc5e17ee030f.md",
         "action_plan": "docs/ACTION_PLAN-linear-f57f28e8-e876-4bff-9217-fc5e17ee030f.md"
+      },
+      "validation": {
+        "status": "done"
+      },
+      "notes": {
+        "terminal_lifecycle_review": "2026-05-24: CO-579 terminal lifecycle review: live Linear issue-context verified CO-458 is Done/completed; reclassified this spec inactive done instead of refreshing active pre-expiry metadata."
       }
     },
     {
@@ -5917,8 +5964,8 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-30",
-      "status": "in_progress",
+      "last_review": "2026-05-24",
+      "status": "done",
       "evidence": [
         "docs/PRD-linear-033979b5-6903-4d5f-9c9b-41769aa69330.md",
         "docs/TECH_SPEC-linear-033979b5-6903-4d5f-9c9b-41769aa69330.md",
@@ -5945,6 +5992,12 @@
         "task": "tasks/tasks-linear-033979b5-6903-4d5f-9c9b-41769aa69330.md",
         "agent_task": ".agent/task/linear-033979b5-6903-4d5f-9c9b-41769aa69330.md",
         "docs": "docs/TECH_SPEC-linear-033979b5-6903-4d5f-9c9b-41769aa69330.md"
+      },
+      "validation": {
+        "status": "done"
+      },
+      "notes": {
+        "terminal_lifecycle_review": "2026-05-24: CO-579 terminal lifecycle review: live Linear issue-context verified CO-447 is Done/completed; reclassified this spec inactive done instead of refreshing active pre-expiry metadata."
       }
     },
     {
@@ -5955,8 +6008,8 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-30",
-      "status": "in_progress",
+      "last_review": "2026-05-24",
+      "status": "done",
       "evidence": [
         "docs/PRD-linear-552f2825-b9e0-4f14-afe0-21b072aa9bb5.md",
         "docs/TECH_SPEC-linear-552f2825-b9e0-4f14-afe0-21b072aa9bb5.md",
@@ -5986,6 +6039,12 @@
         "docs": "docs/TECH_SPEC-linear-552f2825-b9e0-4f14-afe0-21b072aa9bb5.md",
         "prd": "docs/PRD-linear-552f2825-b9e0-4f14-afe0-21b072aa9bb5.md",
         "action_plan": "docs/ACTION_PLAN-linear-552f2825-b9e0-4f14-afe0-21b072aa9bb5.md"
+      },
+      "validation": {
+        "status": "done"
+      },
+      "notes": {
+        "terminal_lifecycle_review": "2026-05-24: CO-579 terminal lifecycle review: live Linear issue-context verified CO-446 is Done/completed; reclassified this spec inactive done instead of refreshing active pre-expiry metadata."
       }
     },
     {
@@ -5996,8 +6055,8 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-30",
-      "status": "in_progress",
+      "last_review": "2026-05-24",
+      "status": "done",
       "canonical_owner_marker": "codex-orchestrator:canonical-owner-key=docs:freshness:maintain",
       "evidence": [
         "docs/PRD-linear-5d677c44-06c1-43ca-9aac-5a74f96671b4.md",
@@ -6052,6 +6111,12 @@
         "task": "tasks/tasks-linear-5d677c44-06c1-43ca-9aac-5a74f96671b4.md",
         "agent_task": ".agent/task/linear-5d677c44-06c1-43ca-9aac-5a74f96671b4.md",
         "docs": "docs/TECH_SPEC-linear-5d677c44-06c1-43ca-9aac-5a74f96671b4.md"
+      },
+      "validation": {
+        "status": "done"
+      },
+      "notes": {
+        "terminal_lifecycle_review": "2026-05-24: CO-579 terminal lifecycle review: live Linear issue-context verified CO-431 is Done/completed; reclassified this spec inactive done instead of refreshing active pre-expiry metadata."
       }
     },
     {
@@ -6062,8 +6127,8 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-30",
-      "status": "in_progress",
+      "last_review": "2026-05-24",
+      "status": "done",
       "evidence": [
         "docs/PRD-linear-345cd50c-4962-4376-a7ca-1982ba311699.md",
         "docs/TECH_SPEC-linear-345cd50c-4962-4376-a7ca-1982ba311699.md",
@@ -6093,6 +6158,12 @@
         "docs": "docs/TECH_SPEC-linear-345cd50c-4962-4376-a7ca-1982ba311699.md",
         "prd": "docs/PRD-linear-345cd50c-4962-4376-a7ca-1982ba311699.md",
         "action_plan": "docs/ACTION_PLAN-linear-345cd50c-4962-4376-a7ca-1982ba311699.md"
+      },
+      "validation": {
+        "status": "done"
+      },
+      "notes": {
+        "terminal_lifecycle_review": "2026-05-24: CO-579 terminal lifecycle review: live Linear issue-context verified CO-445 is Done/completed; reclassified this spec inactive done instead of refreshing active pre-expiry metadata."
       }
     },
     {
@@ -6103,8 +6174,8 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-05-04",
-      "status": "in_progress",
+      "last_review": "2026-05-24",
+      "status": "done",
       "canonical_owner_marker": "codex-orchestrator:canonical-owner-key=docs:freshness:maintain",
       "evidence": [
         "docs/PRD-linear-6df648e0-4a48-45a2-bdd3-aeaa9c1deb2b.md",
@@ -6171,6 +6242,12 @@
         "task": "tasks/tasks-linear-6df648e0-4a48-45a2-bdd3-aeaa9c1deb2b.md",
         "agent_task": ".agent/task/linear-6df648e0-4a48-45a2-bdd3-aeaa9c1deb2b.md",
         "docs": "docs/TECH_SPEC-linear-6df648e0-4a48-45a2-bdd3-aeaa9c1deb2b.md"
+      },
+      "validation": {
+        "status": "done"
+      },
+      "notes": {
+        "terminal_lifecycle_review": "2026-05-24: CO-579 terminal lifecycle review: live Linear issue-context verified CO-444 is Done/completed; reclassified this spec inactive done instead of refreshing active pre-expiry metadata."
       }
     },
     {
@@ -6181,8 +6258,8 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-30",
-      "status": "in_progress",
+      "last_review": "2026-05-24",
+      "status": "done",
       "evidence": [
         "docs/PRD-linear-3ed4e0c0-4a6a-428b-bf31-d6252f230377.md",
         "docs/ACTION_PLAN-linear-3ed4e0c0-4a6a-428b-bf31-d6252f230377.md",
@@ -6205,6 +6282,12 @@
         "spec": "tasks/specs/linear-3ed4e0c0-4a6a-428b-bf31-d6252f230377.md",
         "task": "tasks/tasks-linear-3ed4e0c0-4a6a-428b-bf31-d6252f230377.md",
         "docs": "docs/TECH_SPEC-linear-3ed4e0c0-4a6a-428b-bf31-d6252f230377.md"
+      },
+      "validation": {
+        "status": "done"
+      },
+      "notes": {
+        "terminal_lifecycle_review": "2026-05-24: CO-579 terminal lifecycle review: live Linear issue-context verified CO-443 is Done/completed; reclassified this spec inactive done instead of refreshing active pre-expiry metadata."
       }
     },
     {
@@ -6215,8 +6298,8 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-30",
-      "status": "in_progress",
+      "last_review": "2026-05-24",
+      "status": "done",
       "canonical_owner_marker": "codex-orchestrator:canonical-owner-key=docs:freshness:maintain",
       "evidence": [
         "docs/PRD-linear-b9e7583a-3051-40d3-a87f-0388faa9df61.md",
@@ -6275,6 +6358,12 @@
         "task": "tasks/tasks-linear-b9e7583a-3051-40d3-a87f-0388faa9df61.md",
         "agent_task": ".agent/task/linear-b9e7583a-3051-40d3-a87f-0388faa9df61.md",
         "docs": "docs/TECH_SPEC-linear-b9e7583a-3051-40d3-a87f-0388faa9df61.md"
+      },
+      "validation": {
+        "status": "done"
+      },
+      "notes": {
+        "terminal_lifecycle_review": "2026-05-24: CO-579 terminal lifecycle review: live Linear issue-context verified CO-441 is Done/completed; reclassified this spec inactive done instead of refreshing active pre-expiry metadata."
       }
     },
     {
@@ -6285,7 +6374,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-30",
+      "last_review": "2026-05-24",
       "evidence": [
         ".agent/task/linear-d78c6860-93f6-4936-b3ad-b40e8de8a566.md",
         "docs/ACTION_PLAN-linear-d78c6860-93f6-4936-b3ad-b40e8de8a566.md",
@@ -6354,6 +6443,13 @@
         "task": "tasks/tasks-linear-d78c6860-93f6-4936-b3ad-b40e8de8a566.md",
         "agent_task": ".agent/task/linear-d78c6860-93f6-4936-b3ad-b40e8de8a566.md",
         "docs": "docs/TECH_SPEC-linear-d78c6860-93f6-4936-b3ad-b40e8de8a566.md"
+      },
+      "status": "done",
+      "validation": {
+        "status": "done"
+      },
+      "notes": {
+        "terminal_lifecycle_review": "2026-05-24: CO-579 terminal lifecycle review: live Linear issue-context verified CO-427 is Done/completed; reclassified this spec inactive done instead of refreshing active pre-expiry metadata."
       }
     },
     {
@@ -6364,8 +6460,8 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-30",
-      "status": "in_progress",
+      "last_review": "2026-05-24",
+      "status": "done",
       "canonical_owner_marker": "codex-orchestrator:canonical-owner-key=spec-guard:active-specs:last_review=2026-03-30",
       "approvals": {
         "issue_quality_review": {
@@ -6414,6 +6510,12 @@
         "task": "tasks/tasks-linear-dc2bb702-db1d-450c-be19-a98571289a21.md",
         "agent_task": ".agent/task/linear-dc2bb702-db1d-450c-be19-a98571289a21.md",
         "docs": "docs/TECH_SPEC-linear-dc2bb702-db1d-450c-be19-a98571289a21.md"
+      },
+      "validation": {
+        "status": "done"
+      },
+      "notes": {
+        "terminal_lifecycle_review": "2026-05-24: CO-579 terminal lifecycle review: live Linear issue-context verified CO-428 is Done/completed; reclassified this spec inactive done instead of refreshing active pre-expiry metadata."
       }
     },
     {
@@ -6424,7 +6526,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-30",
+      "last_review": "2026-05-24",
       "canonical_owner_marker": "codex-orchestrator:canonical-owner-key=docs_freshness_candidate|doc_class:task_packet|path_family:tasks/specs|last_review:2026-03-30|cadence_days:30",
       "evidence": [
         "docs/PRD-linear-b9a1044e-03b0-49ef-8435-92840eaf90b9.md",
@@ -6457,6 +6559,13 @@
         "task": "tasks/tasks-linear-b9a1044e-03b0-49ef-8435-92840eaf90b9.md",
         "agent_task": ".agent/task/linear-b9a1044e-03b0-49ef-8435-92840eaf90b9.md",
         "docs": "docs/TECH_SPEC-linear-b9a1044e-03b0-49ef-8435-92840eaf90b9.md"
+      },
+      "status": "done",
+      "validation": {
+        "status": "done"
+      },
+      "notes": {
+        "terminal_lifecycle_review": "2026-05-24: CO-579 terminal lifecycle review: live Linear issue-context verified CO-429 is Done/completed; reclassified this spec inactive done instead of refreshing active pre-expiry metadata."
       }
     },
     {
@@ -6467,7 +6576,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-30",
+      "last_review": "2026-05-24",
       "canonical_owner_marker": "codex-orchestrator:canonical-owner-key=docs:freshness:maintain",
       "evidence": [
         ".runs/linear-b78c98eb-8ed4-4e19-9099-81d5e34bb33c/cli/2026-04-30T01-53-05-383Z-0772e9d7/manifest.json"
@@ -6491,6 +6600,13 @@
         "task": "tasks/tasks-linear-b78c98eb-8ed4-4e19-9099-81d5e34bb33c.md",
         "agent_task": ".agent/task/linear-b78c98eb-8ed4-4e19-9099-81d5e34bb33c.md",
         "docs": "docs/TECH_SPEC-linear-b78c98eb-8ed4-4e19-9099-81d5e34bb33c.md"
+      },
+      "status": "done",
+      "validation": {
+        "status": "done"
+      },
+      "notes": {
+        "terminal_lifecycle_review": "2026-05-24: CO-579 terminal lifecycle review: live Linear issue-context verified CO-430 is Done/completed; reclassified this spec inactive done instead of refreshing active pre-expiry metadata."
       }
     },
     {
@@ -6501,7 +6617,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-30",
+      "last_review": "2026-05-24",
       "approvals": {
         "traceability_packet": {
           "reviewer": "write-enabled docs-only packet worker",
@@ -6515,6 +6631,13 @@
         "task": "tasks/tasks-linear-8098459b-be08-4f9f-8e45-bd315fb4c9b9.md",
         "agent_task": ".agent/task/linear-8098459b-be08-4f9f-8e45-bd315fb4c9b9.md",
         "docs": "docs/TECH_SPEC-linear-8098459b-be08-4f9f-8e45-bd315fb4c9b9.md"
+      },
+      "status": "done",
+      "validation": {
+        "status": "done"
+      },
+      "notes": {
+        "terminal_lifecycle_review": "2026-05-24: CO-579 terminal lifecycle review: live Linear issue-context verified CO-408 is Done/completed; reclassified this spec inactive done instead of refreshing active pre-expiry metadata."
       }
     },
     {
@@ -27780,7 +27903,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-05-01",
+      "last_review": "2026-05-24",
       "approvals": {
         "traceability_packet": {
           "reviewer": "CO-454 traceability packet branch",
@@ -27815,18 +27938,25 @@
         "prd": "docs/PRD-linear-9aedac3e-09df-4859-b818-b6f2d4dc8ccc.md",
         "docs": "docs/TECH_SPEC-linear-9aedac3e-09df-4859-b818-b6f2d4dc8ccc.md",
         "action_plan": "docs/ACTION_PLAN-linear-9aedac3e-09df-4859-b818-b6f2d4dc8ccc.md"
+      },
+      "status": "done",
+      "validation": {
+        "status": "done"
+      },
+      "notes": {
+        "terminal_lifecycle_review": "2026-05-24: CO-579 terminal lifecycle review: live Linear issue-context verified CO-454 is Done/completed; reclassified this spec inactive done instead of refreshing active pre-expiry metadata."
       }
     },
     {
       "id": "20260501-linear-d412792b-9a2a-43d9-96dc-ca021e728d09",
       "title": "CO-452 retire js_repl posture after Codex CLI 0.128.0 removal",
-      "status": "in_progress",
+      "status": "done",
       "relates_to": "tasks/tasks-linear-d412792b-9a2a-43d9-96dc-ca021e728d09.md",
       "risk": "medium",
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-05-01",
+      "last_review": "2026-05-24",
       "approvals": {
         "pre_implementation_issue_quality_review": {
           "reviewer": "parent provider worker",
@@ -27856,7 +27986,7 @@
         }
       },
       "validation": {
-        "status": "validation-green-before-review",
+        "status": "done",
         "passed": [
           "delegation-guard",
           "spec-guard --dry-run",
@@ -27890,6 +28020,9 @@
         "prd": "docs/PRD-linear-d412792b-9a2a-43d9-96dc-ca021e728d09.md",
         "docs": "docs/TECH_SPEC-linear-d412792b-9a2a-43d9-96dc-ca021e728d09.md",
         "action_plan": "docs/ACTION_PLAN-linear-d412792b-9a2a-43d9-96dc-ca021e728d09.md"
+      },
+      "notes": {
+        "terminal_lifecycle_review": "2026-05-24: CO-579 terminal lifecycle review: live Linear issue-context verified CO-452 is Done/completed; reclassified this spec inactive done instead of refreshing active pre-expiry metadata."
       }
     },
     {

@@ -21,7 +21,7 @@
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | `docs:freshness:maintain` global owner binding | Terminal `CO-575` remains configured as live global owner. | remove fallback | CO-579 | `docs:freshness:maintain --check` reports `configured_owner_terminal`. | 2026-05-23 | 2026-05-24 | Not retained | `docs/docs-catalog.json` points to non-terminal CO-579 and maintain check verifies live owner. | docs freshness maintain, docs check, spec guard. |
 | Task-index review-date override | Newer `tasks/index.json` `last_review` can override older registry review dates for indexed task-packet paths. | expire fallback | CO-579 / CO-580 | Task-index review date is newer than registry date for the same task-packet path. | 2026-05-24 | 2026-06-07 | 2026-06-23 | CO-580 lands a centralized lifecycle resolver/finalizer or task-packet mirrors are explicit/archive-clean so registry freshness no longer needs inferred task-index authority. | P1 regressions for statusless entries and numeric alias collisions, task-index override audit output, docs freshness, docs freshness maintain. |
-| Historical numeric task-key aliases | Older task packets can list task/spec/docs paths under numeric task keys while PRD/ACTION mirrors omit the numeric prefix. | expire fallback | CO-579 / CO-580 | Historical PRD/ACTION mirrors are not covered by task-index review authority without numeric aliasing. | 2026-05-24 | 2026-06-07 | 2026-06-23 | Historical mirrors are archived or task-index rows explicitly enumerate all mirror paths. | P1 numeric alias collision regression plus live docs freshness override audit output. |
+| Historical numeric task-key aliases | Older task packets can list task/spec/docs paths under numeric task keys while PRD/ACTION mirrors omit the numeric prefix. | expire fallback | CO-579 / CO-580 | Historical PRD/ACTION mirrors are not covered by task-index review authority without numeric aliasing. | 2026-05-24 | 2026-06-07 | 2026-06-23 | Historical mirrors are archive-safe, retained as explicit terminal packets, or task-index rows explicitly enumerate all mirror paths. | P1 numeric alias collision regression plus live docs freshness override audit output. |
 | Lifecycle authority split | Terminal source state, spec frontmatter, registry status, task-index status, and linked checklist readiness can disagree. | expire fallback | CO-580 | CO-579 found frontmatter-only terminal detection over-blocked active-reviewed packets. | 2026-05-24 | 2026-06-07 | 2026-06-23 | CO-580 lands a shared lifecycle resolver/finalizer or an equivalent smaller proven contract. | CO-580 linked Backlog issue with labels and acceptance criteria. |
 
 ## Milestones & Sequencing
@@ -34,11 +34,12 @@
 7. [x] Add task-index-backed freshness resolution and exact canonical owner reporting for rolling cohorts in both `docs:freshness` and `spec-guard`.
 8. [x] Add historical numeric task-key alias support for older PRD/ACTION mirrors.
 9. [x] Reclassify the residual CO-300 classification finding registry row as archived.
-10. [x] Withdraw the unrelated pre-expiry spec refresh from CO-579 after guard evidence showed it would hide stale fallback windows owned by other lanes.
-11. [x] Create/link CO-580 for the shared lifecycle resolver and owner-finalizer refactor.
-12. [ ] Run packet and docs validation.
-13. [ ] Transition CO-579 out of In Progress only after packet validation and owner verification.
-14. [ ] Re-evaluate CO-555 and CO-527 admission after the global owner blocker is no longer first failure.
+10. [x] Reclassify the 21 pre-expiry task specs inactive `done` from live Linear `Done/completed` issue-context evidence, with matching task-index rows updated and full packet registry rows retained as `retained_terminal_packet` instead of active date-refreshes or false archive stubs.
+11. [x] Prevent implementation-docs archive automation from stubbing evidence-backed `retained_terminal_packet` task candidates or stray candidates by retention age or line threshold, while letting status-only nonterminal stray rows archive when otherwise eligible.
+12. [x] Create/link CO-580 for the shared lifecycle resolver and owner-finalizer refactor.
+13. [x] Run packet and docs validation.
+14. [ ] Transition CO-579 out of In Progress only after packet validation and owner verification.
+15. [x] Re-evaluate CO-555 and CO-527 admission after the global owner blocker is no longer first failure.
 
 ## Validation
 - Checks / tests:

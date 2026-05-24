@@ -419,6 +419,110 @@ describe('docs freshness reporting', () => {
     );
   });
 
+  it('accepts retained terminal packets without treating full packet content as archive stubs', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docs-freshness-retained-terminal-packet-'));
+    createdDirs.push(repoRoot);
+
+    const taskKey = 'linear-retained-terminal-packet';
+    const packetPath = `tasks/tasks-${taskKey}.md`;
+    await mkdir(join(repoRoot, 'tasks'), { recursive: true });
+    await writeFile(
+      join(repoRoot, packetPath),
+      '# Task Checklist\n\n- [ ] Historical unchecked item remains visible in the retained packet.\n',
+      'utf8'
+    );
+    await writeFile(
+      join(repoRoot, 'tasks', 'index.json'),
+      JSON.stringify(
+        {
+          items: [
+            {
+              id: `20260524-${taskKey}`,
+              key: taskKey,
+              status: 'done',
+              last_review: reviewDateDaysAgo(0),
+              paths: {
+                task: packetPath
+              }
+            }
+          ]
+        },
+        null,
+        2
+      ),
+      'utf8'
+    );
+    await writeDocsFreshnessFixture(repoRoot, {
+      registryEntries: [
+        {
+          path: packetPath,
+          status: 'retained_terminal_packet',
+          last_review: '2025-01-01',
+          cadence_days: 365,
+          retained_reason: 'Linear source issue is terminal; full packet retained for historical audit.'
+        }
+      ],
+      catalogPatterns: [{ glob: 'tasks/**/*.md', doc_class: 'task_packet' }]
+    });
+
+    const { report, hasFailures } = await runDocsFreshness(repoRoot, {
+      outRoot: join(repoRoot, 'out'),
+      taskId: 'fixture'
+    });
+
+    expect(hasFailures).toBe(false);
+    expect(report.totals.stale_entries).toBe(0);
+    expect(report.totals.terminal_lifecycle_entries).toBe(0);
+    expect(report.totals.retained_terminal_packet_entries).toBe(1);
+    expect(report.retained_terminal_packet_entries).toEqual([
+      expect.objectContaining({
+        path: packetPath,
+        registry_status: 'retained_terminal_packet',
+        lifecycle_state: 'retained_terminal_packet',
+        recommended_action: 'retain_terminal_packet_history',
+        retained_reason: 'Linear source issue is terminal; full packet retained for historical audit.',
+        task_key: taskKey,
+        status: 'done'
+      })
+    ]);
+  });
+
+  it('rejects retained terminal packets without terminal lifecycle evidence', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docs-freshness-retained-terminal-invalid-'));
+    createdDirs.push(repoRoot);
+
+    await mkdir(join(repoRoot, 'tasks'), { recursive: true });
+    await writeFile(join(repoRoot, 'tasks', 'tasks-active.md'), '# Active packet\n', 'utf8');
+    await writeDocsFreshnessFixture(repoRoot, {
+      registryEntries: [
+        {
+          path: 'tasks/tasks-active.md',
+          status: 'retained_terminal_packet',
+          last_review: '2025-01-01',
+          cadence_days: 365
+        }
+      ],
+      catalogPatterns: [{ glob: 'tasks/**/*.md', doc_class: 'task_packet' }]
+    });
+
+    const { report, hasFailures } = await runDocsFreshness(repoRoot, {
+      outRoot: join(repoRoot, 'out'),
+      taskId: 'fixture'
+    });
+
+    expect(hasFailures).toBe(true);
+    expect(report.invalid_entries).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          path: 'tasks/tasks-active.md',
+          issues: expect.arrayContaining([
+            'retained_terminal_packet requires terminal task lifecycle evidence'
+          ])
+        })
+      ])
+    );
+  });
+
   it('writes a class-separated markdown summary when requested', async () => {
     const repoRoot = await mkdtemp(join(tmpdir(), 'docs-freshness-summary-'));
     createdDirs.push(repoRoot);

@@ -25,6 +25,7 @@ import {
   isTerminalTaskStatus,
   normalizeDocPath,
   PRESERVED_HISTORICAL_STUB_STATUS,
+  RETAINED_TERMINAL_PACKET_STATUS,
   TERMINAL_PENDING_ARCHIVE_STATUS
 } from './lib/docs-freshness-lifecycle.js';
 import { resolveEnvironmentPaths } from './lib/run-manifests.js';
@@ -36,6 +37,7 @@ const STATUS_VALUES = new Set([
   'archived',
   'deprecated',
   PRESERVED_HISTORICAL_STUB_STATUS,
+  RETAINED_TERMINAL_PACKET_STATUS,
   TERMINAL_PENDING_ARCHIVE_STATUS
 ]);
 const OWNER_REQUIRED_STATUSES = new Set(['active', 'deprecated', TERMINAL_PENDING_ARCHIVE_STATUS]);
@@ -642,19 +644,20 @@ export function renderDocsFreshnessMarkdown(report) {
     `- Stale entries: ${report.totals.stale_entries}`,
     `- Rolling cohort entries: ${report.totals.rolling_cohort_entries ?? 0}`,
     `- Terminal lifecycle entries: ${report.totals.terminal_lifecycle_entries ?? 0}`,
+    `- Retained terminal packet entries: ${report.totals.retained_terminal_packet_entries ?? 0}`,
     `- Pre-expiry strict entries: ${report.totals.pre_expiry_entries ?? 0}`,
     `- Task-index review overrides: ${report.totals.task_index_review_overrides ?? 0}`,
     `- Uncatalogued docs: ${report.totals.uncatalogued_docs}`,
     '',
     '## Class Summary',
     '',
-    '| Class | Docs | Registry | Missing Registry | Missing On Disk | Invalid | Stale | Terminal Lifecycle | Uncatalogued |',
-    '| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |'
+    '| Class | Docs | Registry | Missing Registry | Missing On Disk | Invalid | Stale | Terminal Lifecycle | Retained Terminal | Uncatalogued |',
+    '| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |'
   ];
 
   for (const entry of report.class_summary ?? []) {
     lines.push(
-      `| ${entry.label} | ${entry.docs_scanned} | ${entry.registry_entries} | ${entry.missing_in_registry} | ${entry.missing_on_disk} | ${entry.invalid_entries} | ${entry.stale_entries} | ${entry.terminal_lifecycle_entries ?? 0} | ${entry.uncatalogued_docs} |`
+      `| ${entry.label} | ${entry.docs_scanned} | ${entry.registry_entries} | ${entry.missing_in_registry} | ${entry.missing_on_disk} | ${entry.invalid_entries} | ${entry.stale_entries} | ${entry.terminal_lifecycle_entries ?? 0} | ${entry.retained_terminal_packet_entries ?? 0} | ${entry.uncatalogued_docs} |`
     );
   }
 
@@ -765,6 +768,7 @@ export async function runDocsFreshness(
   const rawStaleEntries = [];
   const terminalLifecycleEntries = [];
   const preExpiryEntries = [];
+  const retainedTerminalPacketEntries = [];
   const taskIndexReviewOverrides = [];
   const missingOnDisk = [];
   const registryPaths = new Set();
@@ -841,9 +845,42 @@ export async function runDocsFreshness(
       issues.push('preserved_historical_stub requires a historical task continuity stub');
     }
 
+    const retainedTerminalLifecycle =
+      status === RETAINED_TERMINAL_PACKET_STATUS && entryPath
+        ? lifecycleIndex.byPath.get(entryPath) ?? explicitTerminalTaskStatusLifecycle(taskStatus, entryPath)
+        : null;
+    if (status === RETAINED_TERMINAL_PACKET_STATUS) {
+      if (!isTaskPacketLifecyclePath(entryPath)) {
+        issues.push('retained_terminal_packet requires a task packet or task mirror path');
+      }
+      if (explicitNonTerminalTaskStatus) {
+        issues.push('retained_terminal_packet cannot declare a non-terminal task status');
+      }
+      if (!retainedTerminalLifecycle) {
+        issues.push('retained_terminal_packet requires terminal task lifecycle evidence');
+      }
+    }
+
     if (issues.length > 0) {
       invalidEntries.push({ path: entryPath || '<missing>', issues });
       metricsByClass.push({ doc_class: docClass, metric: 'invalid_entries' });
+    }
+
+    if (issues.length === 0 && retainedTerminalLifecycle) {
+      retainedTerminalPacketEntries.push({
+        ...retainedTerminalLifecycle,
+        path: entryPath,
+        last_review: entry.last_review,
+        cadence_days: cadenceDays,
+        doc_class: docClass || 'uncatalogued',
+        doc_class_label: docClassLabel,
+        path_family: classifyPathFamily(entryPath),
+        registry_status: status,
+        lifecycle_state: RETAINED_TERMINAL_PACKET_STATUS,
+        recommended_action: 'retain_terminal_packet_history',
+        retained_reason: normalizeOwner(entry?.retained_reason) || normalizeOwner(entry?.notes) || null
+      });
+      metricsByClass.push({ doc_class: docClass, metric: 'retained_terminal_packet_entries' });
     }
 
     if (reviewDate && Number.isInteger(cadenceDays) && cadenceDays > 0) {
@@ -1006,6 +1043,7 @@ export async function runDocsFreshness(
       stale_entries: staleEntries.length,
       rolling_cohort_entries: rollingCohortEntries.length,
       terminal_lifecycle_entries: terminalLifecycleEntries.length,
+      retained_terminal_packet_entries: retainedTerminalPacketEntries.length,
       pre_expiry_entries: preExpiryEntries.length,
       task_index_review_overrides: taskIndexReviewOverrides.length,
       uncatalogued_docs: uncataloguedDocs.length
@@ -1019,6 +1057,7 @@ export async function runDocsFreshness(
     invalid_entries: invalidEntries,
     stale_entries: staleEntries,
     terminal_lifecycle_entries: terminalLifecycleEntries,
+    retained_terminal_packet_entries: retainedTerminalPacketEntries,
     pre_expiry_entries: preExpiryEntries,
     task_index_review_overrides: taskIndexReviewOverrides,
     rolling_cohort_entries: rollingCohortEntries,
@@ -1105,6 +1144,9 @@ async function main() {
   if ((report.totals.terminal_lifecycle_entries ?? 0) > 0) {
     console.log(`- terminal lifecycle entries: ${report.totals.terminal_lifecycle_entries}`);
   }
+  if ((report.totals.retained_terminal_packet_entries ?? 0) > 0) {
+    console.log(`- retained terminal packet entries: ${report.totals.retained_terminal_packet_entries}`);
+  }
   if ((report.totals.pre_expiry_entries ?? 0) > 0) {
     console.log(`- strict docs approaching expiry: ${report.totals.pre_expiry_entries}`);
   }
@@ -1125,7 +1167,7 @@ async function main() {
 
   for (const entry of report.class_summary ?? []) {
     console.log(
-      `- ${entry.label}: docs=${entry.docs_scanned} registry=${entry.registry_entries} missing_registry=${entry.missing_in_registry} stale=${entry.stale_entries} terminal_lifecycle=${entry.terminal_lifecycle_entries ?? 0}`
+      `- ${entry.label}: docs=${entry.docs_scanned} registry=${entry.registry_entries} missing_registry=${entry.missing_in_registry} stale=${entry.stale_entries} terminal_lifecycle=${entry.terminal_lifecycle_entries ?? 0} retained_terminal=${entry.retained_terminal_packet_entries ?? 0}`
     );
   }
 

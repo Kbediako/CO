@@ -3,6 +3,7 @@ import { normalizeTaskKey, parseIsoDateOrTimestamp } from './docs-helpers.js';
 
 export const TERMINAL_PENDING_ARCHIVE_STATUS = 'terminal_pending_archive';
 export const PRESERVED_HISTORICAL_STUB_STATUS = 'preserved_historical_stub';
+export const RETAINED_TERMINAL_PACKET_STATUS = 'retained_terminal_packet';
 
 export const TERMINAL_TASK_STATUSES = new Set([
   'succeeded',
