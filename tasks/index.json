@@ -1,6 +1,100 @@
 {
   "items": [
     {
+      "id": "20260524-linear-5634bf98-fe59-41f5-8623-60c9ef0b2993",
+      "title": "CO-579 replace terminal CO-575 docs freshness maintenance owner",
+      "relates_to": "tasks/tasks-linear-5634bf98-fe59-41f5-8623-60c9ef0b2993.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "status": "in_progress",
+      "last_review": "2026-05-24",
+      "canonical_owner_key": "docs:freshness:maintain",
+      "canonical_owner_marker": "codex-orchestrator:canonical-owner-key=docs:freshness:maintain",
+      "evidence": [
+        "docs/PRD-linear-5634bf98-fe59-41f5-8623-60c9ef0b2993.md",
+        "docs/TECH_SPEC-linear-5634bf98-fe59-41f5-8623-60c9ef0b2993.md",
+        "docs/ACTION_PLAN-linear-5634bf98-fe59-41f5-8623-60c9ef0b2993.md",
+        "tasks/specs/linear-5634bf98-fe59-41f5-8623-60c9ef0b2993.md",
+        "tasks/tasks-linear-5634bf98-fe59-41f5-8623-60c9ef0b2993.md",
+        ".agent/task/linear-5634bf98-fe59-41f5-8623-60c9ef0b2993.md",
+        "tasks/index.json",
+        "docs/TASKS.md",
+        "docs/docs-freshness-registry.json",
+        "docs/docs-catalog.json",
+        "docs/findings/linear-5634bf98-fe59-41f5-8623-60c9ef0b2993-pre-expiry-spec-review.md",
+        ".runs/linear-5634bf98-fe59-41f5-8623-60c9ef0b2993/cli/2026-05-23T23-47-35-355Z-d6ade73d/review/telemetry.json",
+        ".runs/linear-5634bf98-fe59-41f5-8623-60c9ef0b2993/cli/2026-05-23T23-47-35-355Z-d6ade73d/review/contract.json"
+      ],
+      "approvals": {
+        "parent_issue_quality_review": {
+          "reviewer": "parent CO orchestrator",
+          "date": "2026-05-24",
+          "status": "approved",
+          "summary": "Live evidence showed CO-575 terminal while CO-579 is a live same-project owner; scope is limited to owner re-home, freshness lifecycle guardrails, registry review evidence, and CO-545 historical path syntax repair."
+        },
+        "standalone_review": {
+          "reviewer": "codex-orchestrator review",
+          "date": "2026-05-24",
+          "status": "clean-success",
+          "telemetry": ".runs/linear-5634bf98-fe59-41f5-8623-60c9ef0b2993/cli/2026-05-23T23-47-35-355Z-d6ade73d/review/telemetry.json",
+          "contract": ".runs/linear-5634bf98-fe59-41f5-8623-60c9ef0b2993/cli/2026-05-23T23-47-35-355Z-d6ade73d/review/contract.json",
+          "summary": "Final enforced gpt-5.5/xhigh standalone review rerun succeeded with review_verdict=clean, contract_validation.status=valid, contract_overall_verdict=clean, and finding_count=0 after frontmatter, spec-guard owner-resolution, and task-index override audit rework."
+        }
+      },
+      "validation": {
+        "status": "review_clean_pr_pending",
+        "passed": [
+          "JSON parse for docs-catalog, docs-freshness-registry, and tasks/index",
+          "git diff --check",
+          "protected-term scan",
+          "node scripts/spec-guard.mjs --dry-run",
+          "npx vitest run tests/spec-guard.spec.ts",
+          "npx vitest run tests/docs-freshness.spec.ts --testNamePattern \"uses newer task index reviews\"",
+          "npx vitest run tests/docs-freshness.spec.ts",
+          "npx vitest run tests/docs-freshness.spec.ts tests/docs-freshness-maintain.spec.ts",
+          "frontmatter YAML smoke check for 21 CO-579 pre-expiry specs",
+          "npm run docs:check",
+          "npm run docs:freshness",
+          "node scripts/docs-freshness-maintain.mjs --check --format json",
+          "npm run build",
+          "npm run lint",
+          "npm run test",
+          "npm run repo:stewardship",
+          "node scripts/diff-budget.mjs with explicit CO-579 scope override",
+          "npm run pack:smoke",
+          "final enforced standalone review rerun: clean-success, clean verdict, valid clean contract, finding_count=0"
+        ],
+        "pending": [
+          "PR lifecycle",
+          "ready-review drain",
+          "Linear review handoff"
+        ]
+      },
+      "paths": {
+        "agent_task": ".agent/task/linear-5634bf98-fe59-41f5-8623-60c9ef0b2993.md",
+        "prd": "docs/PRD-linear-5634bf98-fe59-41f5-8623-60c9ef0b2993.md",
+        "docs": "docs/TECH_SPEC-linear-5634bf98-fe59-41f5-8623-60c9ef0b2993.md",
+        "tech_spec_mirror": "docs/TECH_SPEC-linear-5634bf98-fe59-41f5-8623-60c9ef0b2993.md",
+        "action_plan": "docs/ACTION_PLAN-linear-5634bf98-fe59-41f5-8623-60c9ef0b2993.md",
+        "spec": "tasks/specs/linear-5634bf98-fe59-41f5-8623-60c9ef0b2993.md",
+        "task": "tasks/tasks-linear-5634bf98-fe59-41f5-8623-60c9ef0b2993.md"
+      },
+      "source_issue": {
+        "id": "5634bf98-fe59-41f5-8623-60c9ef0b2993",
+        "identifier": "CO-579",
+        "url": "https://linear.app/asabeko/issue/CO-579"
+      },
+      "notes": {
+        "co580_follow_up": "CO-580 created and linked for shared docs freshness lifecycle resolver and owner-finalizer refactor.",
+        "docs_freshness_maintain": "pass_with_owned_rolling_debt with 101 owned rolling entries under CO-568/CO-569 and no terminal/pre-expiry actions.",
+        "pre_expiry_spec_review": "docs/findings/linear-5634bf98-fe59-41f5-8623-60c9ef0b2993-pre-expiry-spec-review.md",
+        "review_rework": "First enforced standalone review found P2 malformed review_notes frontmatter; CO-579 rework converted refreshed spec notes to YAML lists and preserved historical notes from origin/main. Second enforced review hit bounded-success contract failure while repeatedly inspecting spec-guard; parent fixed the real gap so spec-guard rolling cohort summaries also resolve exact baseline cohort canonical owners instead of collapsing to CO-579. Third enforced review found P2 missing report-level audit data for task-index review overrides that clear stale registry drift; CO-579 now emits task_index_review_overrides and regression coverage. Final enforced review rerun succeeded with clean verdict, valid clean contract, and finding_count=0.",
+        "admission_recheck": "Shared-root co-status after owner verification reports running=0, retrying=1, issues=1, max_allowed=3, with only CO-555 active-like in Rework on PR #834; CO-527 is Backlog with no PR and is not consuming active WIP."
+      }
+    },
+    {
       "id": "20260523-linear-7847b2be-ae34-4256-977f-f2c291f31938",
       "title": "CO-563 co-status terminal worker proof reconciliation",
       "relates_to": "tasks/tasks-linear-7847b2be-ae34-4256-977f-f2c291f31938.md",
@@ -4781,7 +4875,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-05-01",
+      "last_review": "2026-05-24",
       "status": "in_progress",
       "evidence": [
         "docs/PRD-linear-d536879d-3ddc-47b0-ae37-0ab657af18ba.md",
@@ -4808,6 +4902,9 @@
         "task": "tasks/tasks-linear-d536879d-3ddc-47b0-ae37-0ab657af18ba.md",
         "agent_task": ".agent/task/linear-d536879d-3ddc-47b0-ae37-0ab657af18ba.md",
         "docs": "docs/TECH_SPEC-linear-d536879d-3ddc-47b0-ae37-0ab657af18ba.md"
+      },
+      "notes": {
+        "docs_freshness_pre_expiry_review": "CO-579 pre-expiry review: retained active or blocked scope; no spec contract changes required."
       }
     },
     {
@@ -4966,7 +5063,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-05-03",
+      "last_review": "2026-05-24",
       "status": "in_progress",
       "evidence": [
         "docs/PRD-linear-213f6858-ab77-40b9-b80a-f5e5bdde4b37.md",
@@ -5033,6 +5130,9 @@
         "task": "tasks/tasks-linear-213f6858-ab77-40b9-b80a-f5e5bdde4b37.md",
         "agent_task": ".agent/task/linear-213f6858-ab77-40b9-b80a-f5e5bdde4b37.md",
         "docs": "docs/TECH_SPEC-linear-213f6858-ab77-40b9-b80a-f5e5bdde4b37.md"
+      },
+      "notes": {
+        "docs_freshness_pre_expiry_review": "CO-579 pre-expiry review: retained active or blocked scope; no spec contract changes required."
       }
     },
     {
@@ -5258,7 +5358,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-05-01",
+      "last_review": "2026-05-24",
       "status": "in_progress",
       "evidence": [
         "docs/PRD-linear-6d7e842c-b10a-42f5-a7e0-8a30a8dd9442.md",
@@ -5287,6 +5387,9 @@
         "task": "tasks/tasks-linear-6d7e842c-b10a-42f5-a7e0-8a30a8dd9442.md",
         "agent_task": ".agent/task/linear-6d7e842c-b10a-42f5-a7e0-8a30a8dd9442.md",
         "docs": "docs/TECH_SPEC-linear-6d7e842c-b10a-42f5-a7e0-8a30a8dd9442.md"
+      },
+      "notes": {
+        "docs_freshness_pre_expiry_review": "CO-579 pre-expiry review: retained active or blocked scope; no spec contract changes required."
       }
     },
     {
@@ -5578,7 +5681,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-05-01",
+      "last_review": "2026-05-24",
       "status": "in_progress",
       "evidence": [
         "docs/PRD-linear-8bd36e2e-2e54-4c8d-ae79-7b1319fc6adc.md",
@@ -5614,6 +5717,9 @@
         "docs": "docs/TECH_SPEC-linear-8bd36e2e-2e54-4c8d-ae79-7b1319fc6adc.md",
         "prd": "docs/PRD-linear-8bd36e2e-2e54-4c8d-ae79-7b1319fc6adc.md",
         "action_plan": "docs/ACTION_PLAN-linear-8bd36e2e-2e54-4c8d-ae79-7b1319fc6adc.md"
+      },
+      "notes": {
+        "docs_freshness_pre_expiry_review": "CO-579 pre-expiry review: retained active or blocked scope; no spec contract changes required."
       }
     },
     {
@@ -5686,7 +5792,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-05-01",
+      "last_review": "2026-05-24",
       "status": "in_progress",
       "evidence": [
         "docs/PRD-linear-590e4e09-315a-4957-bb72-66b8322e86a6.md",
@@ -5723,6 +5829,9 @@
         "task": "tasks/tasks-linear-590e4e09-315a-4957-bb72-66b8322e86a6.md",
         "agent_task": ".agent/task/linear-590e4e09-315a-4957-bb72-66b8322e86a6.md",
         "docs": "docs/TECH_SPEC-linear-590e4e09-315a-4957-bb72-66b8322e86a6.md"
+      },
+      "notes": {
+        "docs_freshness_pre_expiry_review": "CO-579 pre-expiry review: retained active or blocked scope; no spec contract changes required."
       }
     },
     {
@@ -5733,7 +5842,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-05-01",
+      "last_review": "2026-05-24",
       "status": "in_progress",
       "evidence": [
         "docs/PRD-linear-bdfd9046-97b5-43bd-850f-b305558cdada.md",
@@ -5776,6 +5885,9 @@
         "task": "tasks/tasks-linear-bdfd9046-97b5-43bd-850f-b305558cdada.md",
         "agent_task": ".agent/task/linear-bdfd9046-97b5-43bd-850f-b305558cdada.md",
         "docs": "docs/TECH_SPEC-linear-bdfd9046-97b5-43bd-850f-b305558cdada.md"
+      },
+      "notes": {
+        "docs_freshness_pre_expiry_review": "CO-579 pre-expiry review: retained active or blocked scope; no spec contract changes required."
       }
     },
     {
@@ -5786,7 +5898,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-05-01",
+      "last_review": "2026-05-24",
       "status": "in_progress",
       "evidence": [
         "docs/PRD-linear-f57f28e8-e876-4bff-9217-fc5e17ee030f.md",
@@ -5815,6 +5927,9 @@
         "docs": "docs/TECH_SPEC-linear-f57f28e8-e876-4bff-9217-fc5e17ee030f.md",
         "prd": "docs/PRD-linear-f57f28e8-e876-4bff-9217-fc5e17ee030f.md",
         "action_plan": "docs/ACTION_PLAN-linear-f57f28e8-e876-4bff-9217-fc5e17ee030f.md"
+      },
+      "notes": {
+        "docs_freshness_pre_expiry_review": "CO-579 pre-expiry review: retained active or blocked scope; no spec contract changes required."
       }
     },
     {
@@ -5825,7 +5940,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-30",
+      "last_review": "2026-05-24",
       "status": "in_progress",
       "evidence": [
         "docs/PRD-linear-033979b5-6903-4d5f-9c9b-41769aa69330.md",
@@ -5853,6 +5968,9 @@
         "task": "tasks/tasks-linear-033979b5-6903-4d5f-9c9b-41769aa69330.md",
         "agent_task": ".agent/task/linear-033979b5-6903-4d5f-9c9b-41769aa69330.md",
         "docs": "docs/TECH_SPEC-linear-033979b5-6903-4d5f-9c9b-41769aa69330.md"
+      },
+      "notes": {
+        "docs_freshness_pre_expiry_review": "CO-579 pre-expiry review: retained active or blocked scope; no spec contract changes required."
       }
     },
     {
@@ -5863,7 +5981,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-30",
+      "last_review": "2026-05-24",
       "status": "in_progress",
       "evidence": [
         "docs/PRD-linear-552f2825-b9e0-4f14-afe0-21b072aa9bb5.md",
@@ -5894,6 +6012,9 @@
         "docs": "docs/TECH_SPEC-linear-552f2825-b9e0-4f14-afe0-21b072aa9bb5.md",
         "prd": "docs/PRD-linear-552f2825-b9e0-4f14-afe0-21b072aa9bb5.md",
         "action_plan": "docs/ACTION_PLAN-linear-552f2825-b9e0-4f14-afe0-21b072aa9bb5.md"
+      },
+      "notes": {
+        "docs_freshness_pre_expiry_review": "CO-579 pre-expiry review: retained active or blocked scope; no spec contract changes required."
       }
     },
     {
@@ -5904,7 +6025,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-30",
+      "last_review": "2026-05-24",
       "status": "in_progress",
       "canonical_owner_marker": "codex-orchestrator:canonical-owner-key=docs:freshness:maintain",
       "evidence": [
@@ -5960,6 +6081,9 @@
         "task": "tasks/tasks-linear-5d677c44-06c1-43ca-9aac-5a74f96671b4.md",
         "agent_task": ".agent/task/linear-5d677c44-06c1-43ca-9aac-5a74f96671b4.md",
         "docs": "docs/TECH_SPEC-linear-5d677c44-06c1-43ca-9aac-5a74f96671b4.md"
+      },
+      "notes": {
+        "docs_freshness_pre_expiry_review": "CO-579 pre-expiry review: retained active or blocked scope; no spec contract changes required."
       }
     },
     {
@@ -5970,7 +6094,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-30",
+      "last_review": "2026-05-24",
       "status": "in_progress",
       "evidence": [
         "docs/PRD-linear-345cd50c-4962-4376-a7ca-1982ba311699.md",
@@ -6001,6 +6125,9 @@
         "docs": "docs/TECH_SPEC-linear-345cd50c-4962-4376-a7ca-1982ba311699.md",
         "prd": "docs/PRD-linear-345cd50c-4962-4376-a7ca-1982ba311699.md",
         "action_plan": "docs/ACTION_PLAN-linear-345cd50c-4962-4376-a7ca-1982ba311699.md"
+      },
+      "notes": {
+        "docs_freshness_pre_expiry_review": "CO-579 pre-expiry review: retained active or blocked scope; no spec contract changes required."
       }
     },
     {
@@ -6011,7 +6138,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-05-04",
+      "last_review": "2026-05-24",
       "status": "in_progress",
       "canonical_owner_marker": "codex-orchestrator:canonical-owner-key=docs:freshness:maintain",
       "evidence": [
@@ -6079,6 +6206,9 @@
         "task": "tasks/tasks-linear-6df648e0-4a48-45a2-bdd3-aeaa9c1deb2b.md",
         "agent_task": ".agent/task/linear-6df648e0-4a48-45a2-bdd3-aeaa9c1deb2b.md",
         "docs": "docs/TECH_SPEC-linear-6df648e0-4a48-45a2-bdd3-aeaa9c1deb2b.md"
+      },
+      "notes": {
+        "docs_freshness_pre_expiry_review": "CO-579 pre-expiry review: retained active or blocked scope; no spec contract changes required."
       }
     },
     {
@@ -6089,7 +6219,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-30",
+      "last_review": "2026-05-24",
       "status": "in_progress",
       "evidence": [
         "docs/PRD-linear-3ed4e0c0-4a6a-428b-bf31-d6252f230377.md",
@@ -6113,6 +6243,9 @@
         "spec": "tasks/specs/linear-3ed4e0c0-4a6a-428b-bf31-d6252f230377.md",
         "task": "tasks/tasks-linear-3ed4e0c0-4a6a-428b-bf31-d6252f230377.md",
         "docs": "docs/TECH_SPEC-linear-3ed4e0c0-4a6a-428b-bf31-d6252f230377.md"
+      },
+      "notes": {
+        "docs_freshness_pre_expiry_review": "CO-579 pre-expiry review: retained active or blocked scope; no spec contract changes required."
       }
     },
     {
@@ -6123,7 +6256,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-30",
+      "last_review": "2026-05-24",
       "status": "in_progress",
       "canonical_owner_marker": "codex-orchestrator:canonical-owner-key=docs:freshness:maintain",
       "evidence": [
@@ -6183,6 +6316,9 @@
         "task": "tasks/tasks-linear-b9e7583a-3051-40d3-a87f-0388faa9df61.md",
         "agent_task": ".agent/task/linear-b9e7583a-3051-40d3-a87f-0388faa9df61.md",
         "docs": "docs/TECH_SPEC-linear-b9e7583a-3051-40d3-a87f-0388faa9df61.md"
+      },
+      "notes": {
+        "docs_freshness_pre_expiry_review": "CO-579 pre-expiry review: retained active or blocked scope; no spec contract changes required."
       }
     },
     {
@@ -6193,7 +6329,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-30",
+      "last_review": "2026-05-24",
       "evidence": [
         ".agent/task/linear-d78c6860-93f6-4936-b3ad-b40e8de8a566.md",
         "docs/ACTION_PLAN-linear-d78c6860-93f6-4936-b3ad-b40e8de8a566.md",
@@ -6262,6 +6398,9 @@
         "task": "tasks/tasks-linear-d78c6860-93f6-4936-b3ad-b40e8de8a566.md",
         "agent_task": ".agent/task/linear-d78c6860-93f6-4936-b3ad-b40e8de8a566.md",
         "docs": "docs/TECH_SPEC-linear-d78c6860-93f6-4936-b3ad-b40e8de8a566.md"
+      },
+      "notes": {
+        "docs_freshness_pre_expiry_review": "CO-579 pre-expiry review: retained active or blocked scope; no spec contract changes required."
       }
     },
     {
@@ -6272,7 +6411,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-30",
+      "last_review": "2026-05-24",
       "status": "in_progress",
       "canonical_owner_marker": "codex-orchestrator:canonical-owner-key=spec-guard:active-specs:last_review=2026-03-30",
       "approvals": {
@@ -6322,6 +6461,9 @@
         "task": "tasks/tasks-linear-dc2bb702-db1d-450c-be19-a98571289a21.md",
         "agent_task": ".agent/task/linear-dc2bb702-db1d-450c-be19-a98571289a21.md",
         "docs": "docs/TECH_SPEC-linear-dc2bb702-db1d-450c-be19-a98571289a21.md"
+      },
+      "notes": {
+        "docs_freshness_pre_expiry_review": "CO-579 pre-expiry review: retained active or blocked scope; no spec contract changes required."
       }
     },
     {
@@ -6332,7 +6474,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-30",
+      "last_review": "2026-05-24",
       "canonical_owner_marker": "codex-orchestrator:canonical-owner-key=docs_freshness_candidate|doc_class:task_packet|path_family:tasks/specs|last_review:2026-03-30|cadence_days:30",
       "evidence": [
         "docs/PRD-linear-b9a1044e-03b0-49ef-8435-92840eaf90b9.md",
@@ -6365,6 +6507,9 @@
         "task": "tasks/tasks-linear-b9a1044e-03b0-49ef-8435-92840eaf90b9.md",
         "agent_task": ".agent/task/linear-b9a1044e-03b0-49ef-8435-92840eaf90b9.md",
         "docs": "docs/TECH_SPEC-linear-b9a1044e-03b0-49ef-8435-92840eaf90b9.md"
+      },
+      "notes": {
+        "docs_freshness_pre_expiry_review": "CO-579 pre-expiry review: retained active or blocked scope; no spec contract changes required."
       }
     },
     {
@@ -6375,7 +6520,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-30",
+      "last_review": "2026-05-24",
       "canonical_owner_marker": "codex-orchestrator:canonical-owner-key=docs:freshness:maintain",
       "evidence": [
         ".runs/linear-b78c98eb-8ed4-4e19-9099-81d5e34bb33c/cli/2026-04-30T01-53-05-383Z-0772e9d7/manifest.json"
@@ -6399,6 +6544,9 @@
         "task": "tasks/tasks-linear-b78c98eb-8ed4-4e19-9099-81d5e34bb33c.md",
         "agent_task": ".agent/task/linear-b78c98eb-8ed4-4e19-9099-81d5e34bb33c.md",
         "docs": "docs/TECH_SPEC-linear-b78c98eb-8ed4-4e19-9099-81d5e34bb33c.md"
+      },
+      "notes": {
+        "docs_freshness_pre_expiry_review": "CO-579 pre-expiry review: retained active or blocked scope; no spec contract changes required."
       }
     },
     {
@@ -6409,7 +6557,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-30",
+      "last_review": "2026-05-24",
       "approvals": {
         "traceability_packet": {
           "reviewer": "write-enabled docs-only packet worker",
@@ -6423,6 +6571,9 @@
         "task": "tasks/tasks-linear-8098459b-be08-4f9f-8e45-bd315fb4c9b9.md",
         "agent_task": ".agent/task/linear-8098459b-be08-4f9f-8e45-bd315fb4c9b9.md",
         "docs": "docs/TECH_SPEC-linear-8098459b-be08-4f9f-8e45-bd315fb4c9b9.md"
+      },
+      "notes": {
+        "docs_freshness_pre_expiry_review": "CO-579 pre-expiry review: retained active or blocked scope; no spec contract changes required."
       }
     },
     {
@@ -8350,7 +8501,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-23",
+      "last_review": "2026-05-24",
       "approvals": {
         "docs_packet_child_lane": {
           "reviewer": "bounded same-issue docs child lane",
@@ -8363,7 +8514,9 @@
       },
       "paths": {
         "task": "tasks/tasks-linear-0549b4a2-56b1-4164-b65a-73fd2ba7d9e8.md",
-        "docs": "docs/TECH_SPEC-linear-0549b4a2-release-publish-workflow-fix.md"
+        "docs": "docs/TECH_SPEC-linear-0549b4a2-release-publish-workflow-fix.md",
+        "prd": "docs/PRD-linear-0549b4a2-release-publish-workflow-fix.md",
+        "action_plan": "docs/ACTION_PLAN-linear-0549b4a2-release-publish-workflow-fix.md"
       }
     },
     {
@@ -8567,7 +8720,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-23",
+      "last_review": "2026-05-24",
       "approvals": {
         "parent_docs_first": {
           "reviewer": "provider worker",
@@ -27089,7 +27242,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-23",
+      "last_review": "2026-05-24",
       "approvals": {
         "baseline_evidence_child_lane": {
           "reviewer": "bounded same-issue docs child lane",
@@ -27129,7 +27282,9 @@
         "spec": "tasks/specs/linear-75a26ef8-4cb7-4b6e-9335-85edae0fd9be.md",
         "task": "tasks/tasks-linear-75a26ef8-4cb7-4b6e-9335-85edae0fd9be.md",
         "agent_task": ".agent/task/linear-75a26ef8-4cb7-4b6e-9335-85edae0fd9be.md",
-        "docs": "docs/TECH_SPEC-linear-75a26ef8-4cb7-4b6e-9335-85edae0fd9be.md"
+        "docs": "docs/TECH_SPEC-linear-75a26ef8-4cb7-4b6e-9335-85edae0fd9be.md",
+        "prd": "docs/PRD-linear-75a26ef8-4cb7-4b6e-9335-85edae0fd9be.md",
+        "action_plan": "docs/ACTION_PLAN-linear-75a26ef8-4cb7-4b6e-9335-85edae0fd9be.md"
       }
     },
     {
@@ -27684,7 +27839,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-05-01",
+      "last_review": "2026-05-24",
       "approvals": {
         "traceability_packet": {
           "reviewer": "CO-454 traceability packet branch",
@@ -27719,6 +27874,9 @@
         "prd": "docs/PRD-linear-9aedac3e-09df-4859-b818-b6f2d4dc8ccc.md",
         "docs": "docs/TECH_SPEC-linear-9aedac3e-09df-4859-b818-b6f2d4dc8ccc.md",
         "action_plan": "docs/ACTION_PLAN-linear-9aedac3e-09df-4859-b818-b6f2d4dc8ccc.md"
+      },
+      "notes": {
+        "docs_freshness_pre_expiry_review": "CO-579 pre-expiry review: retained active or blocked scope; no spec contract changes required."
       }
     },
     {
@@ -27730,7 +27888,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-05-01",
+      "last_review": "2026-05-24",
       "approvals": {
         "pre_implementation_issue_quality_review": {
           "reviewer": "parent provider worker",
@@ -27794,6 +27952,9 @@
         "prd": "docs/PRD-linear-d412792b-9a2a-43d9-96dc-ca021e728d09.md",
         "docs": "docs/TECH_SPEC-linear-d412792b-9a2a-43d9-96dc-ca021e728d09.md",
         "action_plan": "docs/ACTION_PLAN-linear-d412792b-9a2a-43d9-96dc-ca021e728d09.md"
+      },
+      "notes": {
+        "docs_freshness_pre_expiry_review": "CO-579 pre-expiry review: retained active or blocked scope; no spec contract changes required."
       }
     },
     {

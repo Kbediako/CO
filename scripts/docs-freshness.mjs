@@ -218,6 +218,38 @@ function explicitTerminalTaskStatusLifecycle(taskStatus, entryPath) {
   };
 }
 
+function resolveEffectiveReviewDate(lifecycleIndex, entryPath, registryLastReview, registryReviewDate) {
+  const fallback = {
+    effectiveLastReview: registryLastReview,
+    effectiveReviewDate: registryReviewDate,
+    reviewSourceMetadata: {}
+  };
+  if (!entryPath || !registryReviewDate) {
+    return fallback;
+  }
+
+  const taskIndexEntry = lifecycleIndex.taskItemsByPath?.get(entryPath);
+  const taskIndexReviewDate = parseIsoDate(taskIndexEntry?.last_review);
+  if (!taskIndexEntry || !taskIndexReviewDate || taskIndexReviewDate <= registryReviewDate) {
+    return fallback;
+  }
+
+  return {
+    effectiveLastReview: taskIndexEntry.last_review,
+    effectiveReviewDate: taskIndexReviewDate,
+    reviewSourceMetadata: {
+      last_review_source: TASKS_INDEX_PATH,
+      registry_last_review: registryLastReview,
+      task_index_last_review: taskIndexEntry.last_review,
+      task_index_task_key: taskIndexEntry.task_key,
+      ...(taskIndexEntry.status ? { task_index_status: taskIndexEntry.status } : {}),
+      ...(taskIndexEntry.source_issue?.identifier
+        ? { task_index_issue_identifier: taskIndexEntry.source_issue.identifier }
+        : {})
+    }
+  };
+}
+
 function addDaysToIsoDate(isoDate, days) {
   const parsed = parseIsoDate(isoDate);
   if (!parsed || !Number.isFinite(days)) {
@@ -431,6 +463,31 @@ function summarizeTaskLineage(entries) {
   };
 }
 
+function canonicalOwnerKeyForBaselineCohortId(baselineCohortId) {
+  return baselineCohortId ? `baseline_cohort_id:${baselineCohortId}` : null;
+}
+
+function resolveRollingCohortOwnerIssue(policy, baselineCohortId) {
+  const canonicalOwnerKey = canonicalOwnerKeyForBaselineCohortId(baselineCohortId);
+  const canonicalOwner = canonicalOwnerKey
+    ? policy.canonical_owner_issues.find((entry) => entry.canonical_owner_key === canonicalOwnerKey)
+    : null;
+  if (canonicalOwner) {
+    return {
+      owner_issue: canonicalOwner.owner_issue,
+      configured_owner_issue: policy.owner_issue,
+      owner_resolution_source: 'rolling_freshness_policy.canonical_owner_issues',
+      canonical_owner_key: canonicalOwnerKey
+    };
+  }
+  return {
+    owner_issue: policy.owner_issue,
+    configured_owner_issue: policy.owner_issue,
+    owner_resolution_source: 'rolling_freshness_policy.owner_issue',
+    canonical_owner_key: canonicalOwnerKey
+  };
+}
+
 function buildRollingCohortSummary(entries, policy) {
   const classBreakdown = new Map();
   const pathFamilyBreakdown = new Map();
@@ -440,10 +497,11 @@ function buildRollingCohortSummary(entries, policy) {
   }
   const first = entries[0];
   const expiresAfter = addDaysToIsoDate(first.last_review, first.cadence_days + policy.window_days);
+  const ownerResolution = resolveRollingCohortOwnerIssue(policy, first.baseline_cohort_id);
   return {
     id: `${first.baseline_cohort_id}-${first.last_review}-cadence-${first.cadence_days}-age-${first.age_days}`,
     baseline_cohort_id: first.baseline_cohort_id,
-    owner_issue: policy.owner_issue,
+    ...ownerResolution,
     status: 'rolling_window',
     last_review: first.last_review,
     cadence_days: first.cadence_days,
@@ -580,6 +638,7 @@ export function renderDocsFreshnessMarkdown(report) {
     `- Rolling cohort entries: ${report.totals.rolling_cohort_entries ?? 0}`,
     `- Terminal lifecycle entries: ${report.totals.terminal_lifecycle_entries ?? 0}`,
     `- Pre-expiry strict entries: ${report.totals.pre_expiry_entries ?? 0}`,
+    `- Task-index review overrides: ${report.totals.task_index_review_overrides ?? 0}`,
     `- Uncatalogued docs: ${report.totals.uncatalogued_docs}`,
     '',
     '## Class Summary',
@@ -701,6 +760,7 @@ export async function runDocsFreshness(
   const rawStaleEntries = [];
   const terminalLifecycleEntries = [];
   const preExpiryEntries = [];
+  const taskIndexReviewOverrides = [];
   const missingOnDisk = [];
   const registryPaths = new Set();
   const metricsByClass = [];
@@ -783,7 +843,13 @@ export async function runDocsFreshness(
 
     if (reviewDate && Number.isInteger(cadenceDays) && cadenceDays > 0) {
       if (isStaleEligibleRegistryEntry(status, entry)) {
-        const ageDays = computeAgeInDays(reviewDate, today);
+        const { effectiveLastReview, effectiveReviewDate, reviewSourceMetadata } = resolveEffectiveReviewDate(
+          lifecycleIndex,
+          entryPath,
+          entry.last_review,
+          reviewDate
+        );
+        const ageDays = computeAgeInDays(effectiveReviewDate, today);
         const daysUntilExpiry = cadenceDays - ageDays;
         const terminalLifecycle = explicitNonTerminalTaskStatus
           ? null
@@ -797,6 +863,23 @@ export async function runDocsFreshness(
             ? { lifecycle_state: entry.lifecycle_state.trim() }
             : {})
         };
+        if (reviewSourceMetadata.last_review_source === TASKS_INDEX_PATH) {
+          taskIndexReviewOverrides.push({
+            path: entryPath,
+            last_review: effectiveLastReview,
+            cadence_days: cadenceDays,
+            age_days: ageDays,
+            days_until_expiry: daysUntilExpiry,
+            next_review: addDaysToIsoDate(effectiveLastReview, cadenceDays),
+            doc_class: docClass || 'uncatalogued',
+            doc_class_label: docClassLabel,
+            path_family: classifyPathFamily(entryPath),
+            registry_status: status,
+            registry_was_stale: computeAgeInDays(reviewDate, today) > cadenceDays,
+            ...reviewSourceMetadata,
+            ...registryLifecycleMetadata
+          });
+        }
         if (
           STRICT_PRE_EXPIRY_DOC_CLASSES.has(docClass || '') &&
           daysUntilExpiry >= 0 &&
@@ -804,23 +887,24 @@ export async function runDocsFreshness(
         ) {
           preExpiryEntries.push({
             path: entryPath,
-            last_review: entry.last_review,
+            last_review: effectiveLastReview,
             cadence_days: cadenceDays,
             age_days: ageDays,
             days_until_expiry: daysUntilExpiry,
-            next_review: addDaysToIsoDate(entry.last_review, cadenceDays),
+            next_review: addDaysToIsoDate(effectiveLastReview, cadenceDays),
             doc_class: docClass || 'uncatalogued',
             doc_class_label: docClassLabel,
             path_family: classifyPathFamily(entryPath),
             direct_action_required: true,
             rolling_deferral_eligible: false,
+            ...reviewSourceMetadata,
             ...registryLifecycleMetadata
           });
         }
         if (terminalLifecycle) {
           terminalLifecycleEntries.push({
             path: entryPath,
-            last_review: entry.last_review,
+            last_review: effectiveLastReview,
             cadence_days: cadenceDays,
             age_days: ageDays,
             overdue_days: Math.max(0, ageDays - cadenceDays),
@@ -828,6 +912,7 @@ export async function runDocsFreshness(
             doc_class_label: docClassLabel,
             path_family: classifyPathFamily(entryPath),
             task_number: extractTaskNumber(entryPath),
+            ...reviewSourceMetadata,
             ...registryLifecycleMetadata,
             ...terminalLifecycle,
             registry_status: status,
@@ -838,7 +923,7 @@ export async function runDocsFreshness(
         } else if (ageDays > cadenceDays) {
           rawStaleEntries.push({
             path: entryPath,
-            last_review: entry.last_review,
+            last_review: effectiveLastReview,
             cadence_days: cadenceDays,
             age_days: ageDays,
             overdue_days: ageDays - cadenceDays,
@@ -846,6 +931,7 @@ export async function runDocsFreshness(
             doc_class_label: docClassLabel,
             path_family: classifyPathFamily(entryPath),
             task_number: extractTaskNumber(entryPath),
+            ...reviewSourceMetadata,
             ...registryLifecycleMetadata
           });
         }
@@ -890,12 +976,15 @@ export async function runDocsFreshness(
             stale_entries: staleEntries.filter(
               (item) => (classifyPath(item.path, docsCatalog) || 'uncatalogued') === entry.doc_class
             ),
-            terminal_lifecycle_entries: terminalLifecycleEntries.filter(
-              (item) => (classifyPath(item.path, docsCatalog) || 'uncatalogued') === entry.doc_class
-            )
-          };
-          return result;
-        }, {});
+      terminal_lifecycle_entries: terminalLifecycleEntries.filter(
+        (item) => (classifyPath(item.path, docsCatalog) || 'uncatalogued') === entry.doc_class
+      ),
+      task_index_review_overrides: taskIndexReviewOverrides.filter(
+        (item) => (classifyPath(item.path, docsCatalog) || 'uncatalogued') === entry.doc_class
+      )
+    };
+    return result;
+  }, {});
 
   const report = {
     version: 3,
@@ -913,6 +1002,7 @@ export async function runDocsFreshness(
       rolling_cohort_entries: rollingCohortEntries.length,
       terminal_lifecycle_entries: terminalLifecycleEntries.length,
       pre_expiry_entries: preExpiryEntries.length,
+      task_index_review_overrides: taskIndexReviewOverrides.length,
       uncatalogued_docs: uncataloguedDocs.length
     },
     rolling_freshness_policy: rollingFreshnessPolicy,
@@ -925,6 +1015,7 @@ export async function runDocsFreshness(
     stale_entries: staleEntries,
     terminal_lifecycle_entries: terminalLifecycleEntries,
     pre_expiry_entries: preExpiryEntries,
+    task_index_review_overrides: taskIndexReviewOverrides,
     rolling_cohort_entries: rollingCohortEntries,
     rolling_freshness_cohorts: rollingFreshnessCohorts
   };
@@ -1011,6 +1102,9 @@ async function main() {
   }
   if ((report.totals.pre_expiry_entries ?? 0) > 0) {
     console.log(`- strict docs approaching expiry: ${report.totals.pre_expiry_entries}`);
+  }
+  if ((report.totals.task_index_review_overrides ?? 0) > 0) {
+    console.log(`- task-index review overrides: ${report.totals.task_index_review_overrides}`);
   }
   if ((report.totals.rolling_cohort_entries ?? 0) > 0) {
     console.log(`- rolling freshness cohort entries: ${report.totals.rolling_cohort_entries}`);

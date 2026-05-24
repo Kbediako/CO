@@ -5,10 +5,12 @@ relates_to: docs/PRD-linear-bdfd9046-97b5-43bd-850f-b305558cdada.md
 risk: high
 owners:
   - Codex
-last_review: 2026-05-01
+last_review: 2026-05-24
 related_action_plan: docs/ACTION_PLAN-linear-bdfd9046-97b5-43bd-850f-b305558cdada.md
 task_checklists:
   - tasks/tasks-linear-bdfd9046-97b5-43bd-850f-b305558cdada.md
+review_notes:
+  - "2026-05-24: CO-579 pre-expiry review: retained active or blocked scope; no spec contract changes required."
 ---
 
 ## Canonical Reference

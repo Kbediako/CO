@@ -4,7 +4,7 @@ title: "CO-444 re-home docs:freshness:maintain owner after terminal CO-441"
 status: in_progress
 owner: Codex
 created: 2026-04-30
-last_review: 2026-04-30
+last_review: 2026-05-24
 review_cadence_days: 30
 risk_level: high
 related_prd: docs/PRD-linear-6df648e0-4a48-45a2-bdd3-aeaa9c1deb2b.md
@@ -12,8 +12,9 @@ related_action_plan: docs/ACTION_PLAN-linear-6df648e0-4a48-45a2-bdd3-aeaa9c1deb2
 related_tasks:
   - tasks/tasks-linear-6df648e0-4a48-45a2-bdd3-aeaa9c1deb2b.md
 review_notes:
-  - 2026-04-30: Bounded child lane created the packet and registry mirrors.
-  - 2026-04-30: Parent reproduced the terminal CO-441 owner blocker and re-homed live metadata to CO-444.
+  - "2026-05-24: CO-579 pre-expiry review: retained active or blocked scope; no spec contract changes required."
+  - "2026-04-30: Bounded child lane created the packet and registry mirrors."
+  - "2026-04-30: Parent reproduced the terminal CO-441 owner blocker and re-homed live metadata to CO-444."
 canonical_owner_marker: codex-orchestrator:canonical-owner-key=docs:freshness:maintain
 ---
 

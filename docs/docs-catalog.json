@@ -136,7 +136,7 @@
     "rolling_freshness_cohorts": {
       "enabled": true,
       "canonical_owner_key": "docs:freshness:maintain",
-      "owner_issue": "CO-575",
+      "owner_issue": "CO-579",
       "owner_issue_team_id": "d4eca09e-973f-4975-92b1-22fa2e914b33",
       "owner_issue_project_id": "f8543cb9-8bc9-4a85-bfde-45b270bcb48c",
       "require_live_owner_verification": true,

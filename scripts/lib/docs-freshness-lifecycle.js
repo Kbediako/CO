@@ -164,6 +164,23 @@ function slugOnlyTaskKey(taskKey, item) {
   return /^[A-Za-z0-9][A-Za-z0-9-]*$/u.test(alias) ? alias : null;
 }
 
+function numberPrefixedTaskKeyAlias(taskKey, item) {
+  if (typeof taskKey !== 'string') {
+    return null;
+  }
+  const match = taskKey.match(/^(\d{4})-([A-Za-z0-9][A-Za-z0-9-]*)$/u);
+  if (!match) {
+    return null;
+  }
+  const taskNumber = match[1];
+  const itemId = normalizeOptionalString(item?.id);
+  const datePrefixedId = itemId?.match(/^\d{8}-(\d{4})-[A-Za-z0-9-]+$/u);
+  if (itemId !== taskNumber && datePrefixedId?.[1] !== taskNumber) {
+    return null;
+  }
+  return match[2];
+}
+
 function addTaskPacketPathAliases(paths, taskKey) {
   addPath(paths, `tasks/tasks-${taskKey}.md`);
   addPath(paths, `tasks/specs/${taskKey}.md`);
@@ -197,6 +214,10 @@ export function collectIndexedTaskPacketPaths(item, options = {}) {
     if (slugAlias) {
       addTaskPacketPathAliases(paths, slugAlias);
     }
+    const numericAlias = includeSlugAliases ? numberPrefixedTaskKeyAlias(taskKey, item) : null;
+    if (numericAlias) {
+      addTaskPacketPathAliases(paths, numericAlias);
+    }
   }
 
   return [...paths].filter(isTaskPacketLifecyclePath).sort();
@@ -221,17 +242,63 @@ function readSourceIssue(item) {
   };
 }
 
+function normalizeLastReviewDate(item) {
+  const rawLastReview = normalizeOptionalString(item?.last_review);
+  const reviewDate = rawLastReview ? parseIsoDateOrTimestamp(rawLastReview) : null;
+  return reviewDate ? formatDate(reviewDate) : null;
+}
+
+function buildTaskIndexEntry(item, taskKey) {
+  return {
+    task_id: normalizeOptionalString(item.id) ?? taskKey,
+    task_key: taskKey,
+    title: normalizeOptionalString(item.title),
+    status: normalizeOptionalString(item.status),
+    last_review: normalizeLastReviewDate(item),
+    source_issue: readSourceIssue(item)
+  };
+}
+
+function shouldReplaceTaskIndexEntry(existing, candidate) {
+  if (!existing) {
+    return true;
+  }
+  const existingReviewDate = existing.last_review ? parseIsoDateOrTimestamp(existing.last_review) : null;
+  const candidateReviewDate = candidate.last_review ? parseIsoDateOrTimestamp(candidate.last_review) : null;
+  if (!existingReviewDate) {
+    return Boolean(candidateReviewDate);
+  }
+  if (!candidateReviewDate) {
+    return false;
+  }
+  return candidateReviewDate > existingReviewDate;
+}
+
 export function buildTaskPacketLifecycleIndex(items) {
   const byPath = new Map();
   const terminalItems = [];
+  const taskItemsByPath = new Map();
   const sourceItems = Array.isArray(items) ? items : [];
 
   for (const item of sourceItems) {
-    if (!isTerminalTaskItem(item)) {
-      continue;
-    }
     const taskKey = normalizeTaskKey(item);
     if (!taskKey) {
+      continue;
+    }
+
+    const taskIndexEntry = buildTaskIndexEntry(item, taskKey);
+    for (const docPath of collectIndexedTaskPacketPaths(item)) {
+      const entry = {
+        ...taskIndexEntry,
+        path: docPath,
+        path_family: classifyTaskPacketPathFamily(docPath)
+      };
+      if (shouldReplaceTaskIndexEntry(taskItemsByPath.get(docPath), entry)) {
+        taskItemsByPath.set(docPath, entry);
+      }
+    }
+
+    if (!isTerminalTaskItem(item)) {
       continue;
     }
 
@@ -260,6 +327,7 @@ export function buildTaskPacketLifecycleIndex(items) {
 
   return {
     byPath,
-    terminalItems
+    terminalItems,
+    taskItemsByPath
   };
 }

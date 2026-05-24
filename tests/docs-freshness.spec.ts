@@ -504,7 +504,18 @@ describe('docs freshness reporting', () => {
     const repoRoot = await mkdtemp(join(tmpdir(), 'docs-freshness-rolling-cohort-'));
     createdDirs.push(repoRoot);
 
-    await writeRollingDocsFixture(repoRoot, { policy: rollingFreshnessPolicy({ canonical_owner_issues: [{ canonical_owner_key: 'fixture-owner', owner_issue: 'CO-320', require_live_owner_verification: true }] }) });
+    await writeRollingDocsFixture(repoRoot, {
+      policy: rollingFreshnessPolicy({
+        canonical_owner_issues: [
+          {
+            canonical_owner_key: 'baseline_cohort_id:fixture-rolling-baseline',
+            owner_issue: 'CO-568',
+            require_live_owner_verification: true
+          },
+          { canonical_owner_key: 'fixture-owner', owner_issue: 'CO-320', require_live_owner_verification: true }
+        ]
+      })
+    });
 
     const { report, hasFailures } = await runDocsFreshness(repoRoot, {
       outRoot: join(repoRoot, 'out'),
@@ -514,7 +525,15 @@ describe('docs freshness reporting', () => {
     expect(hasFailures).toBe(false);
     expect(report.totals.stale_entries).toBe(0);
     expect(report.totals.rolling_cohort_entries).toBe(1);
-    expect(report.rolling_freshness_policy.canonical_owner_issues[0]).toEqual(expect.objectContaining({ canonical_owner_key: 'fixture-owner', owner_issue: 'CO-320', require_live_owner_verification: true }));
+    expect(report.rolling_freshness_policy.canonical_owner_issues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          canonical_owner_key: 'baseline_cohort_id:fixture-rolling-baseline',
+          owner_issue: 'CO-568',
+          require_live_owner_verification: true
+        })
+      ])
+    );
     expect(report.rolling_cohort_entries).toEqual([
       expect.objectContaining({
         path: 'tasks/tasks-1234-example.md',
@@ -526,7 +545,10 @@ describe('docs freshness reporting', () => {
     expect(report.rolling_freshness_cohorts).toEqual([
       expect.objectContaining({
         baseline_cohort_id: 'fixture-rolling-baseline',
-        owner_issue: 'CO-175',
+        owner_issue: 'CO-568',
+        configured_owner_issue: 'CO-175',
+        canonical_owner_key: 'baseline_cohort_id:fixture-rolling-baseline',
+        owner_resolution_source: 'rolling_freshness_policy.canonical_owner_issues',
         stale_entries: 1,
         overdue_days: 1,
         lineage: expect.objectContaining({ task_number_range: '1234-1234' })
@@ -535,9 +557,106 @@ describe('docs freshness reporting', () => {
 
     const markdown = renderDocsFreshnessMarkdown(report);
     expect(markdown).toContain('## Rolling Freshness Cohorts');
-    expect(markdown).toContain('- Owner issue: CO-175');
+    expect(markdown).toContain('- Owner issue: CO-568');
     expect(markdown).toContain('- Rolling cohort entries: 1');
     expect(markdown).toContain('No drift detected across the current docs catalog.');
+  });
+
+  it('uses newer task index reviews for active task packet mirror freshness', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docs-freshness-task-index-effective-review-'));
+    createdDirs.push(repoRoot);
+    const docPath = 'docs/TECH_SPEC-linear-active-fixture.md';
+    const prdAliasPath = 'docs/PRD-active-fixture.md';
+    const taskPath = 'tasks/tasks-1234-active-fixture.md';
+    const registryReviewDate = reviewDateDaysAgo(31);
+    const taskIndexReviewDate = reviewDateDaysAgo(1);
+
+    await Promise.all([
+      mkdir(join(repoRoot, 'docs'), { recursive: true }),
+      mkdir(join(repoRoot, 'tasks'), { recursive: true })
+    ]);
+    await writeFile(join(repoRoot, docPath), '# Active task packet\n', 'utf8');
+    await writeFile(join(repoRoot, prdAliasPath), '# Active task packet PRD\n', 'utf8');
+    await writeFile(join(repoRoot, taskPath), '# Active task checklist\n', 'utf8');
+    await writeFile(
+      join(repoRoot, 'tasks', 'index.json'),
+      JSON.stringify(
+        {
+          items: [
+            {
+              id: '20260422-1234-active-fixture',
+              status: 'in_progress',
+              last_review: taskIndexReviewDate,
+              paths: {
+                docs: docPath,
+                task: taskPath
+              }
+            }
+          ]
+        },
+        null,
+        2
+      ),
+      'utf8'
+    );
+    await writeDocsFreshnessFixture(repoRoot, {
+      registryEntries: [
+        {
+          path: docPath,
+          owner: 'Codex',
+          status: 'active',
+          last_review: registryReviewDate,
+          cadence_days: 30
+        },
+        {
+          path: prdAliasPath,
+          owner: 'Codex',
+          status: 'active',
+          last_review: registryReviewDate,
+          cadence_days: 30
+        },
+        {
+          path: taskPath,
+          owner: 'Codex',
+          status: 'active',
+          last_review: taskIndexReviewDate,
+          cadence_days: 30
+        }
+      ],
+      catalogPatterns: [
+        { glob: 'docs/TECH_SPEC-*.md', doc_class: 'task_packet' },
+        { glob: 'docs/PRD-*.md', doc_class: 'task_packet' },
+        { glob: 'tasks/tasks-*.md', doc_class: 'task_packet' }
+      ]
+    });
+
+    const { report, hasFailures } = await runDocsFreshness(repoRoot, {
+      outRoot: join(repoRoot, 'out'),
+      taskId: 'fixture'
+    });
+
+    expect(hasFailures).toBe(false);
+    expect(report.totals.stale_entries).toBe(0);
+    expect(report.totals.task_index_review_overrides).toBe(2);
+    expect(report.stale_entries).toEqual([]);
+    expect(report.task_index_review_overrides).toEqual([
+      expect.objectContaining({
+        path: docPath,
+        last_review_source: 'tasks/index.json',
+        registry_last_review: registryReviewDate,
+        task_index_last_review: taskIndexReviewDate,
+        task_index_task_key: '1234-active-fixture',
+        registry_was_stale: true
+      }),
+      expect.objectContaining({
+        path: prdAliasPath,
+        last_review_source: 'tasks/index.json',
+        registry_last_review: registryReviewDate,
+        task_index_last_review: taskIndexReviewDate,
+        task_index_task_key: '1234-active-fixture',
+        registry_was_stale: true
+      })
+    ]);
   });
 
   it('keeps non-eligible stale docs as blocking failures when rolling cohorts are enabled', async () => {

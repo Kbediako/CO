@@ -5,7 +5,9 @@ relates_to: docs/PRD-linear-d536879d-3ddc-47b0-ae37-0ab657af18ba.md
 risk: high
 owners:
   - Codex
-last_review: 2026-05-01
+last_review: 2026-05-24
+review_notes:
+  - "2026-05-24: CO-579 pre-expiry review: retained active or blocked scope; no spec contract changes required."
 ---
 
 ## Canonical Reference
