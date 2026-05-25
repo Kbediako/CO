@@ -24,16 +24,28 @@
         "docs/docs-freshness-registry.json"
       ],
       "validation": {
-        "status": "docs_packet_created_validation_pending",
+        "status": "implementation_validated_review_quota_blocked",
         "passed": [
           "live GitHub PR audit found zero open PRs",
-          "live provider-intake audit found one active CO-557 claim and stale completed terminal promoted-review residue",
-          "docs-first packet drafted in isolated worktree"
+          "live provider-intake audit reproduced stale completed terminal promoted-review residue",
+          "docs-first packet drafted in isolated worktree",
+          "node scripts/delegation-guard.mjs --task linear-6c71f385-db09-470b-84cb-61013987a2a1",
+          "node scripts/spec-guard.mjs --dry-run",
+          "npm run test:core -- orchestrator/tests/ProviderIssueHandoff.test.ts -t \"clears stale promoted review residue\"",
+          "npm run build",
+          "npm run lint",
+          "CODEX_NON_INTERACTIVE=1 npm run test",
+          "npm run docs:check",
+          "npm run docs:freshness",
+          "npm run repo:stewardship",
+          "node scripts/diff-budget.mjs",
+          "npm run docs:freshness:maintain -- --format json --dry-run-linear-actions --freshness-report out/linear-6c71f385-db09-470b-84cb-61013987a2a1/docs-freshness.json --summary-markdown out/linear-6c71f385-db09-470b-84cb-61013987a2a1/docs-freshness-maintenance.md --report out/linear-6c71f385-db09-470b-84cb-61013987a2a1/docs-freshness-maintenance.json --warn",
+          "npm run pack:smoke",
+          "manual elegance/minimality review after Codex review quota failure"
         ],
         "pending": [
-          "docs packet structural validation",
-          "docs-review",
-          "implementation and full repo validation"
+          "manifest-backed standalone review is quota-blocked until 2026-05-31T07:51:00 local",
+          "PR attach, ready-review drain, and In Review handoff"
         ]
       },
       "paths": {
