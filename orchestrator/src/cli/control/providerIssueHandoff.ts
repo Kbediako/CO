@@ -8570,12 +8570,13 @@ function shouldClearStaleReviewPromotionForTrackedIssue(input: {
   ) {
     return false;
   }
-  return (
-    compareTrackedIssueUpdatedAt({
-      existingIssueUpdatedAt: reviewPromotion.issue_updated_at ?? null,
-      nextIssueUpdatedAt: input.trackedIssue.updated_at
-    }) === 'newer'
-  );
+  const freshness = compareTrackedIssueUpdatedAt({
+    existingIssueUpdatedAt: reviewPromotion.issue_updated_at ?? null,
+    nextIssueUpdatedAt: input.trackedIssue.updated_at
+  });
+  return trackedIssueIsDone
+    ? freshness === 'equal' || freshness === 'newer'
+    : freshness === 'newer';
 }
 
 function assessProviderTrackedIssueEligibility(

@@ -42597,7 +42597,7 @@ describe('createProviderIssueHandoffService', () => {
     expect(launcher.resume).not.toHaveBeenCalled();
   });
 
-  it('clears stale promoted review residue during completed-run rehydrate when newer tracked issue truth is Done', async () => {
+  it('clears stale promoted review residue during completed-run rehydrate when equal tracked issue truth is Done', async () => {
     const { root, paths } = await createHostPaths();
     const childEnv = {
       repoRoot: root,
@@ -42706,7 +42706,7 @@ describe('createProviderIssueHandoffService', () => {
           title: 'Terminal promoted PR residue',
           state: 'Done',
           state_type: 'completed',
-          updated_at: '2026-05-22T15:45:00.000Z',
+          updated_at: '2026-05-22T15:30:20.000Z',
           assignee_id: null,
           assignee_name: null
         })
@@ -42720,7 +42720,7 @@ describe('createProviderIssueHandoffService', () => {
       reason: 'provider_issue_rehydrated_completed_run',
       issue_state: 'Done',
       issue_state_type: 'completed',
-      issue_updated_at: '2026-05-22T15:45:00.000Z',
+      issue_updated_at: '2026-05-22T15:30:20.000Z',
       run_id: 'run-576-stale-promoted-review-rehydrate',
       run_manifest_path: childPaths.manifestPath,
       retry_queued: null,

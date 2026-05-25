@@ -41,7 +41,9 @@
           "node scripts/diff-budget.mjs",
           "npm run docs:freshness:maintain -- --format json --dry-run-linear-actions --freshness-report out/linear-6c71f385-db09-470b-84cb-61013987a2a1/docs-freshness.json --summary-markdown out/linear-6c71f385-db09-470b-84cb-61013987a2a1/docs-freshness-maintenance.md --report out/linear-6c71f385-db09-470b-84cb-61013987a2a1/docs-freshness-maintenance.json --warn",
           "npm run pack:smoke",
-          "manual elegance/minimality review after Codex review quota failure"
+          "manual correctness review after Codex review quota failure",
+          "manual elegance/minimality review after Codex review quota failure",
+          "break-glass review quota waiver recorded"
         ],
         "pending": [
           "manifest-backed standalone review is quota-blocked until 2026-05-31T07:51:00 local",
@@ -66,7 +68,24 @@
         "source_issue": "CO-516 post-merge closeout recurrence follow-up.",
         "protected_terms": "provider-intake-state.json; completed claim; provider_issue_review_promotion_promoted; issue_state=Merging; review_pr_state OPEN; merge_closeout=null; merged PR; Linear Done; CO-514; CO-518; CO-552; CO-565; CO-566; CO-573",
         "non_goals": "No manual provider-intake cleanup, audit deletion, PR merge policy change, review gate change, broad CO STATUS redesign, worker kill, control-host restart, or terminal issue reopening as fix."
-      }
+      },
+      "waivers": [
+        {
+          "type": "standalone_review_quota_blocked",
+          "owner": "CO-576 provider worker / Codex",
+          "trigger": "Manifest-backed codex-orchestrator review executed with FORCE_CODEX_REVIEW=1 and CODEX_REVIEW_AUTHORITATIVE_GATE=1, but Codex review failed before contract output because the account hit the Codex usage limit.",
+          "introduced_date": "2026-05-25",
+          "review_date": "2026-05-26",
+          "maximum_lifetime": "until 2026-05-31T07:51:00 local or sooner if a fresh PR-head manifest-backed review returns clean enforce-mode telemetry",
+          "removal_condition": "Rerun manifest-backed standalone review on the PR head when quota is available and remove this waiver once telemetry reports review_verdict=clean, contract_validation.status=valid, and contract_overall_verdict=clean.",
+          "reason": "The review tool failed on quota rather than product findings; the implementation remains bounded to CO-576 provider-intake projection and widening the issue into Codex quota remediation would violate the non-goals.",
+          "validation_evidence": [
+            ".runs/linear-6c71f385-db09-470b-84cb-61013987a2a1/cli/2026-05-25T22-38-00-517Z-4bbaef71/review/telemetry.json",
+            ".runs/linear-6c71f385-db09-470b-84cb-61013987a2a1/cli/2026-05-25T22-38-00-517Z-4bbaef71/review/output.log",
+            "out/linear-6c71f385-db09-470b-84cb-61013987a2a1/manual/20260526T0906-review-quota-waiver.md"
+          ]
+        }
+      ]
     },
     {
       "id": "20260525-linear-725576d6-e236-40f7-a4bc-25428121ee77",
