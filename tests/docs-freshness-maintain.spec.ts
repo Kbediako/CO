@@ -5062,6 +5062,57 @@ last_review: ${lastReview}
     expect(decision.totals.uncatalogued_docs).toBe(1);
   });
 
+  it('keeps archived-active lifecycle contradictions as registry blockers before capacity routing', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docs-freshness-maintain-archived-active-'));
+    createdDirs.push(repoRoot);
+    const invalidPath = 'tasks/tasks-1164-archived-active.md';
+    await writeFixture(repoRoot, {
+      entries: [{ path: invalidPath, daysOld: 31 }],
+      policy: rollingFreshnessPolicy({
+        max_entries: 0,
+        max_cohorts: 0
+      })
+    });
+    await writeFile(
+      join(repoRoot, 'docs/docs-freshness-registry.json'),
+      JSON.stringify(
+        {
+          version: 1,
+          entries: [
+            {
+              path: invalidPath,
+              owner: 'Codex',
+              status: 'archived',
+              lifecycle_state: ' ACTIVE ',
+              last_review: reviewDateDaysAgo(31),
+              cadence_days: 30
+            }
+          ]
+        },
+        null,
+        2
+      ),
+      'utf8'
+    );
+
+    const { decision, shouldBlock } = await runMaintain(repoRoot);
+
+    expect(shouldBlock).toBe(true);
+    expect(decision.freshness_decision).toBe('block_missing_or_invalid_registry');
+    expect(decision.totals.invalid_entries).toBe(1);
+    expect(decision.policy_capacity_status).toEqual(
+      expect.objectContaining({
+        over_entry_budget: false,
+        current_entries: 0
+      })
+    );
+    expect(decision.sample_paths).toEqual(
+      expect.objectContaining({
+        missing_or_invalid_paths: [invalidPath]
+      })
+    );
+  });
+
   it('keeps the guide declared baseline cohorts in catalog policy parity', async () => {
     const guide = await readFile(join(process.cwd(), 'docs/guides/docs-freshness-cohorts.md'), 'utf8');
     const catalog = JSON.parse(await readFile(join(process.cwd(), 'docs/docs-catalog.json'), 'utf8'));

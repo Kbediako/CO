@@ -20,6 +20,8 @@ import {
 import {
   buildTaskPacketLifecycleIndex,
   buildTaskPacketLifecycleIndexForRepo,
+  ACTIVE_LIFECYCLE_STATUS,
+  ARCHIVED_LIFECYCLE_STATUS,
   classifyTaskPacketPathFamily,
   collectTaskIndexItems,
   EFFECTIVE_LIFECYCLE_STATUSES,
@@ -802,6 +804,7 @@ export async function runDocsFreshness(
     const entryPath = normalizeDocPath(entry?.path);
     const owner = normalizeOwner(entry?.owner);
     const status = typeof entry?.status === 'string' ? entry.status : '';
+    const lifecycleState = normalizeOptionalString(entry?.lifecycle_state)?.toLowerCase() ?? null;
     const taskStatus = normalizeRegistryTaskStatus(entry);
     const explicitNonTerminalTaskStatus = hasExplicitNonTerminalTaskStatus(entry);
     const cadenceDays = Number.isFinite(entry?.cadence_days) ? Number(entry.cadence_days) : NaN;
@@ -821,6 +824,10 @@ export async function runDocsFreshness(
 
     if (!STATUS_VALUES.has(status)) {
       issues.push('invalid status');
+    }
+
+    if (status === ARCHIVED_LIFECYCLE_STATUS && lifecycleState === ACTIVE_LIFECYCLE_STATUS) {
+      issues.push('archived registry status cannot declare active lifecycle_state');
     }
 
     if (!Number.isInteger(cadenceDays) || cadenceDays <= 0) {
@@ -867,7 +874,7 @@ export async function runDocsFreshness(
     );
 
     if (
-      (status === 'archived' || entry?.lifecycle_state === 'archived') &&
+      (status === ARCHIVED_LIFECYCLE_STATUS || lifecycleState === ARCHIVED_LIFECYCLE_STATUS) &&
       isTaskPacketLifecyclePath(entryPath) &&
       (entryOpenChecklistItems.length > 0 || hasLinkedOpenChecklistObligations)
     ) {
