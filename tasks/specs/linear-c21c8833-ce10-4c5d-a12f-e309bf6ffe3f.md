@@ -5,7 +5,7 @@ relates_to: docs/PRD-linear-c21c8833-ce10-4c5d-a12f-e309bf6ffe3f.md
 risk: high
 owners:
   - Codex
-last_review: 2026-05-02
+last_review: 2026-05-25
 related_action_plan: docs/ACTION_PLAN-linear-c21c8833-ce10-4c5d-a12f-e309bf6ffe3f.md
 task_checklists:
   - tasks/tasks-linear-c21c8833-ce10-4c5d-a12f-e309bf6ffe3f.md
@@ -50,6 +50,9 @@ This mirror points to the canonical docs-facing TECH_SPEC at `docs/TECH_SPEC-lin
 - Focused true review-promotion action-required preservation regression.
 - Focused recover/relaunch/nudge convergence proof for `provider_issue_post_worker_exit_refresh_pending`.
 - Required gates: build, lint, unit tests, docs:check, docs:freshness, repo:stewardship, diff-budget, standalone review, and elegance review, with evidence recorded in the provider-worker checklist.
+
+## 2026-05-25 Review
+- CO-585 pre-expiry review checked stale review-promotion/Rework branch-conflict behavior against current `provider_issue_review_promotion_action_required` and `branch_recovery_conflict` coverage in `orchestrator/tests/ProviderIssueHandoff.test.ts` and provider observability tests. The spec remains accurate and active; no content change beyond truthful review metadata is required.
 
 ## Non-Goals
 - No parent-side manual merge-conflict edit for `PR #751`.

@@ -121,6 +121,12 @@ Use this minimal smoke flow:
    - confirm the status snapshot reaches `dispatch_pilot.status=ready`
    - confirm the selected tracked issue resolves from the configured workspace, team, or project binding
 
+## Provider-worker runtime authority
+
+Provider-driven Linear workers should be launched or recovered through the running root control host, including `codex-orchestrator control-host recover`, `codex-orchestrator control-host relaunch`, or `codex-orchestrator control-host nudge` for targeted issue operations. Direct `start provider-linear-worker` remains unsupported because it bypasses control-host admission, launch-token, provenance, deterministic issue worktree, and root `.runs` and `out` artifact routing.
+
+When runtime selection resolves to `appserver`, the resident app-server JSONL control seam is the authoritative worker-control plane. `codex exec` / `codex exec resume` remain available only as explicit break-glass or legacy CLI fallback paths when app-server authority is unavailable or intentionally bypassed. Use the worker manifest/runtime proof and `co-status --format json` to confirm which runtime provider owned a run.
+
 ## Help surfaces
 
 Use these commands when onboarding an operator:
