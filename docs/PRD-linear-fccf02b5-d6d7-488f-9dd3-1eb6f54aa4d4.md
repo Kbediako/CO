@@ -84,6 +84,7 @@
 | Surface | Fallback / seam | Decision | Owner | Trigger | Introduced date | Review date | Maximum lifetime | Removal condition | Validation |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | Control-host status plane | Active-worker timeout quarantine protects worker evidence while status reads are degraded. | expire fallback | CO-583 | `/ui/machine-status.json` or status probes time out while active workers have lower-authority evidence | 2026-05-25 | 2026-05-25 | 2026-06-24 | Status path is bounded and non-blocking by construction, or quarantine remains fully source-labeled and tested. | Parent focused status/supervision tests and live status proof |
+| Control-host owner freshness policy | Implicit hot-path refresh of committed `control_host_owner` source-root freshness snapshots in `controlRuntime` and `providerIssueHandoff` | remove fallback | CO-583 | Post-PR-890 recurrence showed status and handoff policy reads could still recompute owner freshness through synchronous source-root inspection. | 2026-05-25 | Removed in PR #892. | Removed in PR #892. | Hot status and handoff paths resolve source freshness from committed snapshots only; explicit refresh remains limited to cold diagnostic gauge surfaces. | `ControlMachineStatusContract`, `ControlRuntime`, and `ProviderIssueHandoff` regressions plus CI spec-guard evidence |
 
 ## Open Questions
 - Parent implementation should decide exact response field names for active-worker timeout quarantine, degraded read source, and freshness metadata.

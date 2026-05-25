@@ -35,6 +35,7 @@
 | Surface | Fallback/seam | Decision | Owner | Trigger | Introduced date | Review date | Maximum lifetime | Removal condition | Validation |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | Control-host status plane | Active-worker timeout quarantine and same-endpoint timeout compatibility wording in `coStatusAttachCliShell` / `controlRuntime` | expire fallback | CO-583 | machine-status endpoint/probe timeout while active workers exist | 2026-05-25 | 2026-05-25 | 2026-06-24 | Snapshot-only machine-status request path, `/healthz` supervision probe, `/readyz` degraded readiness, and endpoint-starvation diagnostics replace the quarantine | Focused status-plane/supervision tests, `docs:freshness:maintain`, and live hygiene/`co-status` proof |
+| Control-host owner freshness policy | Implicit hot-path refresh of committed `control_host_owner` source-root freshness snapshots in `controlRuntime` and `providerIssueHandoff` | remove fallback | CO-583 | Post-PR-890 recurrence showed status and handoff policy reads could still recompute owner freshness through synchronous source-root inspection. | 2026-05-25 | Removed in PR #892. | Removed in PR #892. | Hot status and handoff paths resolve source freshness from committed snapshots only; explicit refresh remains limited to cold diagnostic gauge surfaces. | `ControlMachineStatusContract`, `ControlRuntime`, and `ProviderIssueHandoff` regressions plus CI spec-guard evidence |
 
 ## Dependencies
 - Parent CO-583 workspace for implementation and live control-host proof.
