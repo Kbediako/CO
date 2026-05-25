@@ -38,6 +38,7 @@ last_review: 2026-05-25
 - Acceptance criteria:
   - `/ui/machine-status.json` serves a committed immutable snapshot only.
   - Freshness/status collection runs outside the serving event loop with bounded async operations, cancellation, no same-root overlap, and stale-on-failure snapshot semantics.
+  - Provider-intake admission accepts current source-root freshness only when provider polling health carries a collector-verified authority tuple (`source_root_freshness_verified_at`, owner token, run id, source-root realpath) bound to the same control-host owner/run and not older than the freshness observation; provider polling success or `updated_at` timestamps are not source-root evidence.
   - `/healthz` is control-token-authenticated cheap liveness, `/readyz` is degraded readiness, and machine-status is snapshot diagnostics.
   - `co-status`, `live_host`, supervision, and UI machine-status expose the same current freshness/owner generation with superseded facts historical only.
   - Dirty isolated worker workspaces do not count as shared checkout drift when the shared root is clean/current.
@@ -50,6 +51,8 @@ last_review: 2026-05-25
 - Functional requirements:
   - Serve `/ui/machine-status.json` from an immutable committed machine-status snapshot only.
   - Run source-root freshness, owner resolution, provider state refresh, and expensive Git/process work outside the serving event loop with bounded async commands, cancellation, no overlapping same-root refreshes, and stale-on-failure commits.
+  - Record source-root freshness authority through explicit collector verification metadata on provider polling health, not through routine provider poll completion, poll success, or snapshot write timestamps.
+  - Fail provider-intake closed when the current source-root freshness snapshot is missing collector verification, has malformed verification time, predates the freshness observation, or is not bound to the same owner token, run id, and source-root realpath.
   - Keep `/healthz` and `/readyz` semantics separate: control-token-authenticated cheap liveness versus degraded readiness.
   - Ensure `co-status` exposes the same current source-root freshness and owner generation as UI machine-status, `live_host`, and supervision.
   - Preserve superseded dirty owner/source-root facts as historical evidence that cannot drive gates.
@@ -81,7 +84,7 @@ last_review: 2026-05-25
 
 ## Architecture & Data
 - Architecture / design adjustments: Represent committed machine-status snapshots as the request-path authority. Status collection may refresh source-root freshness, stale owner freshness, provider state, and owner facts asynchronously, but serving handlers must not initiate those operations.
-- Data model changes / migrations: Parent may add fields for quarantine reason, degraded read source, freshness verdict, and lower-authority evidence. This child lane does not choose final field names.
+- Data model changes / migrations: Provider polling health may add source-root freshness authority metadata fields (`source_root_freshness_verified_at`, owner token, run id, source-root realpath) plus quarantine reason, degraded read source, freshness verdict, and lower-authority evidence as needed.
 - External dependencies / integrations: None for this docs packet.
 
 ## Validation Plan
@@ -90,6 +93,7 @@ last_review: 2026-05-25
   - `git diff --check -- docs/PRD-linear-fccf02b5-d6d7-488f-9dd3-1eb6f54aa4d4.md docs/TECH_SPEC-linear-fccf02b5-d6d7-488f-9dd3-1eb6f54aa4d4.md docs/ACTION_PLAN-linear-fccf02b5-d6d7-488f-9dd3-1eb6f54aa4d4.md tasks/specs/linear-fccf02b5-d6d7-488f-9dd3-1eb6f54aa4d4.md tasks/tasks-linear-fccf02b5-d6d7-488f-9dd3-1eb6f54aa4d4.md .agent/task/linear-fccf02b5-d6d7-488f-9dd3-1eb6f54aa4d4.md tasks/index.json docs/TASKS.md docs/docs-freshness-registry.json`
 - Parent implementation checks:
   - Focused tests for machine-status endpoint, health/readiness semantics, `co-status`, live-host projection, and supervision restart/quarantine behavior.
+  - Focused tests proving provider polling success does not imply source-root authority, missing or malformed collector verification fails closed, and exact owner/run/source-root authority binding is required.
   - Live or fixture proof that active-worker timeout quarantine preserves lower-authority owner/freshness facts.
 
 ## Open Questions

@@ -17,16 +17,16 @@ import { readDocsFreshnessMaintainRepoGate } from './docsFreshnessRepoGate.js';
 import type { LinearBudgetStatus } from './linearBudgetState.js';
 import {
   readProviderPollingHealth,
-  resolveControlPollingNextRefreshProjection,
-  resolveProviderPollingSourceEvidenceUpdatedAt
+  resolveControlPollingNextRefreshProjection
 } from './providerPollingHealth.js';
 import {
   normalizeControlHostOwnershipPollingPayload,
   isControlHostOwnershipFreshnessAtLeastAsRecent,
   resolveControlHostAuthoritativeSourceFreshness,
-  resolveControlHostSourceFreshnessSnapshotStalenessPolicy,
+  resolveControlHostSourceFreshnessAdmissionPolicy,
   resolveControlHostSourceFreshnessPolicyFromPolling
 } from './controlHostOwnership.js';
+import type { ControlHostSourceFreshnessAuthority } from './controlHostOwnership.js';
 import {
   buildProviderIntakeSummary,
   hasQueuedProviderIntakeRetry,
@@ -698,6 +698,9 @@ function resolveProviderIntakeSourceFreshnessPolicy(
   const persistedPolicy = resolveControlHostSourceFreshnessPolicyFromPolling(
     persistedControlHostOwner,
     { refresh: false }
+  ) ?? resolveControlHostSourceFreshnessAdmissionPolicy(
+    persistedControlHostOwner,
+    resolvePollingSourceRootFreshnessAuthority(state?.polling ?? null)
   );
   const livePolling = readProviderPollingHealth(context.readProviderIssueHandoff?.() ?? null);
   const liveControlHostOwner = livePolling?.control_host_owner ?? null;
@@ -707,31 +710,52 @@ function resolveProviderIntakeSourceFreshnessPolicy(
       refreshedLiveOwner,
       { refresh: false }
     );
-    const liveSnapshotStalenessPolicy =
-      resolveControlHostSourceFreshnessSnapshotStalenessPolicy(
-        refreshedLiveOwner,
-        resolveProviderPollingSourceEvidenceUpdatedAt(livePolling)
-      );
     const liveFreshness = resolveControlHostAuthoritativeSourceFreshness(refreshedLiveOwner);
+    if (livePolicy) {
+      return livePolicy;
+    }
     if (
-      livePolicy ||
-      liveSnapshotStalenessPolicy ||
-      (isAuthoritativeLiveControlHostFreshness(liveFreshness) &&
-        isControlHostOwnershipFreshnessAtLeastAsRecent(
-          refreshedLiveOwner,
-          persistedControlHostOwner,
-          {
-            baselineSnapshotUpdatedAt: resolveProviderPollingSourceEvidenceUpdatedAt(
-              state?.polling ?? null,
-              { includeSnapshotUpdatedAt: true }
-            )
-          }
-        ))
+      isAuthoritativeLiveControlHostFreshness(liveFreshness) &&
+      isControlHostOwnershipFreshnessAtLeastAsRecent(refreshedLiveOwner, persistedControlHostOwner)
     ) {
-      return livePolicy ?? liveSnapshotStalenessPolicy;
+      return resolveControlHostSourceFreshnessAdmissionPolicy(
+        refreshedLiveOwner,
+        resolvePollingSourceRootFreshnessAuthority(livePolling)
+      );
     }
   }
   return persistedPolicy;
+}
+
+function resolvePollingSourceRootFreshnessAuthority(
+  polling: unknown
+): ControlHostSourceFreshnessAuthority | null {
+  if (!polling || typeof polling !== 'object') {
+    return null;
+  }
+  const record = polling as Record<string, unknown>;
+  return {
+    verified_at:
+      typeof record.source_root_freshness_verified_at === 'string'
+        ? record.source_root_freshness_verified_at
+        : null,
+    expires_at:
+      typeof record.source_root_freshness_expires_at === 'string'
+        ? record.source_root_freshness_expires_at
+        : null,
+    owner_token:
+      typeof record.source_root_freshness_owner_token === 'string'
+        ? record.source_root_freshness_owner_token
+        : null,
+    run_id:
+      typeof record.source_root_freshness_run_id === 'string'
+        ? record.source_root_freshness_run_id
+        : null,
+    source_root_realpath:
+      typeof record.source_root_freshness_source_root_realpath === 'string'
+        ? record.source_root_freshness_source_root_realpath
+        : null
+  };
 }
 
 function isAuthoritativeLiveControlHostFreshness(

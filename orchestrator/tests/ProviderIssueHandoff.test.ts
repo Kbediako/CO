@@ -34,6 +34,7 @@ import {
 import {
   flushProviderPollingHealthUpdates,
   initializeProviderPollingHealth,
+  markProviderPollingControlHostOwnerFreshnessVerified,
   markProviderPollingCompleted,
   readProviderPollingHealth,
   markProviderPollingStarted,
@@ -1119,7 +1120,7 @@ describe('createProviderIssueHandoffService', () => {
     expect(persist).toHaveBeenCalledTimes(1);
   });
 
-  it('does not hot-refresh current-at-acquisition owner freshness before direct provider issue starts', async () => {
+  it('fails closed for current-at-acquisition owner freshness before verification evidence lands', async () => {
     const { paths } = await createHostPaths();
     const state = createProviderIntakeState();
     state.polling = {
@@ -1152,24 +1153,22 @@ describe('createProviderIssueHandoffService', () => {
       webhookTimestamp: 1_742_360_000_000
     });
 
-    expect(result.kind).toBe('start');
-    expect(launcher.start).toHaveBeenCalledWith(expect.objectContaining({
-      pipelineId: 'diagnostics',
-      provider: 'linear',
-      issueId: 'lin-issue-1',
-      issueIdentifier: 'CO-2',
-      launchToken: expect.any(String)
-    }));
+    expect(result).toMatchObject({
+      kind: 'ignored',
+      reason: 'stale_supervised_control_host_source'
+    });
+    expect(launcher.start).not.toHaveBeenCalled();
     expect(launcher.resume).not.toHaveBeenCalled();
     expect(state.claims[0]).toMatchObject({
       provider_key: 'linear:lin-issue-1',
-      state: 'starting',
+      state: 'ignored',
+      reason: 'stale_supervised_control_host_source',
       task_id: 'linear-lin-issue-1',
       issue_identifier: 'CO-2',
-      launch_source: 'control-host',
-      launch_token: expect.any(String)
+      launch_source: null,
+      launch_token: null
     });
-    expect(persist).toHaveBeenCalledTimes(2);
+    expect(persist).toHaveBeenCalledTimes(1);
   });
 
   it('keeps terminal release precedence while stale supervised source is authoritative', async () => {
@@ -1266,6 +1265,10 @@ describe('createProviderIssueHandoffService', () => {
       intervalMs: 15_000,
       controlHostOwner: liveOwner,
       skipInitialUpdate: true
+    });
+    markProviderPollingControlHostOwnerFreshnessVerified(service, {
+      controlHostOwner: liveOwner,
+      atMs: Date.now()
     });
 
     const result = await service.handleAcceptedTrackedIssue({
@@ -38446,7 +38449,93 @@ describe('createProviderIssueHandoffService', () => {
     });
   });
 
-  it('fails refresh closed when live current freshness predates latest provider source evidence', async () => {
+  it('fails the first refresh closed when polling start observes stale owner freshness', async () => {
+    const { paths } = await createHostPaths();
+    const state = createProviderIntakeState();
+    const liveOwner = await createCurrentAtAcquisitionOwnerThatBecomesStale(
+      'provider-refresh-first-poll-owner-refresh-'
+    );
+    const refreshedOwner = refreshControlHostOwnershipPollingPayload(liveOwner);
+    if (!refreshedOwner) {
+      throw new Error('expected refreshed owner');
+    }
+    state.claims.push({
+      provider: 'linear',
+      provider_key: 'linear:lin-issue-1',
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-2',
+      issue_title: 'Autonomous intake handoff',
+      issue_state: 'In Progress',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-03-19T04:20:00.000Z',
+      task_id: 'task-1303-failed',
+      mapping_source: 'provider_id_fallback',
+      state: 'resumable',
+      reason: 'provider_issue_rehydrated_resumable_run',
+      accepted_at: '2026-03-19T04:20:05.000Z',
+      updated_at: '2026-03-19T04:20:10.000Z',
+      last_delivery_id: 'delivery-failed',
+      last_event: 'Issue',
+      last_action: 'update',
+      last_webhook_timestamp: 1_742_360_050_000,
+      run_id: 'run-failed',
+      run_manifest_path: join(paths.runDir, 'run-failed-manifest.json'),
+      worker_host: null,
+      launch_source: null,
+      launch_token: null,
+      retry_queued: true,
+      retry_attempt: 1,
+      retry_due_at: '2026-03-19T04:30:10.000Z',
+      retry_error: 'retryable failure pending rerun'
+    });
+
+    const persist = vi.fn(async () => undefined);
+    const launcher = {
+      start: vi.fn(async () => null),
+      resume: vi.fn(async () => undefined)
+    };
+    const resolveTrackedIssue = vi.fn(async () => ({
+      kind: 'ready' as const,
+      trackedIssue: createTrackedIssue({
+        updated_at: '2026-03-19T04:20:00.000Z'
+      })
+    }));
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      resolveTrackedIssue
+    });
+    initializeProviderPollingHealth(service, {
+      intervalMs: 15000,
+      stuckAfterMs: 45000,
+      skipInitialUpdate: true,
+      controlHostOwner: liveOwner
+    });
+    markProviderPollingStarted(service, {
+      mode: 'refresh',
+      atMs: Date.parse('2026-05-18T23:12:00.000Z'),
+      controlHostOwner: refreshedOwner
+    } as Parameters<typeof markProviderPollingStarted>[1] & {
+      controlHostOwner: typeof refreshedOwner;
+    });
+
+    await expect(service.refresh()).rejects.toThrow('stale_supervised_control_host_source');
+
+    expect(resolveTrackedIssue).not.toHaveBeenCalled();
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(state.claims[0]).toMatchObject({
+      state: 'resumable',
+      reason: 'provider_issue_rehydrated_resumable_run',
+      run_id: 'run-failed',
+      retry_queued: true
+    });
+  });
+
+  it('does not fail refresh closed only because polling success is newer than live owner freshness', async () => {
     const { paths } = await createHostPaths();
     const state = createProviderIntakeState();
     const liveOwner = await createCurrentAtAcquisitionOwnerThatBecomesStale(
@@ -38512,13 +38601,21 @@ describe('createProviderIssueHandoffService', () => {
     });
 
     await expect(service.refresh()).rejects.toThrow('stale_supervised_control_host_source');
-
     expect(resolveTrackedIssue).not.toHaveBeenCalled();
+
+    markProviderPollingControlHostOwnerFreshnessVerified(service, {
+      controlHostOwner: liveOwner,
+      atMs: Date.now()
+    });
+
+    await service.refresh();
+
+    expect(resolveTrackedIssue).toHaveBeenCalled();
     expect(launcher.start).not.toHaveBeenCalled();
     expect(launcher.resume).not.toHaveBeenCalled();
     expect(state.claims[0]).toMatchObject({
-      state: 'resumable',
-      reason: 'provider_issue_rehydrated_resumable_run',
+      state: 'accepted',
+      reason: 'provider_issue_rehydration_pending_revalidation',
       run_id: 'run-failed',
       retry_queued: true
     });

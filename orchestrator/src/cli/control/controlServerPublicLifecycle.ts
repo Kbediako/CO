@@ -30,6 +30,7 @@ import {
   isProviderPollingStuck,
   flushProviderPollingHealthUpdates,
   markProviderPollingStuck,
+  markProviderPollingControlHostOwnerFreshnessVerified,
   markProviderPollingCompleted,
   markProviderPollingStarted,
   noteProviderPollingRequest,
@@ -46,6 +47,8 @@ import {
 import { prepareControlServerStartupInputs } from './controlServerStartupInputPreparation.js';
 import {
   acquireControlHostOwnership,
+  refreshControlHostOwnershipPollingPayloadInChild,
+  type ControlHostOwnershipPollingPayload,
   type ControlHostOwnershipHandle
 } from './controlHostOwnership.js';
 
@@ -75,6 +78,7 @@ interface ProviderIssueHandoffOperationHealthContext {
   mode: ControlPollingMode;
   kind?: ProviderIssueHandoffOperationKind;
   completeOnSuccess?: boolean;
+  controlHostOwner?: ControlHostOwnershipPollingPayload | null;
 }
 
 interface ProviderWorkerRecoverRestartRequiredContext {
@@ -84,9 +88,16 @@ interface ProviderWorkerRecoverRestartRequiredContext {
 
 interface ProviderPollTrackedIssueContext {
   readFeatureToggles: (() => ControlState['feature_toggles']) | null;
+  readControlHostOwner: (() => ControlHostOwnershipPollingPayload | null) | null;
+  refreshSourceRootFreshness: (() => void) | null;
 }
 
 interface ProviderRefreshTimerHandle {
+  cancel(): void;
+}
+
+interface SourceRootFreshnessVerificationHandle {
+  trigger(): void;
   cancel(): void;
 }
 
@@ -124,6 +135,8 @@ export interface ControlServerPublicLifecycleState {
   lifecycleState: ControlServerOwnedLifecycleState;
   providerRefreshTimer?: ProviderRefreshTimerHandle | null;
   providerRefreshStartupTrigger?: NodeJS.Timeout | null;
+  sourceRootFreshnessStartupTrigger?: NodeJS.Timeout | null;
+  sourceRootFreshnessVerification?: SourceRootFreshnessVerificationHandle | null;
   triggerProviderRefresh?: (() => Promise<void>) | null;
   controlHostOwnership?: ControlHostOwnershipHandle | null;
 }
@@ -177,6 +190,18 @@ export async function startControlServerPublicLifecycle(
       intervalMs: EXPIRY_INTERVAL_MS
     });
 
+    const controlHostOwnershipForPolling = controlHostOwnership;
+    const readControlHostOwner = controlHostOwnershipForPolling
+      ? (): ControlHostOwnershipPollingPayload | null => controlHostOwnershipForPolling.polling
+      : null;
+    const sourceRootFreshnessVerification =
+      startupInputs.requestContextShared.providerIssueHandoff && readControlHostOwner
+        ? createSourceRootFreshnessVerificationHandle(
+            startupInputs.requestContextShared.providerIssueHandoff,
+            readControlHostOwner
+          )
+        : null;
+
     const providerRefreshCoordinator = startupInputs.requestContextShared.providerIssueHandoff
       ? createProviderRefreshCoordinator(
           startupInputs.requestContextShared.providerIssueHandoff,
@@ -184,10 +209,15 @@ export async function startControlServerPublicLifecycle(
             readFeatureToggles:
               startupInputs.requestContextShared.controlStore
                 ? () => startupInputs.requestContextShared.controlStore.snapshot().feature_toggles
-                : null
+                : null,
+            readControlHostOwner,
+            refreshSourceRootFreshness: sourceRootFreshnessVerification
+              ? sourceRootFreshnessVerification.trigger
+              : null
           }
         )
       : null;
+    let sourceRootFreshnessStartupTrigger: NodeJS.Timeout | null = null;
     if (startupInputs.requestContextShared.providerIssueHandoff) {
       const persistProviderIntakePolling =
         startupInputs.requestContextShared.persist?.providerIntakePolling ?? null;
@@ -219,6 +249,11 @@ export async function startControlServerPublicLifecycle(
               }
             : null
       });
+      if (sourceRootFreshnessVerification) {
+        sourceRootFreshnessStartupTrigger = scheduleStartupSourceRootFreshnessVerification(
+          sourceRootFreshnessVerification.trigger
+        );
+      }
     }
     const providerRefreshStartupTrigger = providerRefreshCoordinator
       ? scheduleStartupProviderRefresh(providerRefreshCoordinator.trigger)
@@ -233,9 +268,13 @@ export async function startControlServerPublicLifecycle(
         ? {
             providerRefreshTimer: providerRefreshCoordinator.timer,
             providerRefreshStartupTrigger,
+            sourceRootFreshnessStartupTrigger,
+            sourceRootFreshnessVerification,
             triggerProviderRefresh: providerRefreshCoordinator.trigger
           }
-        : {}),
+        : sourceRootFreshnessStartupTrigger
+          ? { sourceRootFreshnessStartupTrigger, sourceRootFreshnessVerification }
+          : {}),
       baseUrl: readyInstance.baseUrl
     };
   } catch (error) {
@@ -250,8 +289,14 @@ export async function closeControlServerPublicLifecycle(
   if (state.providerRefreshStartupTrigger) {
     clearTimeout(state.providerRefreshStartupTrigger);
   }
+  if (state.sourceRootFreshnessStartupTrigger) {
+    clearTimeout(state.sourceRootFreshnessStartupTrigger);
+  }
   if (state.providerRefreshTimer) {
     state.providerRefreshTimer.cancel();
+  }
+  if (state.sourceRootFreshnessVerification) {
+    state.sourceRootFreshnessVerification.cancel();
   }
   const serverClosePromise = beginClosingControlServerHttpServer(state.server);
   void serverClosePromise.catch(() => undefined);
@@ -783,6 +828,7 @@ function createProviderRefreshCoordinator(
     if (stopped) {
       return;
     }
+    context.refreshSourceRootFreshness?.();
     const preflightSchedule = await resolveProviderRefreshSchedule().catch(() => null);
     if (stopped) {
       clearScheduledTrigger();
@@ -848,7 +894,8 @@ function createProviderRefreshCoordinator(
         },
         undefined,
         {
-          mode: providerIssueHandoff.poll && context.readFeatureToggles ? 'poll' : 'refresh'
+          mode: providerIssueHandoff.poll && context.readFeatureToggles ? 'poll' : 'refresh',
+          controlHostOwner: context.readControlHostOwner?.() ?? undefined
         }
       );
       await waitForProviderIssueHandoffPendingWithWatchdog(
@@ -880,6 +927,53 @@ function createProviderRefreshCoordinator(
 function scheduleStartupProviderRefresh(trigger: () => Promise<void>): NodeJS.Timeout {
   const startupTrigger = setTimeout(() => {
     void trigger();
+  }, 0);
+  startupTrigger.unref?.();
+  return startupTrigger;
+}
+
+function createSourceRootFreshnessVerificationHandle(
+  providerIssueHandoff: ProviderIssueHandoffService,
+  readControlHostOwner: () => ControlHostOwnershipPollingPayload | null
+): SourceRootFreshnessVerificationHandle {
+  let stopped = false;
+  let inFlight = false;
+  const trigger = (): void => {
+    if (stopped || inFlight) {
+      return;
+    }
+    const controlHostOwner = readControlHostOwner();
+    if (!controlHostOwner) {
+      return;
+    }
+    inFlight = true;
+    void refreshControlHostOwnershipPollingPayloadInChild(controlHostOwner)
+      .then((refreshedOwner) => {
+        if (stopped) {
+          return;
+        }
+        markProviderPollingControlHostOwnerFreshnessVerified(providerIssueHandoff, {
+          controlHostOwner: refreshedOwner
+        });
+      })
+      .catch(() => undefined)
+      .finally(() => {
+        inFlight = false;
+      });
+  };
+  return {
+    trigger,
+    cancel: () => {
+      stopped = true;
+    }
+  };
+}
+
+function scheduleStartupSourceRootFreshnessVerification(
+  trigger: () => void
+): NodeJS.Timeout {
+  const startupTrigger = setTimeout(() => {
+    trigger();
   }, 0);
   startupTrigger.unref?.();
   return startupTrigger;
@@ -1054,7 +1148,8 @@ function startProviderIssueHandoffOperation(
   resetProviderIssueHandoffStuckSignal(state);
   if (healthContext) {
     markProviderPollingStarted(providerIssueHandoff, {
-      mode: healthContext.mode
+      mode: healthContext.mode,
+      controlHostOwner: healthContext.controlHostOwner
     });
   }
   let operationResult: Promise<void>;

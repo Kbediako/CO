@@ -1,7 +1,10 @@
 import type { ProviderIssueHandoffService } from './providerIssueHandoff.js';
 import { logger } from '../../logger.js';
 import type { LinearBudgetStatus } from './linearBudgetState.js';
-import type { ControlHostOwnershipPollingPayload } from './controlHostOwnership.js';
+import {
+  CONTROL_HOST_SOURCE_FRESHNESS_AUTHORITY_TTL_MS,
+  type ControlHostOwnershipPollingPayload
+} from './controlHostOwnership.js';
 
 export type ControlPollingMode = 'poll' | 'refresh';
 export type ControlNextRefreshState = 'cooldown' | 'checking' | 'scheduled' | 'unknown';
@@ -39,6 +42,11 @@ export interface ControlPollingHealthPayload {
   reason: string | null;
   linear_budget: LinearBudgetStatus | null;
   control_host_owner?: ControlHostOwnershipPollingPayload | null;
+  source_root_freshness_verified_at?: string | null;
+  source_root_freshness_expires_at?: string | null;
+  source_root_freshness_owner_token?: string | null;
+  source_root_freshness_run_id?: string | null;
+  source_root_freshness_source_root_realpath?: string | null;
 }
 
 interface MutableProviderPollingHealthState {
@@ -64,6 +72,11 @@ interface MutableProviderPollingHealthState {
   reason: string | null;
   linearBudget: LinearBudgetStatus | null;
   controlHostOwner: ControlHostOwnershipPollingPayload | null;
+  sourceRootFreshnessVerifiedAtMs: number | null;
+  sourceRootFreshnessExpiresAtMs: number | null;
+  sourceRootFreshnessOwnerToken: string | null;
+  sourceRootFreshnessRunId: string | null;
+  sourceRootFreshnessSourceRootRealpath: string | null;
   onUpdate: ((payload: ControlPollingHealthPayload) => Promise<void> | void) | null;
   updateChain: Promise<void>;
 }
@@ -132,10 +145,14 @@ export function markProviderPollingStarted(
     mode: ControlPollingMode;
     queued?: boolean;
     atMs?: number;
+    controlHostOwner?: ControlHostOwnershipPollingPayload | null;
   }
 ): void {
   const atMs = input.atMs ?? Date.now();
   const state = getOrCreateProviderPollingHealthState(providerIssueHandoff);
+  if (input.controlHostOwner !== undefined) {
+    state.controlHostOwner = input.controlHostOwner;
+  }
   state.lastMode = input.mode;
   state.lastRequestedAtMs = atMs;
   state.checking = true;
@@ -232,6 +249,40 @@ export function markProviderPollingCompleted(
   queueProviderPollingHealthUpdate(providerIssueHandoff, state, atMs);
 }
 
+export function markProviderPollingControlHostOwnerFreshnessVerified(
+  providerIssueHandoff: ProviderIssueHandoffService,
+  input: {
+    controlHostOwner: ControlHostOwnershipPollingPayload | null;
+    atMs?: number;
+  }
+): void {
+  const atMs = input.atMs ?? Date.now();
+  const state = getOrCreateProviderPollingHealthState(providerIssueHandoff);
+  state.controlHostOwner = input.controlHostOwner;
+  recordSourceRootFreshnessAuthority(state, input.controlHostOwner, atMs);
+  state.updatedAtMs = atMs;
+  queueProviderPollingHealthUpdate(providerIssueHandoff, state, atMs);
+}
+
+function recordSourceRootFreshnessAuthority(
+  state: MutableProviderPollingHealthState,
+  controlHostOwner: ControlHostOwnershipPollingPayload | null | undefined,
+  fallbackAtMs: number | null = null
+): void {
+  const owner = controlHostOwner?.owner ?? controlHostOwner?.attempted_owner ?? null;
+  const freshness = owner?.source_root_freshness ?? null;
+  const observedAtMs = parseIsoToMs(freshness?.observed_at ?? null);
+  const verifiedAtMs = observedAtMs ?? fallbackAtMs;
+  state.sourceRootFreshnessVerifiedAtMs = verifiedAtMs;
+  state.sourceRootFreshnessExpiresAtMs =
+    verifiedAtMs === null || fallbackAtMs === null
+      ? null
+      : fallbackAtMs + CONTROL_HOST_SOURCE_FRESHNESS_AUTHORITY_TTL_MS;
+  state.sourceRootFreshnessOwnerToken = owner?.owner_token ?? null;
+  state.sourceRootFreshnessRunId = owner?.run_id ?? null;
+  state.sourceRootFreshnessSourceRootRealpath = freshness?.source_root_realpath ?? null;
+}
+
 export function scheduleProviderPolling(
   providerIssueHandoff: ProviderIssueHandoffService,
   input: {
@@ -302,27 +353,6 @@ export function readProviderPollingHealth(
   }
   maybeMarkProviderPollingStuck(providerIssueHandoff, state, nowMs);
   return buildProviderPollingHealthPayload(state, nowMs);
-}
-
-export function resolveProviderPollingSourceEvidenceUpdatedAt(
-  payload:
-    | Pick<
-        ControlPollingHealthPayload,
-        'source_updated_at' | 'last_success_at' | 'updated_at'
-      >
-    | Record<string, unknown>
-    | null
-    | undefined,
-  options: { includeSnapshotUpdatedAt?: boolean } = {}
-): string | null {
-  if (!payload || typeof payload !== 'object') {
-    return null;
-  }
-  return latestIsoTimestamp(
-    readStringField(payload, 'source_updated_at'),
-    readStringField(payload, 'last_success_at'),
-    options.includeSnapshotUpdatedAt ? readStringField(payload, 'updated_at') : null
-  );
 }
 
 export async function flushProviderPollingHealthUpdates(
@@ -428,7 +458,16 @@ function buildProviderPollingHealthPayload(
     restart_required: stuck,
     reason,
     linear_budget: state.linearBudget,
-    control_host_owner: state.controlHostOwner
+    control_host_owner: state.controlHostOwner,
+    source_root_freshness_verified_at: toIsoTimestamp(
+      state.sourceRootFreshnessVerifiedAtMs
+    ),
+    source_root_freshness_expires_at: toIsoTimestamp(
+      state.sourceRootFreshnessExpiresAtMs
+    ),
+    source_root_freshness_owner_token: state.sourceRootFreshnessOwnerToken,
+    source_root_freshness_run_id: state.sourceRootFreshnessRunId,
+    source_root_freshness_source_root_realpath: state.sourceRootFreshnessSourceRootRealpath
   };
 }
 
@@ -536,6 +575,11 @@ function getOrCreateProviderPollingHealthState(
     reason: null,
     linearBudget: null,
     controlHostOwner: null,
+    sourceRootFreshnessVerifiedAtMs: null,
+    sourceRootFreshnessExpiresAtMs: null,
+    sourceRootFreshnessOwnerToken: null,
+    sourceRootFreshnessRunId: null,
+    sourceRootFreshnessSourceRootRealpath: null,
     onUpdate: null,
     updateChain: Promise.resolve()
   };
@@ -607,23 +651,6 @@ function toIsoTimestamp(value: number | null): string | null {
     return null;
   }
   return new Date(value).toISOString();
-}
-
-function latestIsoTimestamp(...values: Array<string | null | undefined>): string | null {
-  let latest: number | null = null;
-  for (const value of values) {
-    const parsed = parseIsoToMs(value);
-    if (parsed === null) {
-      continue;
-    }
-    latest = latest === null ? parsed : Math.max(latest, parsed);
-  }
-  return latest === null ? null : new Date(latest).toISOString();
-}
-
-function readStringField(payload: object, key: string): string | null {
-  const value = (payload as Record<string, unknown>)[key];
-  return typeof value === 'string' && value.trim().length > 0 ? value : null;
 }
 
 function parseIsoToMs(value: string | null | undefined): number | null {

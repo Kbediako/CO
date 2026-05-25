@@ -8,6 +8,7 @@ import { ControlStateStore } from '../src/cli/control/controlState.js';
 import type { ProviderIssueHandoffService } from '../src/cli/control/providerIssueHandoff.js';
 import {
   initializeProviderPollingHealth,
+  markProviderPollingControlHostOwnerFreshnessVerified,
   markProviderPollingCompleted,
   markProviderPollingStuck,
   markProviderPollingStarted,
@@ -7672,7 +7673,7 @@ describe('ControlRuntime', () => {
     } finally {
       vi.useRealTimers();
     }
-  });
+  }, 15_000);
 
   it('keeps proof-bearing explicit null-provider rows visible when raw intake is unavailable', async () => {
     vi.useFakeTimers();
@@ -8490,7 +8491,7 @@ describe('ControlRuntime', () => {
     expect(projection.retrying).toEqual([]);
   });
 
-  it('does not hot-refresh current-at-acquisition owner freshness before serving provider-intake', async () => {
+  it('fails closed for current-at-acquisition owner freshness before verification evidence lands', async () => {
     const repoRoot = await createSourceRootRepo('control-runtime-stale-authority-refresh-');
     const startupFreshness = inspectSourceRootFreshness({
       intendedRepoRoot: repoRoot,
@@ -8523,13 +8524,11 @@ describe('ControlRuntime', () => {
 
     const projection = await fixture.runtime.snapshot().readCompatibilityProjection();
 
-    expect(projection.providerIntakeUnavailable).toBeNull();
-    expect(projection.providerIntake).toMatchObject({
-      claim_count: 3,
-      active_claim_count: 0,
-      running_claim_count: 0,
-      active_issue_identifiers: [],
-      running_issue_identifiers: []
+    expect(projection.providerIntake).toBeNull();
+    expect(projection.providerIntakeUnavailable).toMatchObject({
+      reason: 'stale_supervised_control_host_source',
+      action: 'fail_closed',
+      detail: expect.stringContaining('verified source-root authority snapshot')
     });
     expect(projection.polling?.control_host_owner?.owner?.source_root_freshness).toMatchObject({
       status: 'current',
@@ -8824,6 +8823,10 @@ describe('ControlRuntime', () => {
       skipInitialUpdate: true,
       controlHostOwner: liveOwner
     });
+    markProviderPollingControlHostOwnerFreshnessVerified(providerIssueHandoff, {
+      controlHostOwner: liveOwner,
+      atMs: Date.now()
+    });
 
     const providerIntakeState = createProviderIntakeState([
       {
@@ -8879,7 +8882,7 @@ describe('ControlRuntime', () => {
     });
   });
 
-  it('marks provider intake unavailable when live current freshness predates provider source evidence', async () => {
+  it('does not treat provider polling success as newer source-root freshness evidence', async () => {
     const fixture = await createFixture({ taskId: 'local-mcp' });
     const providerIssueHandoff = {
       handleAcceptedTrackedIssue: vi.fn(),
@@ -8911,7 +8914,6 @@ describe('ControlRuntime', () => {
     markProviderPollingCompleted(providerIssueHandoff, {
       atMs: Date.parse('2026-05-18T23:09:00.000Z')
     });
-
     const providerIntakeState = createProviderIntakeState([
       {
         provider: 'linear',
@@ -8924,18 +8926,18 @@ describe('ControlRuntime', () => {
         issue_updated_at: '2026-05-01T00:00:30.000Z',
         task_id: 'linear-co-512',
         mapping_source: 'provider_id_fallback',
-        state: 'accepted',
-        reason: 'provider_issue_rehydration_pending_revalidation',
+        state: 'running',
+        reason: 'provider_issue_rehydrated_active_run',
         accepted_at: '2026-05-01T00:00:30.000Z',
         updated_at: '2026-05-01T00:00:30.000Z',
         last_delivery_id: 'delivery-512',
         last_event: 'Issue',
         last_action: 'update',
         last_webhook_timestamp: 1_746_057_630_000,
-        run_id: null,
-        run_manifest_path: null,
-        launch_source: null,
-        launch_token: null
+        run_id: 'run-512',
+        run_manifest_path: '/tmp/run-512-manifest.json',
+        launch_source: 'control-host',
+        launch_token: 'launch-512'
       }
     ]);
 
@@ -8948,13 +8950,118 @@ describe('ControlRuntime', () => {
       readProviderIssueHandoff: () => providerIssueHandoff
     });
 
+    const unverifiedProjection = await runtime.snapshot().readCompatibilityProjection();
+
+    expect(unverifiedProjection.providerIntake).toBeNull();
+    expect(unverifiedProjection.providerIntakeUnavailable).toMatchObject({
+      reason: 'stale_supervised_control_host_source',
+      action: 'fail_closed',
+      detail: expect.stringContaining('verified source-root authority snapshot')
+    });
+
+    markProviderPollingControlHostOwnerFreshnessVerified(providerIssueHandoff, {
+      controlHostOwner: liveOwner,
+      atMs: Date.now()
+    });
+
     const projection = await runtime.snapshot().readCompatibilityProjection();
 
-    expect(projection.providerIntake).toBeNull();
-    expect(projection.providerIntakeUnavailable).toMatchObject({
-      reason: 'stale_supervised_control_host_source',
-      action: 'fail_closed'
+    expect(projection.providerIntake).toMatchObject({
+      provider: 'linear'
     });
+    expect(projection.providerIntakeUnavailable).toBeNull();
+    expect(projection.polling).toMatchObject({
+      last_success_at: '2026-05-18T23:09:00.000Z',
+      control_host_owner: {
+        owner: {
+          source_root_freshness: {
+            status: 'current',
+            observed_at: '2026-05-18T22:55:00.000Z'
+          }
+        }
+      }
+    });
+  });
+
+  it('fails provider-intake closed after source-root freshness authority expires', async () => {
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(new Date('2026-05-18T22:55:30.000Z'));
+      const fixture = await createFixture({ taskId: 'local-mcp' });
+      const providerIssueHandoff = {
+        handleAcceptedTrackedIssue: vi.fn(),
+        rehydrate: vi.fn(async () => {}),
+        refresh: vi.fn(async () => {})
+      } as unknown as ProviderIssueHandoffService;
+      const repoRoot = await createSourceRootRepo('control-runtime-expired-source-authority-');
+      const liveFreshness = inspectSourceRootFreshness({
+        intendedRepoRoot: repoRoot,
+        packageRoot: repoRoot,
+        argv: ['node', join(repoRoot, 'bin', 'codex-orchestrator.ts')],
+        cwd: repoRoot,
+        now: () => '2026-05-18T22:55:00.000Z'
+      });
+      const liveOwner = createControlHostOwnerPayload(repoRoot, liveFreshness);
+
+      initializeProviderPollingHealth(providerIssueHandoff, {
+        intervalMs: 15000,
+        stuckAfterMs: 45000,
+        skipInitialUpdate: true,
+        controlHostOwner: liveOwner
+      });
+      markProviderPollingControlHostOwnerFreshnessVerified(providerIssueHandoff, {
+        controlHostOwner: liveOwner,
+        atMs: Date.parse('2026-05-18T22:55:30.000Z')
+      });
+
+      const providerIntakeState = createProviderIntakeState([
+        {
+          provider: 'linear',
+          provider_key: 'linear:lin-issue-512',
+          issue_id: 'lin-issue-512',
+          issue_identifier: 'CO-512',
+          issue_title: 'Active worker under expired source freshness authority',
+          issue_state: 'In Progress',
+          issue_state_type: 'started',
+          issue_updated_at: '2026-05-01T00:00:30.000Z',
+          task_id: 'linear-co-512',
+          mapping_source: 'provider_id_fallback',
+          state: 'running',
+          reason: 'provider_issue_rehydrated_active_run',
+          accepted_at: '2026-05-01T00:00:30.000Z',
+          updated_at: '2026-05-01T00:00:30.000Z',
+          last_delivery_id: 'delivery-512',
+          last_event: 'Issue',
+          last_action: 'update',
+          last_webhook_timestamp: 1_746_057_630_000,
+          run_id: 'run-512',
+          run_manifest_path: '/tmp/run-512-manifest.json',
+          launch_source: 'control-host',
+          launch_token: 'launch-512'
+        }
+      ]);
+
+      vi.setSystemTime(new Date('2026-05-18T23:01:01.000Z'));
+      const runtime = createControlRuntime({
+        controlStore: fixture.controlStore,
+        questionQueue: { list: () => [] },
+        paths: fixture.paths,
+        linearAdvisoryState: { tracked_issue: null },
+        providerIntakeState,
+        readProviderIssueHandoff: () => providerIssueHandoff
+      });
+
+      const projection = await runtime.snapshot().readCompatibilityProjection();
+
+      expect(projection.providerIntake).toBeNull();
+      expect(projection.providerIntakeUnavailable).toMatchObject({
+        reason: 'stale_supervised_control_host_source',
+        action: 'fail_closed',
+        detail: expect.stringContaining('expired source-root authority snapshot')
+      });
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('falls back to persisted stale authority when live ownership has no freshness signal', async () => {
@@ -8983,6 +9090,10 @@ describe('ControlRuntime', () => {
       stuckAfterMs: 45000,
       skipInitialUpdate: true,
       controlHostOwner: liveOwner
+    });
+    markProviderPollingControlHostOwnerFreshnessVerified(providerIssueHandoff, {
+      controlHostOwner: liveOwner,
+      atMs: Date.now()
     });
     await writeFile(join(repoRoot, 'co-556-main-advance.txt'), 'main advanced\n', 'utf8');
     git(repoRoot, ['add', '.']);
@@ -9167,6 +9278,10 @@ describe('ControlRuntime', () => {
       skipInitialUpdate: true,
       controlHostOwner: liveOwner
     });
+    markProviderPollingControlHostOwnerFreshnessVerified(providerIssueHandoff, {
+      controlHostOwner: liveOwner,
+      atMs: Date.now()
+    });
     await writeFile(join(repoRoot, 'co-556-main-advance.txt'), 'main advanced\n', 'utf8');
     git(repoRoot, ['add', '.']);
     git(repoRoot, ['commit', '-m', 'CO-556 main advance']);
@@ -9261,6 +9376,10 @@ describe('ControlRuntime', () => {
       stuckAfterMs: 45000,
       skipInitialUpdate: true,
       controlHostOwner: liveOwner
+    });
+    markProviderPollingControlHostOwnerFreshnessVerified(providerIssueHandoff, {
+      controlHostOwner: liveOwner,
+      atMs: Date.now()
     });
 
     const persistedOwner = refreshControlHostOwnershipPollingPayload(

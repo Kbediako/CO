@@ -9,6 +9,7 @@ import {
   acquireControlHostOwnership,
   readControlHostOwnerMetadata,
   readControlHostOwnershipOperatorHint,
+  resolveControlHostSourceFreshnessAdmissionPolicy,
   resolveControlHostSourceFreshnessPolicy,
   type ControlHostOwnershipPollingPayload,
   type ControlHostOwnerMetadata
@@ -390,6 +391,88 @@ describe('control host ownership', () => {
     } as ControlHostOwnershipPollingPayload;
 
     expect(resolveControlHostSourceFreshnessPolicy(staleReclaimedPayload)).toBeNull();
+  });
+
+  it('requires verified source-root freshness authority to bind owner, run, realpath, and time', () => {
+    const payload = {
+      status: 'owned',
+      reason: null,
+      updated_at: '2026-05-18T23:08:00.000Z',
+      diagnostic_path: null,
+      lock_dir: '/repo/.runs/control-host-owner.lock',
+      owner_path: '/repo/.runs/control-host-owner.json',
+      owner: {
+        owner_token: 'owner-token',
+        status: 'owned',
+        pid: 123,
+        ppid: 1,
+        hostname: TEST_HOST,
+        acquired_at: '2026-05-18T22:55:00.000Z',
+        updated_at: '2026-05-18T23:08:00.000Z',
+        released_at: null,
+        repo_root: '/repo',
+        task_id: 'local-mcp',
+        run_id: 'control-host',
+        run_dir: '/repo/.runs/local-mcp/cli/control-host',
+        pipeline_id: 'provider-linear-worker',
+        source_root_freshness: {
+          schema_version: 1,
+          status: 'current',
+          observed_at: '2026-05-18T23:08:00.000Z',
+          intended_repo_root: '/repo',
+          intended_repo_root_realpath: '/repo',
+          command_path: '/repo/bin/codex-orchestrator.ts',
+          command_path_realpath: '/repo/bin/codex-orchestrator.ts',
+          package_root: '/repo',
+          package_root_realpath: '/repo',
+          source_root: '/repo',
+          source_root_realpath: '/repo',
+          entrypoint_kind: 'source',
+          base_ref: 'origin/main',
+          drift_classes: [],
+          source_checkout: { status: 'current', repo_root: '/repo', dirty: { status: 'clean' } },
+          intended_checkout: { status: 'current', repo_root: '/repo', dirty: { status: 'clean' } },
+          provenance: {
+            command_path_source: 'explicit',
+            package_root_source: 'explicit',
+            source_root_source: 'package_root',
+            command_path_inside_package: true,
+            package_root_matches_intended: true,
+            source_root_matches_intended: true,
+            source_entry_exists: true,
+            dist_entry_exists: true
+          },
+          guidance: [],
+          detail: 'current source'
+        },
+        lock_dir: '/repo/.runs/control-host-owner.lock',
+        owner_path: '/repo/.runs/control-host-owner.json'
+      }
+    } as ControlHostOwnershipPollingPayload;
+
+    const validAuthority = {
+      verified_at: '2026-05-18T23:08:00.000Z',
+      expires_at: new Date(Date.now() + 60_000).toISOString(),
+      owner_token: 'owner-token',
+      run_id: 'control-host',
+      source_root_realpath: '/repo'
+    };
+
+    expect(resolveControlHostSourceFreshnessAdmissionPolicy(payload, validAuthority)).toBeNull();
+
+    for (const authority of [
+      { ...validAuthority, verified_at: 'not-a-date' },
+      { ...validAuthority, verified_at: '2026-05-18T23:07:59.999Z' },
+      { ...validAuthority, owner_token: 'other-owner-token' },
+      { ...validAuthority, run_id: 'other-run' },
+      { ...validAuthority, source_root_realpath: null },
+      { ...validAuthority, source_root_realpath: '/other-repo' }
+    ]) {
+      expect(resolveControlHostSourceFreshnessAdmissionPolicy(payload, authority)).toMatchObject({
+        action: 'fail_closed',
+        reason: 'source_root_freshness_snapshot_unverified'
+      });
+    }
   });
 
   it('uses active owner freshness for rejected duplicate and ambiguous diagnostics', () => {
