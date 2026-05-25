@@ -1931,33 +1931,29 @@ export function createProviderIssueHandoffService(
     if (!isTrackedIssueFreshEnoughForClaim(claim, trackedIssue)) {
       return {};
     }
+    const clearReviewPromotion = shouldClearStaleReviewPromotionForTrackedIssue({
+      claim,
+      trackedIssue
+    });
+    const trackedIssueWorkflowState = classifyProviderLinearWorkflowState(trackedIssue);
+    const clearReviewPromotionWithMergeCloseout =
+      clearReviewPromotion && trackedIssueWorkflowState.isActive;
     if (isSupersededDoneTransitionFailedMergeCloseoutClaim({ claim, trackedIssue })) {
-      return shouldClearStaleReviewPromotionForTrackedIssue({
-        claim,
-        trackedIssue
-      })
+      return clearReviewPromotionWithMergeCloseout
         ? { merge_closeout: null, review_promotion: null }
         : { merge_closeout: null };
     }
     if (isSupersededTerminalMergeCloseoutClaim({ claim, trackedIssue })) {
-      return shouldClearStaleReviewPromotionForTrackedIssue({
-        claim,
-        trackedIssue
-      })
-        ? { review_promotion: null }
-        : {};
+      return clearReviewPromotionWithMergeCloseout ? { review_promotion: null } : {};
     }
     const clearMergeCloseout = shouldClearStaleMergeCloseoutForTrackedIssue({
       claim,
       trackedIssue
     });
     if (!clearMergeCloseout) {
-      return {};
+      return clearReviewPromotion ? { review_promotion: null } : {};
     }
-    return shouldClearStaleReviewPromotionForTrackedIssue({
-      claim,
-      trackedIssue
-    })
+    return clearReviewPromotionWithMergeCloseout
       ? { merge_closeout: null, review_promotion: null }
       : { merge_closeout: null };
   };
@@ -3345,6 +3341,18 @@ export function createProviderIssueHandoffService(
                     }
                   }) ||
                   shouldApplySupersededTransitionFailedMergeCloseoutReleaseClaim({
+                    releaseReason: freshTrackedIssue.releaseReason,
+                    claim: completedClaim,
+                    nextIssueState:
+                      freshTrackedIssue.releaseClaimFields.issue_state ?? completedClaim.issue_state,
+                    nextIssueStateType:
+                      freshTrackedIssue.releaseClaimFields.issue_state_type ??
+                      completedClaim.issue_state_type,
+                    nextIssueUpdatedAt:
+                      freshTrackedIssue.releaseClaimFields.issue_updated_at ??
+                      completedClaim.issue_updated_at
+                  }) ||
+                  shouldApplySupersededTerminalReviewPromotionReleaseClaim({
                     releaseReason: freshTrackedIssue.releaseReason,
                     claim: completedClaim,
                     nextIssueState:
@@ -8404,6 +8412,68 @@ function isSupersededDoneTransitionFailedMergeCloseoutClaim(input: {
   return freshness === 'equal' || freshness === 'newer';
 }
 
+function shouldApplySupersededTerminalReviewPromotionReleaseClaim(input: {
+  releaseReason: string | null;
+  claim: Pick<
+    ProviderIntakeClaimRecord,
+    'issue_state' | 'issue_state_type' | 'issue_updated_at' | 'review_promotion'
+  >;
+  nextIssueState: string | null;
+  nextIssueStateType: string | null;
+  nextIssueUpdatedAt: string | null;
+}): boolean {
+  if (
+    input.releaseReason !== 'provider_issue_released:not_active' &&
+    input.releaseReason !== 'provider_issue_released:not_mutable'
+  ) {
+    return false;
+  }
+  return isSupersededTerminalReviewPromotionClaim({
+    claim: input.claim,
+    trackedIssue: {
+      state: input.nextIssueState,
+      state_type: input.nextIssueStateType,
+      updated_at: input.nextIssueUpdatedAt
+    }
+  });
+}
+
+function isSupersededTerminalReviewPromotionClaim(input: {
+  claim: Pick<
+    ProviderIntakeClaimRecord,
+    'issue_state' | 'issue_state_type' | 'issue_updated_at' | 'review_promotion'
+  >;
+  trackedIssue?: Pick<LiveLinearTrackedIssue, 'state' | 'state_type' | 'updated_at'> | null;
+}): boolean {
+  const reviewPromotion = input.claim.review_promotion ?? null;
+  if (!reviewPromotion || reviewPromotion.status !== 'promoted') {
+    return false;
+  }
+  if (normalizeProviderLinearWorkflowState(reviewPromotion.issue_state) !== 'merging') {
+    return false;
+  }
+  const nextIssue = input.trackedIssue
+    ? {
+        state: input.trackedIssue.state,
+        state_type: input.trackedIssue.state_type
+      }
+    : {
+        state: input.claim.issue_state,
+        state_type: input.claim.issue_state_type
+      };
+  if (!isProviderLinearDoneWorkflowState(nextIssue)) {
+    return false;
+  }
+  const freshness = compareTrackedIssueUpdatedAt({
+    existingIssueUpdatedAt: reviewPromotion.issue_updated_at ?? null,
+    nextIssueUpdatedAt:
+      input.trackedIssue !== undefined
+        ? input.trackedIssue?.updated_at ?? null
+        : input.claim.issue_updated_at ?? null
+  });
+  return freshness === 'equal' || freshness === 'newer';
+}
+
 function mergeCloseoutSnapshotShowsMerged(
   mergeCloseout: Pick<ProviderMergeCloseoutRecord, 'status' | 'snapshot'>
 ): boolean {
@@ -8482,7 +8552,12 @@ function shouldClearStaleReviewPromotionForTrackedIssue(input: {
   if (!reviewPromotion) {
     return false;
   }
-  if (!classifyProviderLinearWorkflowState(input.trackedIssue).isActive) {
+  const trackedIssueWorkflowState = classifyProviderLinearWorkflowState(input.trackedIssue);
+  const trackedIssueIsDone = isProviderLinearDoneWorkflowState(input.trackedIssue);
+  if (!trackedIssueWorkflowState.isActive && !trackedIssueIsDone) {
+    return false;
+  }
+  if (trackedIssueIsDone && reviewPromotion.status !== 'promoted') {
     return false;
   }
   const reviewPromotionWorkflowState = classifyProviderLinearWorkflowState({
@@ -8495,12 +8570,13 @@ function shouldClearStaleReviewPromotionForTrackedIssue(input: {
   ) {
     return false;
   }
-  return (
-    compareTrackedIssueUpdatedAt({
-      existingIssueUpdatedAt: reviewPromotion.issue_updated_at ?? null,
-      nextIssueUpdatedAt: input.trackedIssue.updated_at
-    }) === 'newer'
-  );
+  const freshness = compareTrackedIssueUpdatedAt({
+    existingIssueUpdatedAt: reviewPromotion.issue_updated_at ?? null,
+    nextIssueUpdatedAt: input.trackedIssue.updated_at
+  });
+  return trackedIssueIsDone
+    ? freshness === 'equal' || freshness === 'newer'
+    : freshness === 'newer';
 }
 
 function assessProviderTrackedIssueEligibility(
