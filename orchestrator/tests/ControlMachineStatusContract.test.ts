@@ -201,7 +201,28 @@ describe('control machine status contract', () => {
 
     expect(source).not.toMatch(/\bPromise\.race\s*\(/u);
     expect(source).not.toMatch(/\b(?:spawnSync|execSync|execFileSync)\b/u);
-    expect(source).not.toMatch(/\brefreshControlHostOwnershipPollingPayload\s*\(/u);
+    expect(source).not.toMatch(/\brefreshControlHostOwnershipPollingPayload(?:InChild)?\s*\(/u);
+    expect(source).not.toMatch(/\brefreshSourceRootFreshnessInspection\s*\(/u);
+  });
+
+  it('keeps control-host status hot paths free of owner freshness refresh work', async () => {
+    const controlDir = join(dirname(fileURLToPath(import.meta.url)), '..', 'src', 'cli', 'control');
+    const hotPathFiles = [
+      'controlRuntime.ts',
+      'machineStatusController.ts',
+      'controlServerPublicRouteHelpers.ts'
+    ];
+    const source = (
+      await Promise.all(
+        hotPathFiles.map(async (file) => ({
+          file,
+          text: await readFile(join(controlDir, file), 'utf8')
+        }))
+      )
+    ).map(({ file, text }) => `// ${file}\n${text}`).join('\n');
+
+    expect(source).not.toMatch(/\b(?:spawnSync|execSync|execFileSync)\b/u);
+    expect(source).not.toMatch(/\brefreshControlHostOwnershipPollingPayload(?:InChild)?\s*\(/u);
     expect(source).not.toMatch(/\brefreshSourceRootFreshnessInspection\s*\(/u);
   });
 

@@ -63,9 +63,12 @@ import {
 } from './providerPollingHealth.js';
 import {
   normalizeControlHostOwnershipPollingPayload,
-  refreshControlHostOwnershipPollingPayload,
+  isControlHostOwnershipFreshnessAtLeastAsRecent,
   resolveControlHostAuthoritativeSourceFreshness,
-  resolveControlHostSourceFreshnessPolicyFromPolling
+  resolvePollingSourceRootFreshnessAuthority,
+  resolveControlHostSourceFreshnessAdmissionPolicy,
+  resolveControlHostSourceFreshnessPolicyFromPolling,
+  selectControlHostSourceFreshnessAuthorityForOwner
 } from './controlHostOwnership.js';
 import type { ProviderWorkflowConfigStore } from './providerWorkflowConfigStore.js';
 import {
@@ -588,25 +591,54 @@ export function createProviderIssueHandoffService(
     return Boolean(lifecycleScope && lifecycleScope.epoch !== refreshLifecycleEpoch);
   };
   const resolveProviderHandoffSourceFreshnessPolicy = () => {
-    const liveControlHostOwner =
-      readProviderPollingHealth(providerIssueHandoffService)?.control_host_owner ??
-      null;
+    const persistedControlHostOwner = normalizeControlHostOwnershipPollingPayload(
+      options.state.polling?.control_host_owner
+    );
+    const persistedAuthority = resolvePollingSourceRootFreshnessAuthority(
+      options.state.polling ?? null
+    );
+    const persistedPolicy = resolveControlHostSourceFreshnessPolicyFromPolling(
+      persistedControlHostOwner,
+      { refresh: false }
+    ) ?? resolveControlHostSourceFreshnessAdmissionPolicy(
+      persistedControlHostOwner,
+      persistedAuthority
+    );
+    const livePolling = readProviderPollingHealth(providerIssueHandoffService);
+    const liveControlHostOwner = livePolling?.control_host_owner ?? null;
     if (liveControlHostOwner) {
-      const refreshedLiveOwner = refreshControlHostOwnershipPollingPayload(
-        normalizeControlHostOwnershipPollingPayload(liveControlHostOwner)
-      );
+      const refreshedLiveOwner = normalizeControlHostOwnershipPollingPayload(liveControlHostOwner);
       const livePolicy = resolveControlHostSourceFreshnessPolicyFromPolling(
         refreshedLiveOwner,
         { refresh: false }
       );
       const liveFreshness = resolveControlHostAuthoritativeSourceFreshness(refreshedLiveOwner);
-      if (livePolicy || isAuthoritativeProviderHandoffLiveControlHostFreshness(liveFreshness)) {
+      if (livePolicy) {
         return livePolicy;
       }
+      if (
+        isAuthoritativeProviderHandoffLiveControlHostFreshness(liveFreshness) &&
+        isControlHostOwnershipFreshnessAtLeastAsRecent(
+          refreshedLiveOwner,
+          persistedControlHostOwner,
+          {
+            candidateSnapshotUpdatedAt: livePolling?.updated_at ?? null,
+            baselineSnapshotUpdatedAt: normalizeOptionalString(options.state.polling?.updated_at)
+          }
+        )
+      ) {
+        const liveAuthority = selectControlHostSourceFreshnessAuthorityForOwner(
+          refreshedLiveOwner,
+          resolvePollingSourceRootFreshnessAuthority(livePolling),
+          persistedAuthority
+        );
+        return resolveControlHostSourceFreshnessAdmissionPolicy(
+          refreshedLiveOwner,
+          liveAuthority
+        );
+      }
     }
-    return resolveControlHostSourceFreshnessPolicyFromPolling(
-      options.state.polling?.control_host_owner
-    );
+    return persistedPolicy;
   };
   const isAuthoritativeProviderHandoffLiveControlHostFreshness = (
     freshness: ReturnType<typeof resolveControlHostAuthoritativeSourceFreshness>

@@ -31,6 +31,7 @@
 ## Acceptance Criteria
 - `/ui/machine-status.json` serves a committed immutable snapshot and does not invoke source-root freshness, provider refresh, owner resolution, or sync process/filesystem work.
 - Freshness/status collection runs outside the serving event loop with bounded async operations, cancellation, no same-root overlap, and stale-on-failure snapshot semantics.
+- Provider-intake admission does not infer source-root freshness from provider poll success, poll completion, or polling `updated_at`; it requires explicit collector verification bound to the same owner token, run id, non-empty source-root realpath, matching freshness observation, and expiry, preserves verified authority across later provider refresh starts unless a collector replaces the owner snapshot, and fails closed when that authority is missing, stale, or bound to a previous owner snapshot.
 - `/healthz` is control-token-authenticated cheap liveness, `/readyz` is degraded readiness, and machine-status is snapshot diagnostics; supervision restarts only on liveness failure or unreachable process, not collector staleness alone.
 - `co-status`, `live_host`, supervision, and UI machine-status expose the same current freshness/owner generation; superseded facts are visibly historical and cannot drive gates.
 - Dirty isolated worker workspaces do not count as shared checkout drift when the shared root is clean/current.
@@ -43,6 +44,7 @@
 - Any serving-path module can still call sync child-process APIs such as `spawnSync`, `execFileSync`, or `execSync`.
 - Supervisor liveness still probes heavyweight machine-status diagnostics and restarts on stale collector data alone.
 - A stale dirty source-root fact can override a newer clean shared-root fact on any current authority surface.
+- Provider polling success or polling snapshot `updated_at` can make a source-root freshness snapshot look current without collector verification bound to the same owner/run/source root.
 - Same-endpoint current-endpoint timeouts are still classified as stale endpoint discovery.
 - The fix lacks an active-worker starvation regression test that would have failed under the 2026-05-25 incident shape.
 
@@ -74,7 +76,7 @@
 - User Journeys: Operator sees timeout quarantine as an explicit status-plane condition rather than a silent host failure or an instruction to cycle workers.
 
 ## Technical Considerations
-- Architectural Notes: Treat the immutable machine-status snapshot as the sole request-path authority. Collection may produce stale-on-failure snapshots, but request handlers must not initiate source-root freshness, owner resolution, provider refresh, Git, process, or sync filesystem work.
+- Architectural Notes: Treat the immutable machine-status snapshot as the sole request-path authority. Collection may produce stale-on-failure snapshots, but request handlers must not initiate source-root freshness, owner resolution, provider refresh, Git, process, or sync filesystem work. Provider-intake admission must use explicit source-root freshness authority metadata from the collector, not incidental polling success or snapshot write times.
 - Dependencies / Integrations: Parent implementation may touch machine-status controller/presenter, snapshot collector/runtime, control-host `/healthz` and `/readyz`, `co-status`, live-host evidence projection, supervision probe logic, owner/freshness generation projection, and same-endpoint timeout diagnostics.
 
 ## Fallback / Refactor Decision
@@ -84,6 +86,7 @@
 | Surface | Fallback / seam | Decision | Owner | Trigger | Introduced date | Review date | Maximum lifetime | Removal condition | Validation |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | Control-host status plane | Active-worker timeout quarantine protects worker evidence while status reads are degraded. | expire fallback | CO-583 | `/ui/machine-status.json` or status probes time out while active workers have lower-authority evidence | 2026-05-25 | 2026-05-25 | 2026-06-24 | Status path is bounded and non-blocking by construction, or quarantine remains fully source-labeled and tested. | Parent focused status/supervision tests and live status proof |
+| Control-host owner freshness policy | Implicit hot-path refresh of committed `control_host_owner` source-root freshness snapshots in `controlRuntime` and `providerIssueHandoff` | remove fallback | CO-583 | Post-PR-890 recurrence showed status and handoff policy reads could still recompute owner freshness through synchronous source-root inspection. | 2026-05-25 | Removed in PR #892. | Removed in PR #892. | Hot status and handoff paths resolve source freshness from committed snapshots only; explicit refresh remains limited to cold diagnostic gauge surfaces. | `ControlMachineStatusContract`, `ControlRuntime`, and `ProviderIssueHandoff` regressions plus CI spec-guard evidence |
 
 ## Open Questions
 - Parent implementation should decide exact response field names for active-worker timeout quarantine, degraded read source, and freshness metadata.

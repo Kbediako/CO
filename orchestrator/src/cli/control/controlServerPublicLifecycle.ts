@@ -30,6 +30,7 @@ import {
   isProviderPollingStuck,
   flushProviderPollingHealthUpdates,
   markProviderPollingStuck,
+  markProviderPollingControlHostOwnerFreshnessVerified,
   markProviderPollingCompleted,
   markProviderPollingStarted,
   noteProviderPollingRequest,
@@ -46,6 +47,9 @@ import {
 import { prepareControlServerStartupInputs } from './controlServerStartupInputPreparation.js';
 import {
   acquireControlHostOwnership,
+  refreshControlHostOwnershipPollingPayloadInChild,
+  resolvePollingSourceRootFreshnessAuthority,
+  type ControlHostOwnershipPollingPayload,
   type ControlHostOwnershipHandle
 } from './controlHostOwnership.js';
 
@@ -59,6 +63,7 @@ const PROVIDER_WORKER_RECOVER_OPERATION_WAIT_MS = PROVIDER_REFRESH_STUCK_AFTER_M
 const PROVIDER_WORKER_RECOVER_OPERATION_TOTAL_WAIT_MS = 90_000;
 const PROVIDER_CLOSE_STUCK_DRAIN_GRACE_MS = 1_000;
 const PROVIDER_FULL_RECOVERY_SWEEP_INTERVAL_MS = 10 * 60 * 1000;
+const SOURCE_ROOT_FRESHNESS_VERIFICATION_WAIT_MS = 10_000;
 const SESSION_TTL_MS = 15 * 60 * 1000;
 interface ProviderIssueHandoffOperationState {
   active: Promise<void> | null;
@@ -75,6 +80,7 @@ interface ProviderIssueHandoffOperationHealthContext {
   mode: ControlPollingMode;
   kind?: ProviderIssueHandoffOperationKind;
   completeOnSuccess?: boolean;
+  controlHostOwner?: ControlHostOwnershipPollingPayload | null;
 }
 
 interface ProviderWorkerRecoverRestartRequiredContext {
@@ -84,11 +90,24 @@ interface ProviderWorkerRecoverRestartRequiredContext {
 
 interface ProviderPollTrackedIssueContext {
   readFeatureToggles: (() => ControlState['feature_toggles']) | null;
+  readControlHostOwner: (() => ControlHostOwnershipPollingPayload | null) | null;
+  refreshSourceRootFreshness: (() => Promise<SourceRootFreshnessVerificationOutcome>) | null;
 }
 
 interface ProviderRefreshTimerHandle {
   cancel(): void;
 }
+
+interface SourceRootFreshnessVerificationHandle {
+  trigger(): Promise<SourceRootFreshnessVerificationOutcome>;
+  cancel(): void;
+}
+
+type SourceRootFreshnessVerificationOutcome =
+  | { kind: 'verified'; controlHostOwner: ControlHostOwnershipPollingPayload }
+  | { kind: 'skipped'; reason: 'missing_control_host_owner' | 'stopped' }
+  | { kind: 'pending'; reason: 'source_root_freshness_verification_pending' }
+  | { kind: 'failed'; reason: 'source_root_freshness_verification_failed' };
 
 const providerIssueHandoffOperations = new WeakMap<
   ProviderIssueHandoffService,
@@ -124,6 +143,8 @@ export interface ControlServerPublicLifecycleState {
   lifecycleState: ControlServerOwnedLifecycleState;
   providerRefreshTimer?: ProviderRefreshTimerHandle | null;
   providerRefreshStartupTrigger?: NodeJS.Timeout | null;
+  sourceRootFreshnessStartupTrigger?: NodeJS.Timeout | null;
+  sourceRootFreshnessVerification?: SourceRootFreshnessVerificationHandle | null;
   triggerProviderRefresh?: (() => Promise<void>) | null;
   controlHostOwnership?: ControlHostOwnershipHandle | null;
 }
@@ -177,6 +198,21 @@ export async function startControlServerPublicLifecycle(
       intervalMs: EXPIRY_INTERVAL_MS
     });
 
+    const controlHostOwnershipForPolling = controlHostOwnership;
+    const readControlHostOwner = controlHostOwnershipForPolling
+      ? (): ControlHostOwnershipPollingPayload | null => controlHostOwnershipForPolling.polling
+      : null;
+    const sourceRootFreshnessVerification =
+      startupInputs.requestContextShared.providerIssueHandoff && readControlHostOwner
+        ? createSourceRootFreshnessVerificationHandle(
+            startupInputs.requestContextShared.providerIssueHandoff,
+            readControlHostOwner,
+            (refreshedOwner) => {
+              controlHostOwnershipForPolling!.polling = refreshedOwner;
+            }
+          )
+        : null;
+
     const providerRefreshCoordinator = startupInputs.requestContextShared.providerIssueHandoff
       ? createProviderRefreshCoordinator(
           startupInputs.requestContextShared.providerIssueHandoff,
@@ -184,10 +220,15 @@ export async function startControlServerPublicLifecycle(
             readFeatureToggles:
               startupInputs.requestContextShared.controlStore
                 ? () => startupInputs.requestContextShared.controlStore.snapshot().feature_toggles
-                : null
+                : null,
+            readControlHostOwner,
+            refreshSourceRootFreshness: sourceRootFreshnessVerification
+              ? sourceRootFreshnessVerification.trigger
+              : null
           }
         )
       : null;
+    let sourceRootFreshnessStartupTrigger: NodeJS.Timeout | null = null;
     if (startupInputs.requestContextShared.providerIssueHandoff) {
       const persistProviderIntakePolling =
         startupInputs.requestContextShared.persist?.providerIntakePolling ?? null;
@@ -197,6 +238,9 @@ export async function startControlServerPublicLifecycle(
         intervalMs: PROVIDER_REFRESH_INTERVAL_MS,
         stuckAfterMs: PROVIDER_REFRESH_STUCK_AFTER_MS,
         controlHostOwner: controlHostOwnership?.polling ?? null,
+        sourceRootFreshnessAuthority: resolvePollingSourceRootFreshnessAuthority(
+          persistedPollingSnapshot
+        ),
         skipInitialUpdate: persistedPollingSnapshot !== null,
         onUpdate:
           startupInputs.requestContextShared.providerIntakeState && persistProviderIntakePolling
@@ -219,6 +263,11 @@ export async function startControlServerPublicLifecycle(
               }
             : null
       });
+      if (sourceRootFreshnessVerification) {
+        sourceRootFreshnessStartupTrigger = scheduleStartupSourceRootFreshnessVerification(
+          sourceRootFreshnessVerification.trigger
+        );
+      }
     }
     const providerRefreshStartupTrigger = providerRefreshCoordinator
       ? scheduleStartupProviderRefresh(providerRefreshCoordinator.trigger)
@@ -233,9 +282,13 @@ export async function startControlServerPublicLifecycle(
         ? {
             providerRefreshTimer: providerRefreshCoordinator.timer,
             providerRefreshStartupTrigger,
+            sourceRootFreshnessStartupTrigger,
+            sourceRootFreshnessVerification,
             triggerProviderRefresh: providerRefreshCoordinator.trigger
           }
-        : {}),
+        : sourceRootFreshnessStartupTrigger
+          ? { sourceRootFreshnessStartupTrigger, sourceRootFreshnessVerification }
+          : {}),
       baseUrl: readyInstance.baseUrl
     };
   } catch (error) {
@@ -250,8 +303,14 @@ export async function closeControlServerPublicLifecycle(
   if (state.providerRefreshStartupTrigger) {
     clearTimeout(state.providerRefreshStartupTrigger);
   }
+  if (state.sourceRootFreshnessStartupTrigger) {
+    clearTimeout(state.sourceRootFreshnessStartupTrigger);
+  }
   if (state.providerRefreshTimer) {
     state.providerRefreshTimer.cancel();
+  }
+  if (state.sourceRootFreshnessVerification) {
+    state.sourceRootFreshnessVerification.cancel();
   }
   const serverClosePromise = beginClosingControlServerHttpServer(state.server);
   void serverClosePromise.catch(() => undefined);
@@ -735,7 +794,7 @@ function createProviderRefreshCoordinator(
     timer = null;
   };
 
-  const scheduleNextTriggerAsync = async (): Promise<void> => {
+  const scheduleNextTriggerAsync = async (reasonOverride?: string | null): Promise<void> => {
     if (stopped || timer) {
       return;
     }
@@ -749,7 +808,7 @@ function createProviderRefreshCoordinator(
     }
     scheduleProviderPolling(providerIssueHandoff, {
       intervalMs: schedule.interval_ms,
-      reason: schedule.reason,
+      reason: reasonOverride ?? schedule.reason,
       linearBudget: schedule.linear_budget
     });
     timer = setTimeout(() => {
@@ -791,6 +850,26 @@ function createProviderRefreshCoordinator(
     if (preflightSchedule?.linear_budget?.cooldown_active) {
       clearScheduledTrigger();
       await scheduleNextTriggerAsync();
+      return;
+    }
+    const sourceRootFreshnessOutcome = context.refreshSourceRootFreshness
+      ? await context.refreshSourceRootFreshness()
+      : null;
+    if (
+      stopped ||
+      (sourceRootFreshnessOutcome?.kind === 'skipped' &&
+        sourceRootFreshnessOutcome.reason === 'stopped')
+    ) {
+      clearScheduledTrigger();
+      return;
+    }
+    if (
+      sourceRootFreshnessOutcome?.kind === 'pending' ||
+      sourceRootFreshnessOutcome?.kind === 'failed' ||
+      sourceRootFreshnessOutcome?.kind === 'skipped'
+    ) {
+      clearScheduledTrigger();
+      await scheduleNextTriggerAsync(sourceRootFreshnessOutcome.reason);
       return;
     }
     if (isProviderPollingStuck(providerIssueHandoff)) {
@@ -878,6 +957,90 @@ function createProviderRefreshCoordinator(
 }
 
 function scheduleStartupProviderRefresh(trigger: () => Promise<void>): NodeJS.Timeout {
+  const startupTrigger = setTimeout(() => {
+    void trigger();
+  }, 0);
+  startupTrigger.unref?.();
+  return startupTrigger;
+}
+
+function createSourceRootFreshnessVerificationHandle(
+  providerIssueHandoff: ProviderIssueHandoffService,
+  readControlHostOwner: () => ControlHostOwnershipPollingPayload | null,
+  writeControlHostOwner?: (owner: ControlHostOwnershipPollingPayload) => void
+): SourceRootFreshnessVerificationHandle {
+  let stopped = false;
+  let inFlight: Promise<SourceRootFreshnessVerificationOutcome> | null = null;
+  const startVerification = (): Promise<SourceRootFreshnessVerificationOutcome> => {
+    if (stopped) {
+      return Promise.resolve({ kind: 'skipped', reason: 'stopped' });
+    }
+    if (inFlight) {
+      return inFlight;
+    }
+    const controlHostOwner = readControlHostOwner();
+    if (!controlHostOwner) {
+      return Promise.resolve({ kind: 'skipped', reason: 'missing_control_host_owner' });
+    }
+    inFlight = refreshControlHostOwnershipPollingPayloadInChild(controlHostOwner)
+      .then((refreshedOwner) => {
+        if (stopped || !refreshedOwner) {
+          return {
+            kind: stopped ? 'skipped' : 'failed',
+            reason: stopped ? 'stopped' : 'source_root_freshness_verification_failed'
+          } as SourceRootFreshnessVerificationOutcome;
+        }
+        writeControlHostOwner?.(refreshedOwner);
+        markProviderPollingControlHostOwnerFreshnessVerified(providerIssueHandoff, {
+          controlHostOwner: refreshedOwner
+        });
+        return { kind: 'verified', controlHostOwner: refreshedOwner } as const;
+      })
+      .catch(
+        (): SourceRootFreshnessVerificationOutcome => ({
+          kind: 'failed',
+          reason: 'source_root_freshness_verification_failed'
+        })
+      )
+      .finally(() => {
+        inFlight = null;
+      });
+    return inFlight;
+  };
+  const trigger = async (): Promise<SourceRootFreshnessVerificationOutcome> => {
+    const verification = startVerification();
+    return await waitForSourceRootFreshnessVerification(verification);
+  };
+  return {
+    trigger,
+    cancel: () => {
+      stopped = true;
+    }
+  };
+}
+
+async function waitForSourceRootFreshnessVerification(
+  verification: Promise<SourceRootFreshnessVerificationOutcome>
+): Promise<SourceRootFreshnessVerificationOutcome> {
+  let timeout: NodeJS.Timeout | null = null;
+  const timeoutOutcome = new Promise<SourceRootFreshnessVerificationOutcome>((resolve) => {
+    timeout = setTimeout(() => {
+      resolve({ kind: 'pending', reason: 'source_root_freshness_verification_pending' });
+    }, SOURCE_ROOT_FRESHNESS_VERIFICATION_WAIT_MS);
+    timeout.unref?.();
+  });
+  try {
+    return await Promise.race([verification, timeoutOutcome]);
+  } finally {
+    if (timeout) {
+      clearTimeout(timeout);
+    }
+  }
+}
+
+function scheduleStartupSourceRootFreshnessVerification(
+  trigger: () => Promise<SourceRootFreshnessVerificationOutcome>
+): NodeJS.Timeout {
   const startupTrigger = setTimeout(() => {
     void trigger();
   }, 0);
@@ -1054,7 +1217,8 @@ function startProviderIssueHandoffOperation(
   resetProviderIssueHandoffStuckSignal(state);
   if (healthContext) {
     markProviderPollingStarted(providerIssueHandoff, {
-      mode: healthContext.mode
+      mode: healthContext.mode,
+      controlHostOwner: healthContext.controlHostOwner
     });
   }
   let operationResult: Promise<void>;
