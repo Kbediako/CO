@@ -42597,6 +42597,154 @@ describe('createProviderIssueHandoffService', () => {
     expect(launcher.resume).not.toHaveBeenCalled();
   });
 
+  it('clears stale promoted review residue during completed-run rehydrate when newer tracked issue truth is Done', async () => {
+    const { root, paths } = await createHostPaths();
+    const childEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'task-576-stale-promoted-review-rehydrate'
+    };
+    const childPaths = resolveRunPaths(childEnv, 'run-576-stale-promoted-review-rehydrate');
+    await mkdir(childPaths.runDir, { recursive: true });
+    await writeFile(
+      childPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-576-stale-promoted-review-rehydrate',
+        task_id: 'task-576-stale-promoted-review-rehydrate',
+        status: 'succeeded',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-576',
+        issue_updated_at: '2026-05-22T15:25:00.000Z',
+        updated_at: '2026-05-22T15:30:00.000Z'
+      }),
+      'utf8'
+    );
+
+    const state = createProviderIntakeState();
+    state.claims.push({
+      provider: 'linear',
+      provider_key: 'linear:lin-issue-1',
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-576',
+      issue_title: 'Terminal promoted PR residue',
+      issue_state: 'Merging',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-05-22T15:25:00.000Z',
+      issue_assignee_id: null,
+      issue_assignee_name: null,
+      task_id: 'task-576-stale-promoted-review-rehydrate',
+      mapping_source: 'provider_id_fallback',
+      state: 'completed',
+      reason: 'provider_issue_review_promotion_promoted',
+      accepted_at: '2026-05-22T15:20:05.000Z',
+      updated_at: '2026-05-22T15:30:10.000Z',
+      last_delivery_id: 'delivery-576-stale-promoted-review-rehydrate',
+      last_event: 'Issue',
+      last_action: 'update',
+      last_webhook_timestamp: 1_748_101_205_000,
+      run_id: 'run-576-stale-promoted-review-rehydrate',
+      run_manifest_path: childPaths.manifestPath,
+      launch_source: null,
+      launch_token: null,
+      review_promotion: {
+        recorded_at: '2026-05-22T15:30:20.000Z',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-576',
+        issue_state: 'Merging',
+        issue_state_type: 'started',
+        issue_updated_at: '2026-05-22T15:30:20.000Z',
+        status: 'promoted',
+        reason: 'promoted_to_merging',
+        summary: 'Review handoff already advanced into Merging.',
+        attached_pr_urls: ['https://github.com/Kbediako/CO/pull/866'],
+        ignored_historical_pr_urls: [],
+        conflicting_attached_pr_urls: [],
+        pr: {
+          url: 'https://github.com/Kbediako/CO/pull/866',
+          owner: 'Kbediako',
+          repo: 'CO',
+          number: 866
+        },
+        snapshot: {
+          state: 'OPEN',
+          review_decision: 'APPROVED',
+          merge_state_status: 'CLEAN',
+          ready_to_merge: true,
+          gate_reasons: [],
+          action_required_reasons: [],
+          unresolved_thread_count: 0,
+          checks_pending: 0,
+          checks_failed: 0,
+          required_checks_pending: 0,
+          required_checks_failed: 0,
+          updated_at: '2026-05-22T15:30:20.000Z',
+          merged_at: null,
+          head_oid: 'abc123'
+        },
+        linear_transition: null
+      },
+      merge_closeout: null
+    });
+
+    const { persist, getPersistedState } = createPersistSnapshotSpy(state);
+    const launcher = {
+      start: vi.fn(async () => null),
+      resume: vi.fn(async () => undefined)
+    };
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      resolveTrackedIssue: async () => ({
+        kind: 'ready',
+        trackedIssue: createTrackedIssue({
+          identifier: 'CO-576',
+          title: 'Terminal promoted PR residue',
+          state: 'Done',
+          state_type: 'completed',
+          updated_at: '2026-05-22T15:45:00.000Z',
+          assignee_id: null,
+          assignee_name: null
+        })
+      })
+    });
+
+    await service.rehydrate();
+
+    expect(state.claims[0]).toMatchObject({
+      state: 'completed',
+      reason: 'provider_issue_rehydrated_completed_run',
+      issue_state: 'Done',
+      issue_state_type: 'completed',
+      issue_updated_at: '2026-05-22T15:45:00.000Z',
+      run_id: 'run-576-stale-promoted-review-rehydrate',
+      run_manifest_path: childPaths.manifestPath,
+      retry_queued: null,
+      retry_attempt: null,
+      retry_due_at: null,
+      retry_error: null
+    });
+    expect(state.claims[0]?.review_promotion ?? null).toBeNull();
+    expect(state.claims[0]?.merge_closeout ?? null).toBeNull();
+    expect(getPersistedState().claims[0]).toMatchObject({
+      state: 'completed',
+      reason: 'provider_issue_rehydrated_completed_run',
+      issue_state: 'Done',
+      retry_queued: null,
+      retry_attempt: null,
+      retry_due_at: null,
+      retry_error: null
+    });
+    expect(getPersistedState().claims[0]?.review_promotion ?? null).toBeNull();
+    expect(getPersistedState().claims[0]?.merge_closeout ?? null).toBeNull();
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(launcher.resume).not.toHaveBeenCalled();
+  });
+
   it('clears stale transition_failed merge_closeout residue during completed-run rehydrate when newer tracked issue truth is Done', async () => {
     const { root, paths } = await createHostPaths();
     const childEnv = {

@@ -1,6 +1,62 @@
 {
   "items": [
     {
+      "id": "20260525-linear-6c71f385-db09-470b-84cb-61013987a2a1",
+      "title": "CO-576 reconcile terminal promoted-PR intake residue",
+      "relates_to": "tasks/tasks-linear-6c71f385-db09-470b-84cb-61013987a2a1.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "status": "in_progress",
+      "last_review": "2026-05-25",
+      "canonical_owner_key": "provider-intake:terminal-merge-closeout-truth:post-co516-recurrence-v1",
+      "canonical_owner_marker": "codex-orchestrator:canonical-owner-key=provider-intake:terminal-merge-closeout-truth:post-co516-recurrence-v1",
+      "evidence": [
+        "docs/PRD-linear-6c71f385-db09-470b-84cb-61013987a2a1.md",
+        "docs/TECH_SPEC-linear-6c71f385-db09-470b-84cb-61013987a2a1.md",
+        "docs/ACTION_PLAN-linear-6c71f385-db09-470b-84cb-61013987a2a1.md",
+        "tasks/specs/linear-6c71f385-db09-470b-84cb-61013987a2a1.md",
+        "tasks/tasks-linear-6c71f385-db09-470b-84cb-61013987a2a1.md",
+        ".agent/task/linear-6c71f385-db09-470b-84cb-61013987a2a1.md",
+        "tasks/index.json",
+        "docs/TASKS.md",
+        "docs/docs-freshness-registry.json"
+      ],
+      "validation": {
+        "status": "docs_packet_created_validation_pending",
+        "passed": [
+          "live GitHub PR audit found zero open PRs",
+          "live provider-intake audit found one active CO-557 claim and stale completed terminal promoted-review residue",
+          "docs-first packet drafted in isolated worktree"
+        ],
+        "pending": [
+          "docs packet structural validation",
+          "docs-review",
+          "implementation and full repo validation"
+        ]
+      },
+      "paths": {
+        "agent_task": ".agent/task/linear-6c71f385-db09-470b-84cb-61013987a2a1.md",
+        "prd": "docs/PRD-linear-6c71f385-db09-470b-84cb-61013987a2a1.md",
+        "docs": "docs/TECH_SPEC-linear-6c71f385-db09-470b-84cb-61013987a2a1.md",
+        "tech_spec_mirror": "docs/TECH_SPEC-linear-6c71f385-db09-470b-84cb-61013987a2a1.md",
+        "action_plan": "docs/ACTION_PLAN-linear-6c71f385-db09-470b-84cb-61013987a2a1.md",
+        "spec": "tasks/specs/linear-6c71f385-db09-470b-84cb-61013987a2a1.md",
+        "task": "tasks/tasks-linear-6c71f385-db09-470b-84cb-61013987a2a1.md"
+      },
+      "source_issue": {
+        "id": "6c71f385-db09-470b-84cb-61013987a2a1",
+        "identifier": "CO-576",
+        "url": "https://linear.app/asabeko/issue/CO-576/co-reconcile-post-co-516-terminal-promoted-pr-intake-residue"
+      },
+      "notes": {
+        "source_issue": "CO-516 post-merge closeout recurrence follow-up.",
+        "protected_terms": "provider-intake-state.json; completed claim; provider_issue_review_promotion_promoted; issue_state=Merging; review_pr_state OPEN; merge_closeout=null; merged PR; Linear Done; CO-514; CO-518; CO-552; CO-565; CO-566; CO-573",
+        "non_goals": "No manual provider-intake cleanup, audit deletion, PR merge policy change, review gate change, broad CO STATUS redesign, worker kill, control-host restart, or terminal issue reopening as fix."
+      }
+    },
+    {
       "id": "20260525-linear-725576d6-e236-40f7-a4bc-25428121ee77",
       "title": "CO-586 drain completed-lane docs freshness residue cohorts",
       "relates_to": "tasks/specs/linear-725576d6-e236-40f7-a4bc-25428121ee77.md",
