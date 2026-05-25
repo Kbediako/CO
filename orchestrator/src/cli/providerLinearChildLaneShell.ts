@@ -186,6 +186,16 @@ interface ProviderLinearChildLaneDirectoryEntry {
   isDirectory: () => boolean;
 }
 
+interface ProviderLinearChildLaneArtifactRootCandidate {
+  label: string;
+  root: string;
+}
+
+interface AcceptedChildLaneArtifactRootResolution {
+  artifactRoot: string;
+  selected: ProviderLinearChildLaneArtifactRootCandidate;
+}
+
 interface ProviderLinearChildLaneShellDependencies {
   execRunner: (request: ProviderLinearWorkerExecRequest) => Promise<ProviderLinearWorkerExecResult>;
   readParentDirtyPaths: (workspacePath: string) => Promise<string[]>;
@@ -963,6 +973,12 @@ async function resolveChildLaneDecision(
     params.env.CODEX_ORCHESTRATOR_RUNS_DIR,
     '.runs'
   );
+  const childRunsRoots = resolveChildLaneArtifactRootCandidates({
+    repoRoot: context.repoRoot,
+    primaryRoot: childRunsRoot,
+    contextRunDir: context.runDir,
+    configuredRunsDir: params.env.CODEX_ORCHESTRATOR_RUNS_DIR
+  });
   if (params.action !== 'accept') {
     const finalized = await finalizePendingChildLaneDecision({
       action: params.action,
@@ -1158,7 +1174,7 @@ async function resolveChildLaneDecision(
   }
   const artifactRoot = resolveAcceptedChildLaneArtifactRoot(
     context.repoRoot,
-    childRunsRoot,
+    childRunsRoots,
     target
   );
   if (!artifactRoot) {
@@ -1172,11 +1188,11 @@ async function resolveChildLaneDecision(
       childRun: null,
       childLane: released ?? target,
       code: 'provider_worker_child_lane_patch_invalid',
-      message: 'Child lane artifact root must stay anchored to the expected workspace-local child run directory before parent acceptance.',
+      message: formatAcceptedChildLaneArtifactRootFailureMessage(context.repoRoot, childRunsRoots, target),
       status: 409
     });
   }
-  const patchArtifactPath = resolveAcceptedPatchArtifactPath(context.repoRoot, target, artifactRoot);
+  const patchArtifactPath = resolveAcceptedPatchArtifactPath(context.repoRoot, target, artifactRoot.artifactRoot);
   if (!patchArtifactPath) {
     const released = await releaseAcceptClaimWithSnapshot();
     return failureResult({
@@ -1192,7 +1208,7 @@ async function resolveChildLaneDecision(
       status: 409
     });
   }
-  const proofPath = join(artifactRoot, PROVIDER_LINEAR_CHILD_LANE_PROOF_FILENAME);
+  const proofPath = join(artifactRoot.artifactRoot, PROVIDER_LINEAR_CHILD_LANE_PROOF_FILENAME);
   const acceptedProof = await deps.readChildLaneProof(proofPath).catch(() => null);
   let acceptedProofScope: ProviderLinearWorkerChildLaneScope | null = null;
   if (!acceptedProof) {
@@ -1231,7 +1247,7 @@ async function resolveChildLaneDecision(
       target,
       acceptedProof,
       context.repoRoot,
-      artifactRoot,
+      artifactRoot.artifactRoot,
       patchArtifactPath
     );
     if (proofViolation) {
@@ -2332,7 +2348,12 @@ function resolveChildLaneReservationRepairProofViolation(input: {
   }
   const artifactRoot = resolveAcceptedChildLaneArtifactRoot(
     input.repoRoot,
-    input.childRunsRoot,
+    [
+      {
+        label: 'workspace-local .runs',
+        root: input.childRunsRoot
+      }
+    ],
     input.candidate
   );
   if (!artifactRoot) {
@@ -2349,7 +2370,7 @@ function resolveChildLaneReservationRepairProofViolation(input: {
   if (input.action !== 'accept') {
     return null;
   }
-  const patchArtifactPath = resolveAcceptedPatchArtifactPath(input.repoRoot, input.candidate, artifactRoot);
+  const patchArtifactPath = resolveAcceptedPatchArtifactPath(input.repoRoot, input.candidate, artifactRoot.artifactRoot);
   if (!patchArtifactPath) {
     return 'Child lane proof patch artifact path must stay within the child lane artifact root before reservation repair.';
   }
@@ -2358,7 +2379,7 @@ function resolveChildLaneReservationRepairProofViolation(input: {
     input.candidate,
     input.proof,
     input.repoRoot,
-    artifactRoot,
+    artifactRoot.artifactRoot,
     patchArtifactPath
   );
 }
@@ -2603,11 +2624,101 @@ function resolveAcceptedPatchArtifactPath(
   return isPathWithinRoot(artifactRoot, resolvedPatchArtifactPath) ? resolvedPatchArtifactPath : null;
 }
 
+function appendChildLaneArtifactRootCandidate(
+  candidates: ProviderLinearChildLaneArtifactRootCandidate[],
+  candidate: ProviderLinearChildLaneArtifactRootCandidate | null
+): void {
+  if (!candidate) {
+    return;
+  }
+  const root = resolve(candidate.root);
+  if (candidates.some((entry) => entry.root === root)) {
+    return;
+  }
+  candidates.push({ label: candidate.label, root });
+}
+
+function resolveRunsRootFromRunDir(runDir: string): string | null {
+  const resolvedRunDir = resolve(runDir);
+  const cliDir = dirname(resolvedRunDir);
+  const taskDir = dirname(cliDir);
+  const runsRoot = dirname(taskDir);
+  return basename(cliDir) === 'cli' ? runsRoot : null;
+}
+
+function resolveConfiguredSharedRunsRoot(
+  repoRoot: string,
+  configuredRunsDir: string | undefined
+): ProviderLinearChildLaneArtifactRootCandidate | null {
+  if (basename(dirname(repoRoot)) !== '.workspaces') {
+    return null;
+  }
+  const normalized = normalizeOptionalString(configuredRunsDir);
+  if (!normalized) {
+    return null;
+  }
+  const sharedRoot = dirname(dirname(repoRoot));
+  const candidate = isAbsolute(normalized) ? resolve(normalized) : resolve(sharedRoot, normalized);
+  if (!isPathWithinRoot(sharedRoot, candidate) || isPathWithinRoot(repoRoot, candidate)) {
+    return null;
+  }
+  return {
+    label: 'shared control-host artifact root',
+    root: candidate
+  };
+}
+
+function resolveChildLaneArtifactRootCandidates(input: {
+  repoRoot: string;
+  primaryRoot: string;
+  contextRunDir: string;
+  configuredRunsDir: string | undefined;
+}): ProviderLinearChildLaneArtifactRootCandidate[] {
+  const candidates: ProviderLinearChildLaneArtifactRootCandidate[] = [];
+  appendChildLaneArtifactRootCandidate(candidates, {
+    label: 'workspace-local .runs',
+    root: input.primaryRoot
+  });
+  appendChildLaneArtifactRootCandidate(
+    candidates,
+    resolveConfiguredSharedRunsRoot(input.repoRoot, input.configuredRunsDir)
+  );
+  const parentRunsRoot = resolveRunsRootFromRunDir(input.contextRunDir);
+  if (parentRunsRoot) {
+    appendChildLaneArtifactRootCandidate(candidates, {
+      label: isPathWithinRoot(input.repoRoot, parentRunsRoot)
+        ? 'parent run artifact root'
+        : 'shared control-host artifact root',
+      root: parentRunsRoot
+    });
+  }
+  return candidates;
+}
+
+function formatArtifactRootCandidate(candidate: ProviderLinearChildLaneArtifactRootCandidate): string {
+  return `${candidate.label}=${candidate.root}`;
+}
+
+function formatAcceptedChildLaneArtifactRootFailureMessage(
+  repoRoot: string,
+  candidates: ProviderLinearChildLaneArtifactRootCandidate[],
+  childLane: ProviderLinearWorkerChildLaneRecord
+): string {
+  const taskId = normalizeOptionalString(childLane.task_id) ?? '(missing task id)';
+  const runId = normalizeOptionalString(childLane.run_id) ?? '(missing run id)';
+  const artifactRoot = normalizeOptionalString(childLane.artifact_root) ?? '(missing artifact root)';
+  const manifestPath = normalizeOptionalString(childLane.manifest_path) ?? '(missing manifest path)';
+  const resolvedArtifactRoot = artifactRoot === '(missing artifact root)' ? artifactRoot : resolveRunPath(repoRoot, artifactRoot);
+  const resolvedManifestPath = manifestPath === '(missing manifest path)' ? manifestPath : resolveRunPath(repoRoot, manifestPath);
+  const expectedRoots = candidates.map(formatArtifactRootCandidate).join('; ');
+  return `Child lane artifact root must stay anchored to exactly one expected child run directory before parent acceptance. task_id=${taskId}; run_id=${runId}; artifact_root=${resolvedArtifactRoot}; manifest_path=${resolvedManifestPath}; expected roots: ${expectedRoots}.`;
+}
+
 function resolveAcceptedChildLaneArtifactRoot(
   repoRoot: string,
-  childRunsRoot: string,
+  candidates: ProviderLinearChildLaneArtifactRootCandidate[],
   childLane: ProviderLinearWorkerChildLaneRecord
-): string | null {
+): AcceptedChildLaneArtifactRootResolution | null {
   const taskId = normalizeOptionalString(childLane.task_id);
   const artifactRoot = normalizeOptionalString(childLane.artifact_root);
   const manifestPath = normalizeOptionalString(childLane.manifest_path);
@@ -2621,18 +2732,22 @@ function resolveAcceptedChildLaneArtifactRoot(
   } catch {
     return null;
   }
-  const expectedArtifactRoot = resolve(childRunsRoot, taskId, 'cli', safeRunId);
   const resolvedArtifactRoot = resolveRunPath(repoRoot, artifactRoot);
-  if (resolvedArtifactRoot !== expectedArtifactRoot) {
+  const resolvedManifestPath = manifestPath ? resolveRunPath(repoRoot, manifestPath) : null;
+  const matches = candidates.filter((candidate) => {
+    const expectedArtifactRoot = resolve(candidate.root, taskId, 'cli', safeRunId);
+    if (resolvedArtifactRoot !== expectedArtifactRoot) {
+      return false;
+    }
+    return !resolvedManifestPath || resolvedManifestPath === join(expectedArtifactRoot, 'manifest.json');
+  });
+  if (matches.length !== 1) {
     return null;
   }
-  if (manifestPath) {
-    const resolvedManifestPath = resolveRunPath(repoRoot, manifestPath);
-    if (resolvedManifestPath !== join(expectedArtifactRoot, 'manifest.json')) {
-      return null;
-    }
-  }
-  return expectedArtifactRoot;
+  return {
+    artifactRoot: resolvedArtifactRoot,
+    selected: matches[0]!
+  };
 }
 
 async function readPatchChangedPaths(patchPath: string): Promise<string[]> {

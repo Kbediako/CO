@@ -79,6 +79,32 @@ async function createProviderWorkerManifest(runsRootOverride: string | null = nu
   return { manifestPath, runDir };
 }
 
+async function createProviderWorkspaceManifest() {
+  tempRoot = await mkdtemp(join(tmpdir(), 'provider-linear-child-lane-workspace-'));
+  const workspacePath = join(tempRoot, '.workspaces', TASK_ID);
+  const sharedRunsRoot = join(tempRoot, '.runs');
+  const runDir = join(sharedRunsRoot, TASK_ID, 'cli', RUN_ID);
+  const manifestPath = join(runDir, 'manifest.json');
+  await mkdir(runDir, { recursive: true });
+  await mkdir(workspacePath, { recursive: true });
+  await writeFile(
+    manifestPath,
+    JSON.stringify({
+      run_id: RUN_ID,
+      task_id: TASK_ID,
+      pipeline_id: 'provider-linear-worker',
+      ...ISSUE,
+      issue_updated_at: '2026-03-30T07:10:00.000Z',
+      provider_launch_source: 'control-host',
+      provider_control_host_task_id: CONTROL_HOST_TASK_ID,
+      provider_control_host_run_id: CONTROL_HOST_RUN_ID,
+      workspace_path: workspacePath
+    }),
+    'utf8'
+  );
+  return { manifestPath, runDir, sharedRunsRoot, workspacePath };
+}
+
 function buildProviderWorkerEnv(
   manifestPath: string,
   overrides: NodeJS.ProcessEnv = {}
@@ -5013,6 +5039,121 @@ describe('runProviderLinearChildLaneShell', () => {
         decision: 'accepted'
       })
     ]);
+  });
+
+  it('accepts a non-stale child lane rooted under the shared control-host artifact root from a provider workspace', async () => {
+    const { manifestPath, runDir, sharedRunsRoot, workspacePath } = await createProviderWorkspaceManifest();
+    const artifactRoot = join(sharedRunsRoot, `${TASK_ID}-impl-a`, 'cli', 'child-run-1');
+    const childLane = createLaneRecord({
+      manifest_path: join(artifactRoot, 'manifest.json'),
+      artifact_root: artifactRoot,
+      log_path: join(artifactRoot, 'run.log'),
+      patch_artifact_path: join(artifactRoot, 'provider-linear-child-lane.patch'),
+      workspace_path: workspacePath
+    });
+    await appendProviderLinearWorkerChildLaneRecord(runDir, childLane);
+    await writeChildLaneManifest(childLane);
+    await writeChildLaneProof(childLane);
+    await writePatchArtifact(childLane.patch_artifact_path ?? '', childLane.scope.files[0] ?? '');
+    const applyPatchArtifact = vi.fn(async () => undefined);
+
+    const result = await runProviderLinearChildLaneShell(
+      {
+        action: 'accept',
+        streamName: childLane.stream,
+        env: buildProviderWorkerEnv(manifestPath, {
+          CODEX_ORCHESTRATOR_ROOT: workspacePath,
+          CODEX_ORCHESTRATOR_RUNS_DIR: sharedRunsRoot
+        })
+      },
+      {
+        applyPatchArtifact,
+        readParentDirtyPaths: vi.fn(async () => []) as never,
+        readParentHeadSha: vi.fn(async () => childLane.parent_snapshot.base_sha),
+        readTrackedIssue: vi.fn(async () => ({
+          id: ISSUE.issue_id,
+          identifier: ISSUE.issue_identifier,
+          updated_at: childLane.parent_snapshot.issue_updated_at,
+          state: childLane.parent_snapshot.issue_state,
+          state_type: childLane.parent_snapshot.issue_state_type
+        })) as never,
+        refreshProofSnapshot: vi.fn(async () => undefined)
+      }
+    );
+
+    expect(result).toMatchObject({
+      ok: true,
+      operation: 'child-lane',
+      action: 'accepted',
+      child_lane: {
+        stream: childLane.stream,
+        decision: 'accepted'
+      }
+    });
+    expect(applyPatchArtifact).toHaveBeenCalledWith(workspacePath, childLane.patch_artifact_path);
+    expect(await readProviderLinearWorkerChildLanes(runDir)).toEqual([
+      expect.objectContaining({
+        stream: childLane.stream,
+        decision: 'accepted'
+      })
+    ]);
+  });
+
+  it('rejects provider-workspace child lane acceptance when the artifact root matches neither authoritative root', async () => {
+    const { manifestPath, runDir, sharedRunsRoot, workspacePath } = await createProviderWorkspaceManifest();
+    const unexpectedRoot = join(tempRoot ?? '', 'unexpected-runs', `${TASK_ID}-impl-a`, 'cli', 'child-run-1');
+    const childLane = createLaneRecord({
+      manifest_path: join(unexpectedRoot, 'manifest.json'),
+      artifact_root: unexpectedRoot,
+      log_path: join(unexpectedRoot, 'run.log'),
+      patch_artifact_path: join(unexpectedRoot, 'provider-linear-child-lane.patch'),
+      workspace_path: workspacePath
+    });
+    await appendProviderLinearWorkerChildLaneRecord(runDir, childLane);
+    const applyPatchArtifact = vi.fn(async () => undefined);
+
+    const result = await runProviderLinearChildLaneShell(
+      {
+        action: 'accept',
+        streamName: childLane.stream,
+        env: buildProviderWorkerEnv(manifestPath, {
+          CODEX_ORCHESTRATOR_ROOT: workspacePath,
+          CODEX_ORCHESTRATOR_RUNS_DIR: sharedRunsRoot
+        })
+      },
+      {
+        applyPatchArtifact,
+        readParentDirtyPaths: vi.fn(async () => []) as never,
+        readParentHeadSha: vi.fn(async () => childLane.parent_snapshot.base_sha),
+        readTrackedIssue: vi.fn(async () => ({
+          id: ISSUE.issue_id,
+          identifier: ISSUE.issue_identifier,
+          updated_at: childLane.parent_snapshot.issue_updated_at,
+          state: childLane.parent_snapshot.issue_state,
+          state_type: childLane.parent_snapshot.issue_state_type
+        })) as never,
+        refreshProofSnapshot: vi.fn(async () => undefined)
+      }
+    );
+
+    expect(result).toMatchObject({
+      ok: false,
+      operation: 'child-lane',
+      action: 'accept',
+      error: {
+        code: 'provider_worker_child_lane_patch_invalid',
+        status: 409
+      }
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.message).toContain('workspace-local .runs=');
+      expect(result.error.message).toContain('shared control-host artifact root=');
+      expect(result.error.message).toContain(unexpectedRoot);
+      expect(result.error.message).toContain(join(workspacePath, '.runs'));
+      expect(result.error.message).toContain(sharedRunsRoot);
+    }
+    expect(applyPatchArtifact).not.toHaveBeenCalled();
   });
 
   it('rejects acceptance when the persisted patch artifact escapes the child run artifact root', async () => {

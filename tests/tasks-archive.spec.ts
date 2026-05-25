@@ -580,6 +580,32 @@ describe('tasks-archive script', () => {
     expect(archiveContent).not.toContain('1002-still-active-task');
   });
 
+  it('archives terminal snapshots when tasks/index marks the task done', async () => {
+    const repo = await initRepository({
+      completedTaskIndexEntry: {
+        status: 'done'
+      }
+    });
+
+    await execFileAsync('node', [scriptPath, '--out', 'docs/TASKS-archive-YYYY.md'], {
+      cwd: repo,
+      env: {
+        ...process.env,
+        CODEX_ORCHESTRATOR_ROOT: repo,
+        CODEX_ORCHESTRATOR_OUT_DIR: 'out'
+      }
+    });
+
+    const tasksContent = await readFile(join(repo, 'docs', 'TASKS.md'), 'utf8');
+    const archiveContent = await readFile(
+      join(repo, 'docs', `TASKS-archive-${archiveYear}.md`),
+      'utf8'
+    );
+
+    expect(tasksContent).not.toContain('linear-6ed6ef11-538e-48f0-936c-8547632bf92e');
+    expect(archiveContent).toContain('linear-6ed6ef11-538e-48f0-936c-8547632bf92e');
+  });
+
   it('does not archive snapshots when index status is still active despite historical completed_at', async () => {
     const repo = await initRepository({
       completedTaskIndexEntry: {

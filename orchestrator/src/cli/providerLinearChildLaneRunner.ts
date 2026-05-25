@@ -615,6 +615,7 @@ function buildChildLanePrompt(context: ProviderLinearChildLaneContext): string {
       ? `- Phase scope: ${context.scope.phases.join(', ')}`
       : '- Phase scope: none declared'
   ];
+  const docsTaskKeyContractLines = buildProviderDocsPacketTaskKeyContractLines(context);
   return [
     buildChildLanePromptHeader(context.issueIdentifier),
     '',
@@ -629,11 +630,34 @@ function buildChildLanePrompt(context: ProviderLinearChildLaneContext): string {
     `Purpose: ${context.purpose}`,
     ...scopeLines,
     ...(context.runMemoryPromptLines.length > 0 ? ['', ...context.runMemoryPromptLines] : []),
+    ...docsTaskKeyContractLines,
     '',
     context.instructions ? `Additional instructions:\n${context.instructions}` : 'Additional instructions: none.',
     '',
     'Finish by leaving the lane workspace changes in place for patch export. Do not commit.'
   ].join('\n');
+}
+
+function buildProviderDocsPacketTaskKeyContractLines(
+  context: Pick<ProviderLinearChildLaneContext, 'issueId' | 'scope'>
+): string[] {
+  const docsPhase = context.scope.phases.includes('docs');
+  const docsPacketFile = context.scope.files.some((file) =>
+    /^(?:docs\/(?:PRD|TECH_SPEC|ACTION_PLAN)-|tasks\/(?:tasks-|specs\/)|\.agent\/task\/|tasks\/index\.json|docs\/TASKS\.md|docs\/docs-freshness-registry\.json)/u.test(
+      file
+    )
+  );
+  if (!docsPhase && !docsPacketFile) {
+    return [];
+  }
+  const providerIssueTaskKey = context.issueId ? `linear-${context.issueId}` : 'linear-<issue-id>';
+  return [
+    '',
+    'Provider docs packet task-key contract:',
+    `- Use \`${providerIssueTaskKey}\` as the registered provider issue task key for task/checklist/spec paths and \`tasks/index.json\` normalization.`,
+    '- Do not append issue-title, retry, or freshness suffixes to that provider issue task key.',
+    `- Child packet evidence belongs under \`${providerIssueTaskKey}-docs-packet\`; docs-review retries belong under \`${providerIssueTaskKey}-docs-review\`.`
+  ];
 }
 
 function buildProviderLinearChildLaneSessionPromptNeedles(
