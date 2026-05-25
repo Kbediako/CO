@@ -1,517 +1,7 @@
 {
   "version": 1,
-  "generated_at": "2026-05-24",
+  "generated_at": "2026-05-25",
   "entries": [
-    {
-      "path": ".agent/task/linear-2a51671e-14fa-46c8-bce4-bcfd71e66066.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-24",
-      "cadence_days": 30,
-      "source_issue": {
-        "id": "2a51671e-14fa-46c8-bce4-bcfd71e66066",
-        "identifier": "CO-581",
-        "url": "https://linear.app/asabeko/issue/CO-581"
-      },
-      "doc_class": "task_mirror",
-      "lifecycle_state": "active",
-      "created_at": "2026-05-24",
-      "next_review": "2026-06-23",
-      "notes": "CO-581 docs-first packet for exact-key retained May 19 docs freshness cohort owner."
-    },
-    {
-      "path": "docs/ACTION_PLAN-linear-2a51671e-14fa-46c8-bce4-bcfd71e66066.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-24",
-      "cadence_days": 30,
-      "source_issue": {
-        "id": "2a51671e-14fa-46c8-bce4-bcfd71e66066",
-        "identifier": "CO-581",
-        "url": "https://linear.app/asabeko/issue/CO-581"
-      },
-      "doc_class": "task_packet",
-      "lifecycle_state": "active",
-      "created_at": "2026-05-24",
-      "next_review": "2026-06-23",
-      "notes": "CO-581 docs-first packet for exact-key retained May 19 docs freshness cohort owner."
-    },
-    {
-      "path": "docs/PRD-linear-2a51671e-14fa-46c8-bce4-bcfd71e66066.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-24",
-      "cadence_days": 30,
-      "source_issue": {
-        "id": "2a51671e-14fa-46c8-bce4-bcfd71e66066",
-        "identifier": "CO-581",
-        "url": "https://linear.app/asabeko/issue/CO-581"
-      },
-      "doc_class": "task_packet",
-      "lifecycle_state": "active",
-      "created_at": "2026-05-24",
-      "next_review": "2026-06-23",
-      "notes": "CO-581 docs-first packet for exact-key retained May 19 docs freshness cohort owner."
-    },
-    {
-      "path": "docs/TECH_SPEC-linear-2a51671e-14fa-46c8-bce4-bcfd71e66066.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-24",
-      "cadence_days": 30,
-      "source_issue": {
-        "id": "2a51671e-14fa-46c8-bce4-bcfd71e66066",
-        "identifier": "CO-581",
-        "url": "https://linear.app/asabeko/issue/CO-581"
-      },
-      "doc_class": "task_packet",
-      "lifecycle_state": "active",
-      "created_at": "2026-05-24",
-      "next_review": "2026-06-23",
-      "notes": "CO-581 docs-first packet for exact-key retained May 19 docs freshness cohort owner."
-    },
-    {
-      "path": "tasks/specs/linear-2a51671e-14fa-46c8-bce4-bcfd71e66066.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-24",
-      "cadence_days": 30,
-      "source_issue": {
-        "id": "2a51671e-14fa-46c8-bce4-bcfd71e66066",
-        "identifier": "CO-581",
-        "url": "https://linear.app/asabeko/issue/CO-581"
-      },
-      "doc_class": "active_spec",
-      "lifecycle_state": "active",
-      "created_at": "2026-05-24",
-      "next_review": "2026-06-23",
-      "notes": "CO-581 docs-first packet for exact-key retained May 19 docs freshness cohort owner."
-    },
-    {
-      "path": "tasks/tasks-linear-2a51671e-14fa-46c8-bce4-bcfd71e66066.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-24",
-      "cadence_days": 30,
-      "source_issue": {
-        "id": "2a51671e-14fa-46c8-bce4-bcfd71e66066",
-        "identifier": "CO-581",
-        "url": "https://linear.app/asabeko/issue/CO-581"
-      },
-      "doc_class": "task_mirror",
-      "lifecycle_state": "active",
-      "created_at": "2026-05-24",
-      "next_review": "2026-06-23",
-      "notes": "CO-581 docs-first packet for exact-key retained May 19 docs freshness cohort owner."
-    },
-    {
-      "path": ".agent/task/linear-e8f55d3d-1975-4da0-9b33-4307f7d63a08.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-24",
-      "cadence_days": 30,
-      "source_issue": {
-        "id": "e8f55d3d-1975-4da0-9b33-4307f7d63a08",
-        "identifier": "CO-568",
-        "url": "https://linear.app/asabeko/issue/CO-568"
-      },
-      "doc_class": "task_mirror",
-      "lifecycle_state": "active",
-      "created_at": "2026-05-24",
-      "next_review": "2026-06-23",
-      "notes": "CO-568 docs-first packet for exact-key retained May 19 docs freshness cohort owner."
-    },
-    {
-      "path": "docs/ACTION_PLAN-linear-e8f55d3d-1975-4da0-9b33-4307f7d63a08.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-24",
-      "cadence_days": 30,
-      "source_issue": {
-        "id": "e8f55d3d-1975-4da0-9b33-4307f7d63a08",
-        "identifier": "CO-568",
-        "url": "https://linear.app/asabeko/issue/CO-568"
-      },
-      "doc_class": "task_packet",
-      "lifecycle_state": "active",
-      "created_at": "2026-05-24",
-      "next_review": "2026-06-23",
-      "notes": "CO-568 docs-first packet for exact-key retained May 19 docs freshness cohort owner."
-    },
-    {
-      "path": "docs/PRD-linear-e8f55d3d-1975-4da0-9b33-4307f7d63a08.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-24",
-      "cadence_days": 30,
-      "source_issue": {
-        "id": "e8f55d3d-1975-4da0-9b33-4307f7d63a08",
-        "identifier": "CO-568",
-        "url": "https://linear.app/asabeko/issue/CO-568"
-      },
-      "doc_class": "task_packet",
-      "lifecycle_state": "active",
-      "created_at": "2026-05-24",
-      "next_review": "2026-06-23",
-      "notes": "CO-568 docs-first packet for exact-key retained May 19 docs freshness cohort owner."
-    },
-    {
-      "path": "docs/TECH_SPEC-linear-e8f55d3d-1975-4da0-9b33-4307f7d63a08.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-24",
-      "cadence_days": 30,
-      "source_issue": {
-        "id": "e8f55d3d-1975-4da0-9b33-4307f7d63a08",
-        "identifier": "CO-568",
-        "url": "https://linear.app/asabeko/issue/CO-568"
-      },
-      "doc_class": "task_packet",
-      "lifecycle_state": "active",
-      "created_at": "2026-05-24",
-      "next_review": "2026-06-23",
-      "notes": "CO-568 docs-first packet for exact-key retained May 19 docs freshness cohort owner."
-    },
-    {
-      "path": "tasks/specs/linear-e8f55d3d-1975-4da0-9b33-4307f7d63a08.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-24",
-      "cadence_days": 30,
-      "source_issue": {
-        "id": "e8f55d3d-1975-4da0-9b33-4307f7d63a08",
-        "identifier": "CO-568",
-        "url": "https://linear.app/asabeko/issue/CO-568"
-      },
-      "doc_class": "active_spec",
-      "lifecycle_state": "active",
-      "created_at": "2026-05-24",
-      "next_review": "2026-06-23",
-      "notes": "CO-568 docs-first packet for exact-key retained May 19 docs freshness cohort owner."
-    },
-    {
-      "path": "tasks/tasks-linear-e8f55d3d-1975-4da0-9b33-4307f7d63a08.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-24",
-      "cadence_days": 30,
-      "source_issue": {
-        "id": "e8f55d3d-1975-4da0-9b33-4307f7d63a08",
-        "identifier": "CO-568",
-        "url": "https://linear.app/asabeko/issue/CO-568"
-      },
-      "doc_class": "task_mirror",
-      "lifecycle_state": "active",
-      "created_at": "2026-05-24",
-      "next_review": "2026-06-23",
-      "notes": "CO-568 docs-first packet for exact-key retained May 19 docs freshness cohort owner."
-    },
-    {
-      "path": ".agent/task/linear-0509ba11-5b44-40d0-9880-822b068053c3.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-24",
-      "cadence_days": 30,
-      "source_issue": {
-        "id": "0509ba11-5b44-40d0-9880-822b068053c3",
-        "identifier": "CO-580",
-        "url": "https://linear.app/asabeko/issue/CO-580"
-      },
-      "doc_class": "task_mirror",
-      "lifecycle_state": "active",
-      "created_at": "2026-05-24",
-      "next_review": "2026-06-23",
-      "notes": "CO-580 docs-first packet for shared docs freshness lifecycle resolver and owner finalizer."
-    },
-    {
-      "path": "docs/ACTION_PLAN-linear-0509ba11-5b44-40d0-9880-822b068053c3.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-24",
-      "cadence_days": 30,
-      "source_issue": {
-        "id": "0509ba11-5b44-40d0-9880-822b068053c3",
-        "identifier": "CO-580",
-        "url": "https://linear.app/asabeko/issue/CO-580"
-      },
-      "doc_class": "task_packet",
-      "lifecycle_state": "active",
-      "created_at": "2026-05-24",
-      "next_review": "2026-06-23",
-      "notes": "CO-580 docs-first packet for shared docs freshness lifecycle resolver and owner finalizer."
-    },
-    {
-      "path": "docs/PRD-linear-0509ba11-5b44-40d0-9880-822b068053c3.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-24",
-      "cadence_days": 30,
-      "source_issue": {
-        "id": "0509ba11-5b44-40d0-9880-822b068053c3",
-        "identifier": "CO-580",
-        "url": "https://linear.app/asabeko/issue/CO-580"
-      },
-      "doc_class": "task_packet",
-      "lifecycle_state": "active",
-      "created_at": "2026-05-24",
-      "next_review": "2026-06-23",
-      "notes": "CO-580 docs-first packet for shared docs freshness lifecycle resolver and owner finalizer."
-    },
-    {
-      "path": "docs/TECH_SPEC-linear-0509ba11-5b44-40d0-9880-822b068053c3.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-24",
-      "cadence_days": 30,
-      "source_issue": {
-        "id": "0509ba11-5b44-40d0-9880-822b068053c3",
-        "identifier": "CO-580",
-        "url": "https://linear.app/asabeko/issue/CO-580"
-      },
-      "doc_class": "task_packet",
-      "lifecycle_state": "active",
-      "created_at": "2026-05-24",
-      "next_review": "2026-06-23",
-      "notes": "CO-580 docs-first packet for shared docs freshness lifecycle resolver and owner finalizer."
-    },
-    {
-      "path": "tasks/specs/linear-0509ba11-5b44-40d0-9880-822b068053c3.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-24",
-      "cadence_days": 30,
-      "source_issue": {
-        "id": "0509ba11-5b44-40d0-9880-822b068053c3",
-        "identifier": "CO-580",
-        "url": "https://linear.app/asabeko/issue/CO-580"
-      },
-      "doc_class": "active_spec",
-      "lifecycle_state": "active",
-      "created_at": "2026-05-24",
-      "next_review": "2026-06-23",
-      "notes": "CO-580 docs-first packet for shared docs freshness lifecycle resolver and owner finalizer."
-    },
-    {
-      "path": "tasks/tasks-linear-0509ba11-5b44-40d0-9880-822b068053c3.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-24",
-      "cadence_days": 30,
-      "source_issue": {
-        "id": "0509ba11-5b44-40d0-9880-822b068053c3",
-        "identifier": "CO-580",
-        "url": "https://linear.app/asabeko/issue/CO-580"
-      },
-      "doc_class": "task_mirror",
-      "lifecycle_state": "active",
-      "created_at": "2026-05-24",
-      "next_review": "2026-06-23",
-      "notes": "CO-580 docs-first packet for shared docs freshness lifecycle resolver and owner finalizer."
-    },
-    {
-      "path": ".agent/task/linear-5634bf98-fe59-41f5-8623-60c9ef0b2993.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-24",
-      "cadence_days": 30,
-      "source_issue": {
-        "id": "5634bf98-fe59-41f5-8623-60c9ef0b2993",
-        "identifier": "CO-579",
-        "url": "https://linear.app/asabeko/issue/CO-579"
-      },
-      "doc_class": "task_mirror",
-      "lifecycle_state": "active",
-      "created_at": "2026-05-24",
-      "next_review": "2026-06-23",
-      "notes": "CO-579 docs-first packet for replacing terminal CO-575 as docs:freshness:maintain global owner."
-    },
-    {
-      "path": "docs/ACTION_PLAN-linear-5634bf98-fe59-41f5-8623-60c9ef0b2993.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-24",
-      "cadence_days": 30,
-      "source_issue": {
-        "id": "5634bf98-fe59-41f5-8623-60c9ef0b2993",
-        "identifier": "CO-579",
-        "url": "https://linear.app/asabeko/issue/CO-579"
-      },
-      "doc_class": "task_packet",
-      "lifecycle_state": "active",
-      "created_at": "2026-05-24",
-      "next_review": "2026-06-23",
-      "notes": "CO-579 docs-first packet for replacing terminal CO-575 as docs:freshness:maintain global owner."
-    },
-    {
-      "path": "docs/PRD-linear-5634bf98-fe59-41f5-8623-60c9ef0b2993.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-24",
-      "cadence_days": 30,
-      "source_issue": {
-        "id": "5634bf98-fe59-41f5-8623-60c9ef0b2993",
-        "identifier": "CO-579",
-        "url": "https://linear.app/asabeko/issue/CO-579"
-      },
-      "doc_class": "task_packet",
-      "lifecycle_state": "active",
-      "created_at": "2026-05-24",
-      "next_review": "2026-06-23",
-      "notes": "CO-579 docs-first packet for replacing terminal CO-575 as docs:freshness:maintain global owner."
-    },
-    {
-      "path": "docs/TECH_SPEC-linear-5634bf98-fe59-41f5-8623-60c9ef0b2993.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-24",
-      "cadence_days": 30,
-      "source_issue": {
-        "id": "5634bf98-fe59-41f5-8623-60c9ef0b2993",
-        "identifier": "CO-579",
-        "url": "https://linear.app/asabeko/issue/CO-579"
-      },
-      "doc_class": "task_packet",
-      "lifecycle_state": "active",
-      "created_at": "2026-05-24",
-      "next_review": "2026-06-23",
-      "notes": "CO-579 docs-first packet for replacing terminal CO-575 as docs:freshness:maintain global owner."
-    },
-    {
-      "path": "tasks/specs/linear-5634bf98-fe59-41f5-8623-60c9ef0b2993.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-24",
-      "cadence_days": 30,
-      "source_issue": {
-        "id": "5634bf98-fe59-41f5-8623-60c9ef0b2993",
-        "identifier": "CO-579",
-        "url": "https://linear.app/asabeko/issue/CO-579"
-      },
-      "doc_class": "active_spec",
-      "lifecycle_state": "active",
-      "created_at": "2026-05-24",
-      "next_review": "2026-06-23",
-      "notes": "CO-579 docs-first packet for replacing terminal CO-575 as docs:freshness:maintain global owner."
-    },
-    {
-      "path": "tasks/tasks-linear-5634bf98-fe59-41f5-8623-60c9ef0b2993.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-24",
-      "cadence_days": 30,
-      "source_issue": {
-        "id": "5634bf98-fe59-41f5-8623-60c9ef0b2993",
-        "identifier": "CO-579",
-        "url": "https://linear.app/asabeko/issue/CO-579"
-      },
-      "doc_class": "task_mirror",
-      "lifecycle_state": "active",
-      "created_at": "2026-05-24",
-      "next_review": "2026-06-23",
-      "notes": "CO-579 docs-first packet for replacing terminal CO-575 as docs:freshness:maintain global owner."
-    },
-    {
-      "path": ".agent/task/linear-7847b2be-ae34-4256-977f-f2c291f31938.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-23",
-      "cadence_days": 30,
-      "source_issue": {
-        "id": "7847b2be-ae34-4256-977f-f2c291f31938",
-        "identifier": "CO-563",
-        "url": "https://linear.app/asabeko/issue/CO-563"
-      },
-      "doc_class": "task_mirror",
-      "lifecycle_state": "active",
-      "created_at": "2026-05-23",
-      "next_review": "2026-06-22",
-      "notes": "CO-563 docs-first packet for co-status terminal worker proof reconciliation."
-    },
-    {
-      "path": "docs/ACTION_PLAN-linear-7847b2be-ae34-4256-977f-f2c291f31938.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-23",
-      "cadence_days": 30,
-      "source_issue": {
-        "id": "7847b2be-ae34-4256-977f-f2c291f31938",
-        "identifier": "CO-563",
-        "url": "https://linear.app/asabeko/issue/CO-563"
-      },
-      "doc_class": "task_packet",
-      "lifecycle_state": "active",
-      "created_at": "2026-05-23",
-      "next_review": "2026-06-22",
-      "notes": "CO-563 docs-first packet for co-status terminal worker proof reconciliation."
-    },
-    {
-      "path": "docs/PRD-linear-7847b2be-ae34-4256-977f-f2c291f31938.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-23",
-      "cadence_days": 30,
-      "source_issue": {
-        "id": "7847b2be-ae34-4256-977f-f2c291f31938",
-        "identifier": "CO-563",
-        "url": "https://linear.app/asabeko/issue/CO-563"
-      },
-      "doc_class": "task_packet",
-      "lifecycle_state": "active",
-      "created_at": "2026-05-23",
-      "next_review": "2026-06-22",
-      "notes": "CO-563 docs-first packet for co-status terminal worker proof reconciliation."
-    },
-    {
-      "path": "docs/TECH_SPEC-linear-7847b2be-ae34-4256-977f-f2c291f31938.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-23",
-      "cadence_days": 30,
-      "source_issue": {
-        "id": "7847b2be-ae34-4256-977f-f2c291f31938",
-        "identifier": "CO-563",
-        "url": "https://linear.app/asabeko/issue/CO-563"
-      },
-      "doc_class": "task_packet",
-      "lifecycle_state": "active",
-      "created_at": "2026-05-23",
-      "next_review": "2026-06-22",
-      "notes": "CO-563 docs-first packet for co-status terminal worker proof reconciliation."
-    },
-    {
-      "path": "tasks/specs/linear-7847b2be-ae34-4256-977f-f2c291f31938.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-23",
-      "cadence_days": 30,
-      "source_issue": {
-        "id": "7847b2be-ae34-4256-977f-f2c291f31938",
-        "identifier": "CO-563",
-        "url": "https://linear.app/asabeko/issue/CO-563"
-      },
-      "doc_class": "active_spec",
-      "lifecycle_state": "active",
-      "created_at": "2026-05-23",
-      "next_review": "2026-06-22",
-      "notes": "CO-563 docs-first packet for co-status terminal worker proof reconciliation."
-    },
-    {
-      "path": "tasks/tasks-linear-7847b2be-ae34-4256-977f-f2c291f31938.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-23",
-      "cadence_days": 30,
-      "source_issue": {
-        "id": "7847b2be-ae34-4256-977f-f2c291f31938",
-        "identifier": "CO-563",
-        "url": "https://linear.app/asabeko/issue/CO-563"
-      },
-      "doc_class": "task_mirror",
-      "lifecycle_state": "active",
-      "created_at": "2026-05-23",
-      "next_review": "2026-06-22",
-      "notes": "CO-563 docs-first packet for co-status terminal worker proof reconciliation."
-    },
     {
       "path": ".agent/AGENTS.md",
       "owner": "Codex (top-level agent), Review agent",
@@ -2865,9 +2355,9 @@
     {
       "path": ".agent/task/1164-coordinator-symphony-aligned-orchestrator-perform-run-lifecycle-execution-and-run-error-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-22",
-      "cadence_days": 30,
+      "status": "archived",
+      "last_review": "2026-05-25",
+      "cadence_days": 365,
       "notes": "CO-580 lifecycle resolver migration: terminal source evidence remains active because local open checklist obligations prevent archive readiness. Linked open checklist obligation groups=1.",
       "lifecycle_state": "active"
     },
@@ -2930,18 +2420,18 @@
     {
       "path": ".agent/task/1173-coordinator-symphony-aligned-orchestrator-cloud-target-execution-request-contract-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-22",
-      "cadence_days": 30,
+      "status": "archived",
+      "last_review": "2026-05-25",
+      "cadence_days": 365,
       "notes": "CO-580 lifecycle resolver migration: terminal source evidence remains active because local open checklist obligations prevent archive readiness. Linked open checklist obligation groups=1.",
       "lifecycle_state": "active"
     },
     {
       "path": ".agent/task/1174-coordinator-symphony-aligned-orchestrator-cloud-target-missing-env-failure-contract-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-22",
-      "cadence_days": 30,
+      "status": "archived",
+      "last_review": "2026-05-25",
+      "cadence_days": 365,
       "notes": "CO-580 lifecycle resolver migration: terminal source evidence remains active because local open checklist obligations prevent archive readiness. Linked open checklist obligation groups=1.",
       "lifecycle_state": "active"
     },
@@ -3074,27 +2564,27 @@
     {
       "path": ".agent/task/1193-coordinator-symphony-aligned-orchestrator-control-plane-lifecycle-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-22",
-      "cadence_days": 30,
+      "status": "archived",
+      "last_review": "2026-05-25",
+      "cadence_days": 365,
       "notes": "CO-580 lifecycle resolver migration: terminal source evidence remains active because local open checklist obligations prevent archive readiness. Linked open checklist obligation groups=1.",
       "lifecycle_state": "active"
     },
     {
       "path": ".agent/task/1194-coordinator-symphony-aligned-orchestrator-start-preparation-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-22",
-      "cadence_days": 30,
+      "status": "archived",
+      "last_review": "2026-05-25",
+      "cadence_days": 365,
       "notes": "CO-580 lifecycle resolver migration: terminal source evidence remains active because local open checklist obligations prevent archive readiness. Linked open checklist obligation groups=1.",
       "lifecycle_state": "active"
     },
     {
       "path": ".agent/task/1195-coordinator-symphony-aligned-orchestrator-resume-preparation-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-22",
-      "cadence_days": 30,
+      "status": "archived",
+      "last_review": "2026-05-25",
+      "cadence_days": 365,
       "notes": "CO-580 lifecycle resolver migration: terminal source evidence remains active because local open checklist obligations prevent archive readiness. Linked open checklist obligation groups=1.",
       "lifecycle_state": "active"
     },
@@ -4259,6 +3749,23 @@
       "cadence_days": 30
     },
     {
+      "path": ".agent/task/linear-0509ba11-5b44-40d0-9880-822b068053c3.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-24",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "0509ba11-5b44-40d0-9880-822b068053c3",
+        "identifier": "CO-580",
+        "url": "https://linear.app/asabeko/issue/CO-580"
+      },
+      "doc_class": "task_mirror",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-24",
+      "next_review": "2026-06-23",
+      "notes": "CO-580 docs-first packet for shared docs freshness lifecycle resolver and owner finalizer."
+    },
+    {
       "path": ".agent/task/linear-057747d0-a472-4cba-ac18-2d7342f2a168.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "archived",
@@ -4663,6 +4170,23 @@
       "next_review": "2026-06-15"
     },
     {
+      "path": ".agent/task/linear-2a51671e-14fa-46c8-bce4-bcfd71e66066.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-24",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "2a51671e-14fa-46c8-bce4-bcfd71e66066",
+        "identifier": "CO-581",
+        "url": "https://linear.app/asabeko/issue/CO-581"
+      },
+      "doc_class": "task_mirror",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-24",
+      "next_review": "2026-06-23",
+      "notes": "CO-581 docs-first packet for exact-key retained May 19 docs freshness cohort owner."
+    },
+    {
       "path": ".agent/task/linear-2a8f00cf-a39a-4b15-aeca-23bacd618af1.md",
       "owner": "Codex",
       "status": "archived",
@@ -4699,6 +4223,22 @@
       "status": "active",
       "last_review": "2026-05-18",
       "cadence_days": 30
+    },
+    {
+      "path": ".agent/task/linear-2fe8fdb4-928d-4861-9f73-44021e1a4d0b.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-21",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "2fe8fdb4-928d-4861-9f73-44021e1a4d0b",
+        "identifier": "CO-551",
+        "url": "https://linear.app/asabeko/issue/CO-551"
+      },
+      "doc_class": "task_mirror",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-21",
+      "next_review": "2026-06-20"
     },
     {
       "path": ".agent/task/linear-30d86aaa-8afb-4e47-8de1-f2ab493a15a9.md",
@@ -5178,6 +4718,23 @@
       "cadence_days": 365
     },
     {
+      "path": ".agent/task/linear-5634bf98-fe59-41f5-8623-60c9ef0b2993.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-24",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "5634bf98-fe59-41f5-8623-60c9ef0b2993",
+        "identifier": "CO-579",
+        "url": "https://linear.app/asabeko/issue/CO-579"
+      },
+      "doc_class": "task_mirror",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-24",
+      "next_review": "2026-06-23",
+      "notes": "CO-579 docs-first packet for replacing terminal CO-575 as docs:freshness:maintain global owner."
+    },
+    {
       "path": ".agent/task/linear-56395d00-0da1-447e-8d2d-68b195e8a3dc.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "archived",
@@ -5647,11 +5204,44 @@
       "cadence_days": 30
     },
     {
+      "path": ".agent/task/linear-7847b2be-ae34-4256-977f-f2c291f31938.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-23",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "7847b2be-ae34-4256-977f-f2c291f31938",
+        "identifier": "CO-563",
+        "url": "https://linear.app/asabeko/issue/CO-563"
+      },
+      "doc_class": "task_mirror",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-23",
+      "next_review": "2026-06-22",
+      "notes": "CO-563 docs-first packet for co-status terminal worker proof reconciliation."
+    },
+    {
       "path": ".agent/task/linear-7896d3c1-7a62-4b79-97df-a71984fab5b2.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "archived",
       "last_review": "2026-05-18",
       "cadence_days": 365
+    },
+    {
+      "path": ".agent/task/linear-795a9aa4-02fd-4f2f-8942-7df40ae865ce.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-22",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "795a9aa4-02fd-4f2f-8942-7df40ae865ce",
+        "identifier": "CO-578",
+        "url": "https://linear.app/asabeko/issue/CO-578/co-snapshot-mutable-review-manifest-evidence-before-contract"
+      },
+      "doc_class": "task_mirror",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-22",
+      "next_review": "2026-06-21"
     },
     {
       "path": ".agent/task/linear-7988e9a6-8258-4cff-b585-fadc31741ce1.md",
@@ -5667,6 +5257,23 @@
       "status": "active",
       "last_review": "2026-05-14",
       "cadence_days": 30
+    },
+    {
+      "path": ".agent/task/linear-7aeca30c-c52c-4213-9d40-0ac0cf81b316.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-21",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "7aeca30c-c52c-4213-9d40-0ac0cf81b316",
+        "identifier": "CO-570",
+        "url": "https://linear.app/asabeko/issue/CO-570"
+      },
+      "doc_class": "task_mirror",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-21",
+      "next_review": "2026-06-20",
+      "notes": "CO-570 docs-first packet for explicit docs-review/change-bundle review scope."
     },
     {
       "path": ".agent/task/linear-7b3de1c1-f420-4203-bb8c-494dadecaa88.md",
@@ -5760,6 +5367,22 @@
       "status": "archived",
       "last_review": "2026-05-18",
       "cadence_days": 365
+    },
+    {
+      "path": ".agent/task/linear-813d1f69-7777-4dd4-8709-90d9121339d4.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-22",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "813d1f69-7777-4dd4-8709-90d9121339d4",
+        "identifier": "CO-567",
+        "url": "https://linear.app/asabeko/issue/CO-567/co-enforce-generated-runtime-freshness-after-shared-root-fast-forward"
+      },
+      "doc_class": "task_mirror",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-22",
+      "next_review": "2026-06-21"
     },
     {
       "path": ".agent/task/linear-850b66b4-6a56-426a-947e-ce45d7f12a96.md",
@@ -5971,6 +5594,23 @@
       "lifecycle_state": "active",
       "created_at": "2026-05-22",
       "next_review": "2026-06-21"
+    },
+    {
+      "path": ".agent/task/linear-91fd1820-50cd-4d33-97b6-8d62b64ce22f.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-22",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "91fd1820-50cd-4d33-97b6-8d62b64ce22f",
+        "identifier": "CO-574",
+        "url": "https://linear.app/asabeko/issue/CO-574/co-stop-control-host-machine-status-endpoint-stalls-under-active"
+      },
+      "doc_class": "task_packet",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-21",
+      "next_review": "2026-06-21",
+      "notes": "CO-574 docs-first packet for control-host machine-status probe timeout and accepted/no-run provider recovery recurrence; CO-575 docs freshness owner repair remains blocked by this lane."
     },
     {
       "path": ".agent/task/linear-93785af4-9df9-4713-8a63-b0caddb5796f.md",
@@ -6447,9 +6087,9 @@
     {
       "path": ".agent/task/linear-ac7cefc8-ed87-4591-86cf-63b07bc20c2c.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-22",
-      "cadence_days": 30,
+      "status": "archived",
+      "last_review": "2026-05-25",
+      "cadence_days": 365,
       "notes": "CO-580 lifecycle resolver migration: terminal source evidence remains active because local open checklist obligations prevent archive readiness. Linked open checklist obligation groups=1.",
       "lifecycle_state": "active"
     },
@@ -7269,6 +6909,23 @@
       "cadence_days": 30
     },
     {
+      "path": ".agent/task/linear-e8f55d3d-1975-4da0-9b33-4307f7d63a08.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-24",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "e8f55d3d-1975-4da0-9b33-4307f7d63a08",
+        "identifier": "CO-568",
+        "url": "https://linear.app/asabeko/issue/CO-568"
+      },
+      "doc_class": "task_mirror",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-24",
+      "next_review": "2026-06-23",
+      "notes": "CO-568 docs-first packet for exact-key retained May 19 docs freshness cohort owner."
+    },
+    {
       "path": ".agent/task/linear-e913b2ab-2be9-4891-bf54-0ac4642ba012.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -7398,6 +7055,22 @@
       "status": "active",
       "last_review": "2026-05-06",
       "cadence_days": 30
+    },
+    {
+      "path": ".agent/task/linear-f42d51e8-18ab-469a-9155-a272e8eaee70.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-22",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "f42d51e8-18ab-469a-9155-a272e8eaee70",
+        "identifier": "CO-577",
+        "url": "https://linear.app/asabeko/issue/CO-577/co-fix-quota-hygiene-degraded-machine-status-classification"
+      },
+      "doc_class": "task_mirror",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-22",
+      "next_review": "2026-06-21"
     },
     {
       "path": ".agent/task/linear-f43c6213-a14e-4c3f-ab51-2c539a4d2c90.md",
@@ -10758,6 +10431,23 @@
       "cadence_days": 30
     },
     {
+      "path": "docs/ACTION_PLAN-linear-0509ba11-5b44-40d0-9880-822b068053c3.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-24",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "0509ba11-5b44-40d0-9880-822b068053c3",
+        "identifier": "CO-580",
+        "url": "https://linear.app/asabeko/issue/CO-580"
+      },
+      "doc_class": "task_packet",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-24",
+      "next_review": "2026-06-23",
+      "notes": "CO-580 docs-first packet for shared docs freshness lifecycle resolver and owner finalizer."
+    },
+    {
       "path": "docs/ACTION_PLAN-linear-0549b4a2-release-publish-workflow-fix.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -11179,6 +10869,23 @@
       "next_review": "2026-06-15"
     },
     {
+      "path": "docs/ACTION_PLAN-linear-2a51671e-14fa-46c8-bce4-bcfd71e66066.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-24",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "2a51671e-14fa-46c8-bce4-bcfd71e66066",
+        "identifier": "CO-581",
+        "url": "https://linear.app/asabeko/issue/CO-581"
+      },
+      "doc_class": "task_packet",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-24",
+      "next_review": "2026-06-23",
+      "notes": "CO-581 docs-first packet for exact-key retained May 19 docs freshness cohort owner."
+    },
+    {
       "path": "docs/ACTION_PLAN-linear-2a8f00cf-a39a-4b15-aeca-23bacd618af1.md",
       "owner": "Codex",
       "status": "archived",
@@ -11215,6 +10922,22 @@
       "status": "active",
       "last_review": "2026-05-18",
       "cadence_days": 30
+    },
+    {
+      "path": "docs/ACTION_PLAN-linear-2fe8fdb4-928d-4861-9f73-44021e1a4d0b.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-21",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "2fe8fdb4-928d-4861-9f73-44021e1a4d0b",
+        "identifier": "CO-551",
+        "url": "https://linear.app/asabeko/issue/CO-551"
+      },
+      "doc_class": "task_packet",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-21",
+      "next_review": "2026-06-20"
     },
     {
       "path": "docs/ACTION_PLAN-linear-30d86aaa-8afb-4e47-8de1-f2ab493a15a9.md",
@@ -11705,6 +11428,23 @@
       "cadence_days": 365
     },
     {
+      "path": "docs/ACTION_PLAN-linear-5634bf98-fe59-41f5-8623-60c9ef0b2993.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-24",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "5634bf98-fe59-41f5-8623-60c9ef0b2993",
+        "identifier": "CO-579",
+        "url": "https://linear.app/asabeko/issue/CO-579"
+      },
+      "doc_class": "task_packet",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-24",
+      "next_review": "2026-06-23",
+      "notes": "CO-579 docs-first packet for replacing terminal CO-575 as docs:freshness:maintain global owner."
+    },
+    {
       "path": "docs/ACTION_PLAN-linear-56395d00-0da1-447e-8d2d-68b195e8a3dc.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "archived",
@@ -12183,11 +11923,44 @@
       "cadence_days": 30
     },
     {
+      "path": "docs/ACTION_PLAN-linear-7847b2be-ae34-4256-977f-f2c291f31938.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-23",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "7847b2be-ae34-4256-977f-f2c291f31938",
+        "identifier": "CO-563",
+        "url": "https://linear.app/asabeko/issue/CO-563"
+      },
+      "doc_class": "task_packet",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-23",
+      "next_review": "2026-06-22",
+      "notes": "CO-563 docs-first packet for co-status terminal worker proof reconciliation."
+    },
+    {
       "path": "docs/ACTION_PLAN-linear-7896d3c1-7a62-4b79-97df-a71984fab5b2.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "archived",
       "last_review": "2026-05-18",
       "cadence_days": 365
+    },
+    {
+      "path": "docs/ACTION_PLAN-linear-795a9aa4-02fd-4f2f-8942-7df40ae865ce.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-22",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "795a9aa4-02fd-4f2f-8942-7df40ae865ce",
+        "identifier": "CO-578",
+        "url": "https://linear.app/asabeko/issue/CO-578/co-snapshot-mutable-review-manifest-evidence-before-contract"
+      },
+      "doc_class": "action_plan",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-22",
+      "next_review": "2026-06-21"
     },
     {
       "path": "docs/ACTION_PLAN-linear-7988e9a6-8258-4cff-b585-fadc31741ce1.md",
@@ -12203,6 +11976,23 @@
       "status": "active",
       "last_review": "2026-05-14",
       "cadence_days": 30
+    },
+    {
+      "path": "docs/ACTION_PLAN-linear-7aeca30c-c52c-4213-9d40-0ac0cf81b316.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-21",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "7aeca30c-c52c-4213-9d40-0ac0cf81b316",
+        "identifier": "CO-570",
+        "url": "https://linear.app/asabeko/issue/CO-570"
+      },
+      "doc_class": "task_packet",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-21",
+      "next_review": "2026-06-20",
+      "notes": "CO-570 docs-first packet for explicit docs-review/change-bundle review scope."
     },
     {
       "path": "docs/ACTION_PLAN-linear-7b3de1c1-f420-4203-bb8c-494dadecaa88.md",
@@ -12296,6 +12086,22 @@
       "status": "archived",
       "last_review": "2026-05-18",
       "cadence_days": 365
+    },
+    {
+      "path": "docs/ACTION_PLAN-linear-813d1f69-7777-4dd4-8709-90d9121339d4.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-22",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "813d1f69-7777-4dd4-8709-90d9121339d4",
+        "identifier": "CO-567",
+        "url": "https://linear.app/asabeko/issue/CO-567/co-enforce-generated-runtime-freshness-after-shared-root-fast-forward"
+      },
+      "doc_class": "task_packet",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-22",
+      "next_review": "2026-06-21"
     },
     {
       "path": "docs/ACTION_PLAN-linear-850b66b4-6a56-426a-947e-ce45d7f12a96.md",
@@ -12524,6 +12330,23 @@
       "lifecycle_state": "active",
       "created_at": "2026-05-22",
       "next_review": "2026-06-21"
+    },
+    {
+      "path": "docs/ACTION_PLAN-linear-91fd1820-50cd-4d33-97b6-8d62b64ce22f.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-22",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "91fd1820-50cd-4d33-97b6-8d62b64ce22f",
+        "identifier": "CO-574",
+        "url": "https://linear.app/asabeko/issue/CO-574/co-stop-control-host-machine-status-endpoint-stalls-under-active"
+      },
+      "doc_class": "task_packet",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-21",
+      "next_review": "2026-06-21",
+      "notes": "CO-574 docs-first packet for control-host machine-status probe timeout and accepted/no-run provider recovery recurrence; CO-575 docs freshness owner repair remains blocked by this lane."
     },
     {
       "path": "docs/ACTION_PLAN-linear-93785af4-9df9-4713-8a63-b0caddb5796f.md",
@@ -13010,9 +12833,9 @@
     {
       "path": "docs/ACTION_PLAN-linear-ac7cefc8-ed87-4591-86cf-63b07bc20c2c.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-22",
-      "cadence_days": 30,
+      "status": "archived",
+      "last_review": "2026-05-25",
+      "cadence_days": 365,
       "notes": "CO-580 lifecycle resolver migration: terminal source evidence remains active because local open checklist obligations prevent archive readiness. Linked open checklist obligation groups=1.",
       "lifecycle_state": "active"
     },
@@ -13846,6 +13669,23 @@
       "cadence_days": 30
     },
     {
+      "path": "docs/ACTION_PLAN-linear-e8f55d3d-1975-4da0-9b33-4307f7d63a08.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-24",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "e8f55d3d-1975-4da0-9b33-4307f7d63a08",
+        "identifier": "CO-568",
+        "url": "https://linear.app/asabeko/issue/CO-568"
+      },
+      "doc_class": "task_packet",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-24",
+      "next_review": "2026-06-23",
+      "notes": "CO-568 docs-first packet for exact-key retained May 19 docs freshness cohort owner."
+    },
+    {
       "path": "docs/ACTION_PLAN-linear-e913b2ab-2be9-4891-bf54-0ac4642ba012.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -13975,6 +13815,22 @@
       "status": "active",
       "last_review": "2026-05-06",
       "cadence_days": 30
+    },
+    {
+      "path": "docs/ACTION_PLAN-linear-f42d51e8-18ab-469a-9155-a272e8eaee70.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-22",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "f42d51e8-18ab-469a-9155-a272e8eaee70",
+        "identifier": "CO-577",
+        "url": "https://linear.app/asabeko/issue/CO-577/co-fix-quota-hygiene-degraded-machine-status-classification"
+      },
+      "doc_class": "task_packet",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-22",
+      "next_review": "2026-06-21"
     },
     {
       "path": "docs/ACTION_PLAN-linear-f43c6213-a14e-4c3f-ab51-2c539a4d2c90.md",
@@ -14466,36 +14322,6 @@
       "status": "active",
       "last_review": "2026-04-04",
       "cadence_days": 90
-    },
-    {
-      "path": "docs/PRD-linear-91f04f3e-5a43-491a-915e-bf6229760676.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-22",
-      "cadence_days": 30,
-      "source_issue": {
-        "id": "91f04f3e-5a43-491a-915e-bf6229760676",
-        "identifier": "CO-549"
-      },
-      "doc_class": "task_packet",
-      "lifecycle_state": "active",
-      "created_at": "2026-05-22",
-      "next_review": "2026-06-21"
-    },
-    {
-      "path": "docs/TECH_SPEC-linear-91f04f3e-5a43-491a-915e-bf6229760676.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-22",
-      "cadence_days": 30,
-      "source_issue": {
-        "id": "91f04f3e-5a43-491a-915e-bf6229760676",
-        "identifier": "CO-549"
-      },
-      "doc_class": "task_packet",
-      "lifecycle_state": "active",
-      "created_at": "2026-05-22",
-      "next_review": "2026-06-21"
     },
     {
       "path": "docs/book/archive/codex-cli-0124-adoption.md",
@@ -18904,9 +18730,9 @@
     {
       "path": "docs/PRD-coordinator-symphony-aligned-orchestrator-cloud-target-execution-request-contract-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-22",
-      "cadence_days": 30,
+      "status": "archived",
+      "last_review": "2026-05-25",
+      "cadence_days": 365,
       "notes": "CO-580 lifecycle resolver migration: terminal source evidence remains active because local open checklist obligations prevent archive readiness. Linked open checklist obligation groups=1.",
       "lifecycle_state": "active"
     },
@@ -18923,9 +18749,9 @@
     {
       "path": "docs/PRD-coordinator-symphony-aligned-orchestrator-cloud-target-missing-env-failure-contract-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-22",
-      "cadence_days": 30,
+      "status": "archived",
+      "last_review": "2026-05-25",
+      "cadence_days": 365,
       "notes": "CO-580 lifecycle resolver migration: terminal source evidence remains active because local open checklist obligations prevent archive readiness. Linked open checklist obligation groups=1.",
       "lifecycle_state": "active"
     },
@@ -19052,9 +18878,9 @@
     {
       "path": "docs/PRD-coordinator-symphony-aligned-orchestrator-perform-run-lifecycle-execution-and-run-error-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-22",
-      "cadence_days": 30,
+      "status": "archived",
+      "last_review": "2026-05-25",
+      "cadence_days": 365,
       "notes": "CO-580 lifecycle resolver migration: terminal source evidence remains active because local open checklist obligations prevent archive readiness. Linked open checklist obligation groups=1.",
       "lifecycle_state": "active"
     },
@@ -19159,9 +18985,9 @@
     {
       "path": "docs/PRD-coordinator-symphony-aligned-orchestrator-resume-preparation-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-22",
-      "cadence_days": 30,
+      "status": "archived",
+      "last_review": "2026-05-25",
+      "cadence_days": 365,
       "notes": "CO-580 lifecycle resolver migration: terminal source evidence remains active because local open checklist obligations prevent archive readiness. Linked open checklist obligation groups=1.",
       "lifecycle_state": "active"
     },
@@ -19216,9 +19042,9 @@
     {
       "path": "docs/PRD-coordinator-symphony-aligned-orchestrator-start-preparation-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-22",
-      "cadence_days": 30,
+      "status": "archived",
+      "last_review": "2026-05-25",
+      "cadence_days": 365,
       "notes": "CO-580 lifecycle resolver migration: terminal source evidence remains active because local open checklist obligations prevent archive readiness. Linked open checklist obligation groups=1.",
       "lifecycle_state": "active"
     },
@@ -19242,9 +19068,9 @@
     {
       "path": "docs/PRD-coordinator-symphony-aligned-orchestrator-with-control-plane-lifecycle-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-22",
-      "cadence_days": 30,
+      "status": "archived",
+      "last_review": "2026-05-25",
+      "cadence_days": 365,
       "notes": "CO-580 lifecycle resolver migration: terminal source evidence remains active because local open checklist obligations prevent archive readiness. Linked open checklist obligation groups=1.",
       "lifecycle_state": "active"
     },
@@ -20663,6 +20489,23 @@
       "cadence_days": 30
     },
     {
+      "path": "docs/PRD-linear-0509ba11-5b44-40d0-9880-822b068053c3.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-24",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "0509ba11-5b44-40d0-9880-822b068053c3",
+        "identifier": "CO-580",
+        "url": "https://linear.app/asabeko/issue/CO-580"
+      },
+      "doc_class": "task_packet",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-24",
+      "next_review": "2026-06-23",
+      "notes": "CO-580 docs-first packet for shared docs freshness lifecycle resolver and owner finalizer."
+    },
+    {
       "path": "docs/PRD-linear-0549b4a2-release-publish-workflow-fix.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -21084,6 +20927,23 @@
       "next_review": "2026-06-15"
     },
     {
+      "path": "docs/PRD-linear-2a51671e-14fa-46c8-bce4-bcfd71e66066.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-24",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "2a51671e-14fa-46c8-bce4-bcfd71e66066",
+        "identifier": "CO-581",
+        "url": "https://linear.app/asabeko/issue/CO-581"
+      },
+      "doc_class": "task_packet",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-24",
+      "next_review": "2026-06-23",
+      "notes": "CO-581 docs-first packet for exact-key retained May 19 docs freshness cohort owner."
+    },
+    {
       "path": "docs/PRD-linear-2a8f00cf-a39a-4b15-aeca-23bacd618af1.md",
       "owner": "Codex",
       "status": "archived",
@@ -21120,6 +20980,22 @@
       "status": "active",
       "last_review": "2026-05-18",
       "cadence_days": 30
+    },
+    {
+      "path": "docs/PRD-linear-2fe8fdb4-928d-4861-9f73-44021e1a4d0b.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-21",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "2fe8fdb4-928d-4861-9f73-44021e1a4d0b",
+        "identifier": "CO-551",
+        "url": "https://linear.app/asabeko/issue/CO-551"
+      },
+      "doc_class": "task_packet",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-21",
+      "next_review": "2026-06-20"
     },
     {
       "path": "docs/PRD-linear-30d86aaa-8afb-4e47-8de1-f2ab493a15a9.md",
@@ -21610,6 +21486,23 @@
       "cadence_days": 365
     },
     {
+      "path": "docs/PRD-linear-5634bf98-fe59-41f5-8623-60c9ef0b2993.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-24",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "5634bf98-fe59-41f5-8623-60c9ef0b2993",
+        "identifier": "CO-579",
+        "url": "https://linear.app/asabeko/issue/CO-579"
+      },
+      "doc_class": "task_packet",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-24",
+      "next_review": "2026-06-23",
+      "notes": "CO-579 docs-first packet for replacing terminal CO-575 as docs:freshness:maintain global owner."
+    },
+    {
       "path": "docs/PRD-linear-56395d00-0da1-447e-8d2d-68b195e8a3dc.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "archived",
@@ -22088,11 +21981,44 @@
       "cadence_days": 30
     },
     {
+      "path": "docs/PRD-linear-7847b2be-ae34-4256-977f-f2c291f31938.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-23",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "7847b2be-ae34-4256-977f-f2c291f31938",
+        "identifier": "CO-563",
+        "url": "https://linear.app/asabeko/issue/CO-563"
+      },
+      "doc_class": "task_packet",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-23",
+      "next_review": "2026-06-22",
+      "notes": "CO-563 docs-first packet for co-status terminal worker proof reconciliation."
+    },
+    {
       "path": "docs/PRD-linear-7896d3c1-7a62-4b79-97df-a71984fab5b2.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "archived",
       "last_review": "2026-05-18",
       "cadence_days": 365
+    },
+    {
+      "path": "docs/PRD-linear-795a9aa4-02fd-4f2f-8942-7df40ae865ce.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-22",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "795a9aa4-02fd-4f2f-8942-7df40ae865ce",
+        "identifier": "CO-578",
+        "url": "https://linear.app/asabeko/issue/CO-578/co-snapshot-mutable-review-manifest-evidence-before-contract"
+      },
+      "doc_class": "prd",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-22",
+      "next_review": "2026-06-21"
     },
     {
       "path": "docs/PRD-linear-7988e9a6-8258-4cff-b585-fadc31741ce1.md",
@@ -22108,6 +22034,23 @@
       "status": "active",
       "last_review": "2026-05-14",
       "cadence_days": 30
+    },
+    {
+      "path": "docs/PRD-linear-7aeca30c-c52c-4213-9d40-0ac0cf81b316.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-21",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "7aeca30c-c52c-4213-9d40-0ac0cf81b316",
+        "identifier": "CO-570",
+        "url": "https://linear.app/asabeko/issue/CO-570"
+      },
+      "doc_class": "task_packet",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-21",
+      "next_review": "2026-06-20",
+      "notes": "CO-570 docs-first packet for explicit docs-review/change-bundle review scope."
     },
     {
       "path": "docs/PRD-linear-7b3de1c1-f420-4203-bb8c-494dadecaa88.md",
@@ -22201,6 +22144,22 @@
       "status": "archived",
       "last_review": "2026-05-18",
       "cadence_days": 365
+    },
+    {
+      "path": "docs/PRD-linear-813d1f69-7777-4dd4-8709-90d9121339d4.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-22",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "813d1f69-7777-4dd4-8709-90d9121339d4",
+        "identifier": "CO-567",
+        "url": "https://linear.app/asabeko/issue/CO-567/co-enforce-generated-runtime-freshness-after-shared-root-fast-forward"
+      },
+      "doc_class": "task_packet",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-22",
+      "next_review": "2026-06-21"
     },
     {
       "path": "docs/PRD-linear-850b66b4-6a56-426a-947e-ce45d7f12a96.md",
@@ -22414,6 +22373,38 @@
       "status": "active",
       "last_review": "2026-04-23",
       "cadence_days": 30
+    },
+    {
+      "path": "docs/PRD-linear-91f04f3e-5a43-491a-915e-bf6229760676.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-22",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "91f04f3e-5a43-491a-915e-bf6229760676",
+        "identifier": "CO-549"
+      },
+      "doc_class": "task_packet",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-22",
+      "next_review": "2026-06-21"
+    },
+    {
+      "path": "docs/PRD-linear-91fd1820-50cd-4d33-97b6-8d62b64ce22f.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-22",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "91fd1820-50cd-4d33-97b6-8d62b64ce22f",
+        "identifier": "CO-574",
+        "url": "https://linear.app/asabeko/issue/CO-574/co-stop-control-host-machine-status-endpoint-stalls-under-active"
+      },
+      "doc_class": "task_packet",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-21",
+      "next_review": "2026-06-21",
+      "notes": "CO-574 docs-first packet for control-host machine-status probe timeout and accepted/no-run provider recovery recurrence; CO-575 docs freshness owner repair remains blocked by this lane."
     },
     {
       "path": "docs/PRD-linear-93785af4-9df9-4713-8a63-b0caddb5796f.md",
@@ -23734,6 +23725,23 @@
       "cadence_days": 30
     },
     {
+      "path": "docs/PRD-linear-e8f55d3d-1975-4da0-9b33-4307f7d63a08.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-24",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "e8f55d3d-1975-4da0-9b33-4307f7d63a08",
+        "identifier": "CO-568",
+        "url": "https://linear.app/asabeko/issue/CO-568"
+      },
+      "doc_class": "task_packet",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-24",
+      "next_review": "2026-06-23",
+      "notes": "CO-568 docs-first packet for exact-key retained May 19 docs freshness cohort owner."
+    },
+    {
       "path": "docs/PRD-linear-e913b2ab-2be9-4891-bf54-0ac4642ba012.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -23863,6 +23871,22 @@
       "status": "active",
       "last_review": "2026-05-06",
       "cadence_days": 30
+    },
+    {
+      "path": "docs/PRD-linear-f42d51e8-18ab-469a-9155-a272e8eaee70.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-22",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "f42d51e8-18ab-469a-9155-a272e8eaee70",
+        "identifier": "CO-577",
+        "url": "https://linear.app/asabeko/issue/CO-577/co-fix-quota-hygiene-degraded-machine-status-classification"
+      },
+      "doc_class": "task_packet",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-22",
+      "next_review": "2026-06-21"
     },
     {
       "path": "docs/PRD-linear-f43c6213-a14e-4c3f-ab51-2c539a4d2c90.md",
@@ -25875,9 +25899,9 @@
     {
       "path": "docs/TECH_SPEC-coordinator-symphony-aligned-orchestrator-cloud-target-execution-request-contract-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-22",
-      "cadence_days": 30,
+      "status": "archived",
+      "last_review": "2026-05-25",
+      "cadence_days": 365,
       "notes": "CO-580 lifecycle resolver migration: terminal source evidence remains active because local open checklist obligations prevent archive readiness. Linked open checklist obligation groups=1.",
       "lifecycle_state": "active"
     },
@@ -25894,9 +25918,9 @@
     {
       "path": "docs/TECH_SPEC-coordinator-symphony-aligned-orchestrator-cloud-target-missing-env-failure-contract-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-22",
-      "cadence_days": 30,
+      "status": "archived",
+      "last_review": "2026-05-25",
+      "cadence_days": 365,
       "notes": "CO-580 lifecycle resolver migration: terminal source evidence remains active because local open checklist obligations prevent archive readiness. Linked open checklist obligation groups=1.",
       "lifecycle_state": "active"
     },
@@ -26023,9 +26047,9 @@
     {
       "path": "docs/TECH_SPEC-coordinator-symphony-aligned-orchestrator-perform-run-lifecycle-execution-and-run-error-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-22",
-      "cadence_days": 30,
+      "status": "archived",
+      "last_review": "2026-05-25",
+      "cadence_days": 365,
       "notes": "CO-580 lifecycle resolver migration: terminal source evidence remains active because local open checklist obligations prevent archive readiness. Linked open checklist obligation groups=1.",
       "lifecycle_state": "active"
     },
@@ -26130,9 +26154,9 @@
     {
       "path": "docs/TECH_SPEC-coordinator-symphony-aligned-orchestrator-resume-preparation-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-22",
-      "cadence_days": 30,
+      "status": "archived",
+      "last_review": "2026-05-25",
+      "cadence_days": 365,
       "notes": "CO-580 lifecycle resolver migration: terminal source evidence remains active because local open checklist obligations prevent archive readiness. Linked open checklist obligation groups=1.",
       "lifecycle_state": "active"
     },
@@ -26187,9 +26211,9 @@
     {
       "path": "docs/TECH_SPEC-coordinator-symphony-aligned-orchestrator-start-preparation-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-22",
-      "cadence_days": 30,
+      "status": "archived",
+      "last_review": "2026-05-25",
+      "cadence_days": 365,
       "notes": "CO-580 lifecycle resolver migration: terminal source evidence remains active because local open checklist obligations prevent archive readiness. Linked open checklist obligation groups=1.",
       "lifecycle_state": "active"
     },
@@ -26213,9 +26237,9 @@
     {
       "path": "docs/TECH_SPEC-coordinator-symphony-aligned-orchestrator-with-control-plane-lifecycle-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-22",
-      "cadence_days": 30,
+      "status": "archived",
+      "last_review": "2026-05-25",
+      "cadence_days": 365,
       "notes": "CO-580 lifecycle resolver migration: terminal source evidence remains active because local open checklist obligations prevent archive readiness. Linked open checklist obligation groups=1.",
       "lifecycle_state": "active"
     },
@@ -27633,6 +27657,23 @@
       "cadence_days": 30
     },
     {
+      "path": "docs/TECH_SPEC-linear-0509ba11-5b44-40d0-9880-822b068053c3.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-24",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "0509ba11-5b44-40d0-9880-822b068053c3",
+        "identifier": "CO-580",
+        "url": "https://linear.app/asabeko/issue/CO-580"
+      },
+      "doc_class": "task_packet",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-24",
+      "next_review": "2026-06-23",
+      "notes": "CO-580 docs-first packet for shared docs freshness lifecycle resolver and owner finalizer."
+    },
+    {
       "path": "docs/TECH_SPEC-linear-0549b4a2-release-publish-workflow-fix.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -28047,6 +28088,23 @@
       "next_review": "2026-06-15"
     },
     {
+      "path": "docs/TECH_SPEC-linear-2a51671e-14fa-46c8-bce4-bcfd71e66066.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-24",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "2a51671e-14fa-46c8-bce4-bcfd71e66066",
+        "identifier": "CO-581",
+        "url": "https://linear.app/asabeko/issue/CO-581"
+      },
+      "doc_class": "task_packet",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-24",
+      "next_review": "2026-06-23",
+      "notes": "CO-581 docs-first packet for exact-key retained May 19 docs freshness cohort owner."
+    },
+    {
       "path": "docs/TECH_SPEC-linear-2a8f00cf-a39a-4b15-aeca-23bacd618af1.md",
       "owner": "Codex",
       "status": "archived",
@@ -28083,6 +28141,22 @@
       "status": "active",
       "last_review": "2026-05-18",
       "cadence_days": 30
+    },
+    {
+      "path": "docs/TECH_SPEC-linear-2fe8fdb4-928d-4861-9f73-44021e1a4d0b.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-21",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "2fe8fdb4-928d-4861-9f73-44021e1a4d0b",
+        "identifier": "CO-551",
+        "url": "https://linear.app/asabeko/issue/CO-551"
+      },
+      "doc_class": "task_packet",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-21",
+      "next_review": "2026-06-20"
     },
     {
       "path": "docs/TECH_SPEC-linear-30d86aaa-8afb-4e47-8de1-f2ab493a15a9.md",
@@ -28566,6 +28640,23 @@
       "cadence_days": 365
     },
     {
+      "path": "docs/TECH_SPEC-linear-5634bf98-fe59-41f5-8623-60c9ef0b2993.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-24",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "5634bf98-fe59-41f5-8623-60c9ef0b2993",
+        "identifier": "CO-579",
+        "url": "https://linear.app/asabeko/issue/CO-579"
+      },
+      "doc_class": "task_packet",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-24",
+      "next_review": "2026-06-23",
+      "notes": "CO-579 docs-first packet for replacing terminal CO-575 as docs:freshness:maintain global owner."
+    },
+    {
       "path": "docs/TECH_SPEC-linear-56395d00-0da1-447e-8d2d-68b195e8a3dc.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "archived",
@@ -29021,11 +29112,44 @@
       "cadence_days": 30
     },
     {
+      "path": "docs/TECH_SPEC-linear-7847b2be-ae34-4256-977f-f2c291f31938.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-23",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "7847b2be-ae34-4256-977f-f2c291f31938",
+        "identifier": "CO-563",
+        "url": "https://linear.app/asabeko/issue/CO-563"
+      },
+      "doc_class": "task_packet",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-23",
+      "next_review": "2026-06-22",
+      "notes": "CO-563 docs-first packet for co-status terminal worker proof reconciliation."
+    },
+    {
       "path": "docs/TECH_SPEC-linear-7896d3c1-7a62-4b79-97df-a71984fab5b2.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "archived",
       "last_review": "2026-05-18",
       "cadence_days": 365
+    },
+    {
+      "path": "docs/TECH_SPEC-linear-795a9aa4-02fd-4f2f-8942-7df40ae865ce.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-22",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "795a9aa4-02fd-4f2f-8942-7df40ae865ce",
+        "identifier": "CO-578",
+        "url": "https://linear.app/asabeko/issue/CO-578/co-snapshot-mutable-review-manifest-evidence-before-contract"
+      },
+      "doc_class": "tech_spec_mirror",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-22",
+      "next_review": "2026-06-21"
     },
     {
       "path": "docs/TECH_SPEC-linear-7988e9a6-8258-4cff-b585-fadc31741ce1.md",
@@ -29041,6 +29165,23 @@
       "status": "active",
       "last_review": "2026-05-14",
       "cadence_days": 30
+    },
+    {
+      "path": "docs/TECH_SPEC-linear-7aeca30c-c52c-4213-9d40-0ac0cf81b316.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-21",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "7aeca30c-c52c-4213-9d40-0ac0cf81b316",
+        "identifier": "CO-570",
+        "url": "https://linear.app/asabeko/issue/CO-570"
+      },
+      "doc_class": "task_packet",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-21",
+      "next_review": "2026-06-20",
+      "notes": "CO-570 docs-first packet for explicit docs-review/change-bundle review scope."
     },
     {
       "path": "docs/TECH_SPEC-linear-7b3de1c1-f420-4203-bb8c-494dadecaa88.md",
@@ -29134,6 +29275,22 @@
       "status": "archived",
       "last_review": "2026-05-18",
       "cadence_days": 365
+    },
+    {
+      "path": "docs/TECH_SPEC-linear-813d1f69-7777-4dd4-8709-90d9121339d4.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-22",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "813d1f69-7777-4dd4-8709-90d9121339d4",
+        "identifier": "CO-567",
+        "url": "https://linear.app/asabeko/issue/CO-567/co-enforce-generated-runtime-freshness-after-shared-root-fast-forward"
+      },
+      "doc_class": "task_packet",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-22",
+      "next_review": "2026-06-21"
     },
     {
       "path": "docs/TECH_SPEC-linear-850b66b4-6a56-426a-947e-ce45d7f12a96.md",
@@ -29340,6 +29497,38 @@
       "status": "active",
       "last_review": "2026-04-23",
       "cadence_days": 30
+    },
+    {
+      "path": "docs/TECH_SPEC-linear-91f04f3e-5a43-491a-915e-bf6229760676.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-22",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "91f04f3e-5a43-491a-915e-bf6229760676",
+        "identifier": "CO-549"
+      },
+      "doc_class": "task_packet",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-22",
+      "next_review": "2026-06-21"
+    },
+    {
+      "path": "docs/TECH_SPEC-linear-91fd1820-50cd-4d33-97b6-8d62b64ce22f.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-22",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "91fd1820-50cd-4d33-97b6-8d62b64ce22f",
+        "identifier": "CO-574",
+        "url": "https://linear.app/asabeko/issue/CO-574/co-stop-control-host-machine-status-endpoint-stalls-under-active"
+      },
+      "doc_class": "task_packet",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-21",
+      "next_review": "2026-06-21",
+      "notes": "CO-574 docs-first packet for control-host machine-status probe timeout and accepted/no-run provider recovery recurrence; CO-575 docs freshness owner repair remains blocked by this lane."
     },
     {
       "path": "docs/TECH_SPEC-linear-93785af4-9df9-4713-8a63-b0caddb5796f.md",
@@ -29826,9 +30015,9 @@
     {
       "path": "docs/TECH_SPEC-linear-ac7cefc8-ed87-4591-86cf-63b07bc20c2c.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-22",
-      "cadence_days": 30,
+      "status": "archived",
+      "last_review": "2026-05-25",
+      "cadence_days": 365,
       "notes": "CO-580 lifecycle resolver migration: terminal source evidence remains active because local open checklist obligations prevent archive readiness. Linked open checklist obligation groups=1.",
       "lifecycle_state": "active"
     },
@@ -30625,6 +30814,23 @@
       "cadence_days": 30
     },
     {
+      "path": "docs/TECH_SPEC-linear-e8f55d3d-1975-4da0-9b33-4307f7d63a08.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-24",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "e8f55d3d-1975-4da0-9b33-4307f7d63a08",
+        "identifier": "CO-568",
+        "url": "https://linear.app/asabeko/issue/CO-568"
+      },
+      "doc_class": "task_packet",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-24",
+      "next_review": "2026-06-23",
+      "notes": "CO-568 docs-first packet for exact-key retained May 19 docs freshness cohort owner."
+    },
+    {
       "path": "docs/TECH_SPEC-linear-e913b2ab-2be9-4891-bf54-0ac4642ba012.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -30747,6 +30953,22 @@
       "status": "active",
       "last_review": "2026-05-06",
       "cadence_days": 30
+    },
+    {
+      "path": "docs/TECH_SPEC-linear-f42d51e8-18ab-469a-9155-a272e8eaee70.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-22",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "f42d51e8-18ab-469a-9155-a272e8eaee70",
+        "identifier": "CO-577",
+        "url": "https://linear.app/asabeko/issue/CO-577/co-fix-quota-hygiene-degraded-machine-status-classification"
+      },
+      "doc_class": "task_packet",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-22",
+      "next_review": "2026-06-21"
     },
     {
       "path": "docs/TECH_SPEC-linear-f43c6213-a14e-4c3f-ab51-2c539a4d2c90.md",
@@ -33516,9 +33738,9 @@
     {
       "path": "tasks/specs/1164-coordinator-symphony-aligned-orchestrator-perform-run-lifecycle-execution-and-run-error-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-22",
-      "cadence_days": 30,
+      "status": "archived",
+      "last_review": "2026-05-25",
+      "cadence_days": 365,
       "notes": "CO-580 lifecycle resolver migration: terminal source evidence remains active because local open checklist obligations prevent archive readiness. Linked open checklist obligation groups=1.",
       "lifecycle_state": "active"
     },
@@ -33581,18 +33803,18 @@
     {
       "path": "tasks/specs/1173-coordinator-symphony-aligned-orchestrator-cloud-target-execution-request-contract-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-22",
-      "cadence_days": 30,
+      "status": "archived",
+      "last_review": "2026-05-25",
+      "cadence_days": 365,
       "notes": "CO-580 lifecycle resolver migration: terminal source evidence remains active because local open checklist obligations prevent archive readiness. Linked open checklist obligation groups=1.",
       "lifecycle_state": "active"
     },
     {
       "path": "tasks/specs/1174-coordinator-symphony-aligned-orchestrator-cloud-target-missing-env-failure-contract-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-22",
-      "cadence_days": 30,
+      "status": "archived",
+      "last_review": "2026-05-25",
+      "cadence_days": 365,
       "notes": "CO-580 lifecycle resolver migration: terminal source evidence remains active because local open checklist obligations prevent archive readiness. Linked open checklist obligation groups=1.",
       "lifecycle_state": "active"
     },
@@ -33736,27 +33958,27 @@
     {
       "path": "tasks/specs/1193-coordinator-symphony-aligned-orchestrator-control-plane-lifecycle-shell-extraction.md",
       "owner": "Codex",
-      "status": "active",
-      "last_review": "2026-05-16",
-      "cadence_days": 30,
+      "status": "archived",
+      "last_review": "2026-05-25",
+      "cadence_days": 365,
       "notes": "CO-580 lifecycle resolver migration: terminal source evidence remains active because local open checklist obligations prevent archive readiness. Linked open checklist obligation groups=1.",
       "lifecycle_state": "active"
     },
     {
       "path": "tasks/specs/1194-coordinator-symphony-aligned-orchestrator-start-preparation-shell-extraction.md",
       "owner": "Codex",
-      "status": "active",
-      "last_review": "2026-05-16",
-      "cadence_days": 30,
+      "status": "archived",
+      "last_review": "2026-05-25",
+      "cadence_days": 365,
       "notes": "CO-580 lifecycle resolver migration: terminal source evidence remains active because local open checklist obligations prevent archive readiness. Linked open checklist obligation groups=1.",
       "lifecycle_state": "active"
     },
     {
       "path": "tasks/specs/1195-coordinator-symphony-aligned-orchestrator-resume-preparation-shell-extraction.md",
       "owner": "Codex",
-      "status": "active",
-      "last_review": "2026-05-16",
-      "cadence_days": 30,
+      "status": "archived",
+      "last_review": "2026-05-25",
+      "cadence_days": 365,
       "notes": "CO-580 lifecycle resolver migration: terminal source evidence remains active because local open checklist obligations prevent archive readiness. Linked open checklist obligation groups=1.",
       "lifecycle_state": "active"
     },
@@ -34872,6 +35094,23 @@
       "cadence_days": 30
     },
     {
+      "path": "tasks/specs/linear-0509ba11-5b44-40d0-9880-822b068053c3.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-24",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "0509ba11-5b44-40d0-9880-822b068053c3",
+        "identifier": "CO-580",
+        "url": "https://linear.app/asabeko/issue/CO-580"
+      },
+      "doc_class": "active_spec",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-24",
+      "next_review": "2026-06-23",
+      "notes": "CO-580 docs-first packet for shared docs freshness lifecycle resolver and owner finalizer."
+    },
+    {
       "path": "tasks/specs/linear-057747d0-a472-4cba-ac18-2d7342f2a168.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "archived",
@@ -35282,6 +35521,23 @@
       "next_review": "2026-06-15"
     },
     {
+      "path": "tasks/specs/linear-2a51671e-14fa-46c8-bce4-bcfd71e66066.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-24",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "2a51671e-14fa-46c8-bce4-bcfd71e66066",
+        "identifier": "CO-581",
+        "url": "https://linear.app/asabeko/issue/CO-581"
+      },
+      "doc_class": "active_spec",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-24",
+      "next_review": "2026-06-23",
+      "notes": "CO-581 docs-first packet for exact-key retained May 19 docs freshness cohort owner."
+    },
+    {
       "path": "tasks/specs/linear-2a8f00cf-a39a-4b15-aeca-23bacd618af1.md",
       "owner": "Codex",
       "status": "archived",
@@ -35318,6 +35574,22 @@
       "status": "active",
       "last_review": "2026-05-18",
       "cadence_days": 30
+    },
+    {
+      "path": "tasks/specs/linear-2fe8fdb4-928d-4861-9f73-44021e1a4d0b.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-21",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "2fe8fdb4-928d-4861-9f73-44021e1a4d0b",
+        "identifier": "CO-551",
+        "url": "https://linear.app/asabeko/issue/CO-551"
+      },
+      "doc_class": "active_spec",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-21",
+      "next_review": "2026-06-20"
     },
     {
       "path": "tasks/specs/linear-30d86aaa-8afb-4e47-8de1-f2ab493a15a9.md",
@@ -35814,6 +36086,23 @@
       "cadence_days": 365
     },
     {
+      "path": "tasks/specs/linear-5634bf98-fe59-41f5-8623-60c9ef0b2993.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-24",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "5634bf98-fe59-41f5-8623-60c9ef0b2993",
+        "identifier": "CO-579",
+        "url": "https://linear.app/asabeko/issue/CO-579"
+      },
+      "doc_class": "active_spec",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-24",
+      "next_review": "2026-06-23",
+      "notes": "CO-579 docs-first packet for replacing terminal CO-575 as docs:freshness:maintain global owner."
+    },
+    {
       "path": "tasks/specs/linear-56395d00-0da1-447e-8d2d-68b195e8a3dc.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "archived",
@@ -36294,11 +36583,44 @@
       "cadence_days": 30
     },
     {
+      "path": "tasks/specs/linear-7847b2be-ae34-4256-977f-f2c291f31938.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-23",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "7847b2be-ae34-4256-977f-f2c291f31938",
+        "identifier": "CO-563",
+        "url": "https://linear.app/asabeko/issue/CO-563"
+      },
+      "doc_class": "active_spec",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-23",
+      "next_review": "2026-06-22",
+      "notes": "CO-563 docs-first packet for co-status terminal worker proof reconciliation."
+    },
+    {
       "path": "tasks/specs/linear-7896d3c1-7a62-4b79-97df-a71984fab5b2.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "archived",
       "last_review": "2026-05-18",
       "cadence_days": 365
+    },
+    {
+      "path": "tasks/specs/linear-795a9aa4-02fd-4f2f-8942-7df40ae865ce.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-22",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "795a9aa4-02fd-4f2f-8942-7df40ae865ce",
+        "identifier": "CO-578",
+        "url": "https://linear.app/asabeko/issue/CO-578/co-snapshot-mutable-review-manifest-evidence-before-contract"
+      },
+      "doc_class": "tech_spec",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-22",
+      "next_review": "2026-06-21"
     },
     {
       "path": "tasks/specs/linear-7988e9a6-8258-4cff-b585-fadc31741ce1.md",
@@ -36313,6 +36635,23 @@
       "status": "active",
       "last_review": "2026-05-14",
       "cadence_days": 30
+    },
+    {
+      "path": "tasks/specs/linear-7aeca30c-c52c-4213-9d40-0ac0cf81b316.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-21",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "7aeca30c-c52c-4213-9d40-0ac0cf81b316",
+        "identifier": "CO-570",
+        "url": "https://linear.app/asabeko/issue/CO-570"
+      },
+      "doc_class": "active_spec",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-21",
+      "next_review": "2026-06-20",
+      "notes": "CO-570 docs-first packet for explicit docs-review/change-bundle review scope."
     },
     {
       "path": "tasks/specs/linear-7b3de1c1-f420-4203-bb8c-494dadecaa88.md",
@@ -36407,6 +36746,22 @@
       "status": "archived",
       "last_review": "2026-05-18",
       "cadence_days": 365
+    },
+    {
+      "path": "tasks/specs/linear-813d1f69-7777-4dd4-8709-90d9121339d4.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-22",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "813d1f69-7777-4dd4-8709-90d9121339d4",
+        "identifier": "CO-567",
+        "url": "https://linear.app/asabeko/issue/CO-567/co-enforce-generated-runtime-freshness-after-shared-root-fast-forward"
+      },
+      "doc_class": "active_spec",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-22",
+      "next_review": "2026-06-21"
     },
     {
       "path": "tasks/specs/linear-850b66b4-6a56-426a-947e-ce45d7f12a96.md",
@@ -36636,6 +36991,23 @@
       "lifecycle_state": "active",
       "created_at": "2026-05-22",
       "next_review": "2026-06-21"
+    },
+    {
+      "path": "tasks/specs/linear-91fd1820-50cd-4d33-97b6-8d62b64ce22f.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-22",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "91fd1820-50cd-4d33-97b6-8d62b64ce22f",
+        "identifier": "CO-574",
+        "url": "https://linear.app/asabeko/issue/CO-574/co-stop-control-host-machine-status-endpoint-stalls-under-active"
+      },
+      "doc_class": "task_packet",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-21",
+      "next_review": "2026-06-21",
+      "notes": "CO-574 docs-first packet for control-host machine-status probe timeout and accepted/no-run provider recovery recurrence; CO-575 docs freshness owner repair remains blocked by this lane."
     },
     {
       "path": "tasks/specs/linear-93785af4-9df9-4713-8a63-b0caddb5796f.md",
@@ -37115,9 +37487,9 @@
     {
       "path": "tasks/specs/linear-ac7cefc8-ed87-4591-86cf-63b07bc20c2c.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-22",
-      "cadence_days": 30,
+      "status": "archived",
+      "last_review": "2026-05-25",
+      "cadence_days": 365,
       "notes": "CO-580 lifecycle resolver migration: terminal source evidence remains active because local open checklist obligations prevent archive readiness. Linked open checklist obligation groups=1.",
       "lifecycle_state": "active"
     },
@@ -37950,6 +38322,23 @@
       "next_review": "2026-06-19"
     },
     {
+      "path": "tasks/specs/linear-e8f55d3d-1975-4da0-9b33-4307f7d63a08.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-24",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "e8f55d3d-1975-4da0-9b33-4307f7d63a08",
+        "identifier": "CO-568",
+        "url": "https://linear.app/asabeko/issue/CO-568"
+      },
+      "doc_class": "active_spec",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-24",
+      "next_review": "2026-06-23",
+      "notes": "CO-568 docs-first packet for exact-key retained May 19 docs freshness cohort owner."
+    },
+    {
       "path": "tasks/specs/linear-e913b2ab-2be9-4891-bf54-0ac4642ba012.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -38081,6 +38470,22 @@
       "status": "active",
       "last_review": "2026-05-06",
       "cadence_days": 30
+    },
+    {
+      "path": "tasks/specs/linear-f42d51e8-18ab-469a-9155-a272e8eaee70.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-22",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "f42d51e8-18ab-469a-9155-a272e8eaee70",
+        "identifier": "CO-577",
+        "url": "https://linear.app/asabeko/issue/CO-577/co-fix-quota-hygiene-degraded-machine-status-classification"
+      },
+      "doc_class": "active_spec",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-22",
+      "next_review": "2026-06-21"
     },
     {
       "path": "tasks/specs/linear-f43c6213-a14e-4c3f-ab51-2c539a4d2c90.md",
@@ -40433,9 +40838,9 @@
     {
       "path": "tasks/tasks-1164-coordinator-symphony-aligned-orchestrator-perform-run-lifecycle-execution-and-run-error-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-22",
-      "cadence_days": 30,
+      "status": "archived",
+      "last_review": "2026-05-25",
+      "cadence_days": 365,
       "notes": "CO-580 lifecycle resolver migration: terminal source evidence remains active because local open checklist obligations prevent archive readiness. Linked open checklist obligation groups=1.",
       "lifecycle_state": "active"
     },
@@ -40498,18 +40903,18 @@
     {
       "path": "tasks/tasks-1173-coordinator-symphony-aligned-orchestrator-cloud-target-execution-request-contract-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-22",
-      "cadence_days": 30,
+      "status": "archived",
+      "last_review": "2026-05-25",
+      "cadence_days": 365,
       "notes": "CO-580 lifecycle resolver migration: terminal source evidence remains active because local open checklist obligations prevent archive readiness. Linked open checklist obligation groups=1.",
       "lifecycle_state": "active"
     },
     {
       "path": "tasks/tasks-1174-coordinator-symphony-aligned-orchestrator-cloud-target-missing-env-failure-contract-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-22",
-      "cadence_days": 30,
+      "status": "archived",
+      "last_review": "2026-05-25",
+      "cadence_days": 365,
       "notes": "CO-580 lifecycle resolver migration: terminal source evidence remains active because local open checklist obligations prevent archive readiness. Linked open checklist obligation groups=1.",
       "lifecycle_state": "active"
     },
@@ -40642,27 +41047,27 @@
     {
       "path": "tasks/tasks-1193-coordinator-symphony-aligned-orchestrator-control-plane-lifecycle-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-22",
-      "cadence_days": 30,
+      "status": "archived",
+      "last_review": "2026-05-25",
+      "cadence_days": 365,
       "notes": "CO-580 lifecycle resolver migration: terminal source evidence remains active because local open checklist obligations prevent archive readiness. Linked open checklist obligation groups=1.",
       "lifecycle_state": "active"
     },
     {
       "path": "tasks/tasks-1194-coordinator-symphony-aligned-orchestrator-start-preparation-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-22",
-      "cadence_days": 30,
+      "status": "archived",
+      "last_review": "2026-05-25",
+      "cadence_days": 365,
       "notes": "CO-580 lifecycle resolver migration: terminal source evidence remains active because local open checklist obligations prevent archive readiness. Linked open checklist obligation groups=1.",
       "lifecycle_state": "active"
     },
     {
       "path": "tasks/tasks-1195-coordinator-symphony-aligned-orchestrator-resume-preparation-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-22",
-      "cadence_days": 30,
+      "status": "archived",
+      "last_review": "2026-05-25",
+      "cadence_days": 365,
       "notes": "CO-580 lifecycle resolver migration: terminal source evidence remains active because local open checklist obligations prevent archive readiness. Linked open checklist obligation groups=1.",
       "lifecycle_state": "active"
     },
@@ -41807,6 +42212,23 @@
       "cadence_days": 30
     },
     {
+      "path": "tasks/tasks-linear-0509ba11-5b44-40d0-9880-822b068053c3.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-24",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "0509ba11-5b44-40d0-9880-822b068053c3",
+        "identifier": "CO-580",
+        "url": "https://linear.app/asabeko/issue/CO-580"
+      },
+      "doc_class": "task_mirror",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-24",
+      "next_review": "2026-06-23",
+      "notes": "CO-580 docs-first packet for shared docs freshness lifecycle resolver and owner finalizer."
+    },
+    {
       "path": "tasks/tasks-linear-0549b4a2-56b1-4164-b65a-73fd2ba7d9e8.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -42225,6 +42647,23 @@
       "next_review": "2026-06-15"
     },
     {
+      "path": "tasks/tasks-linear-2a51671e-14fa-46c8-bce4-bcfd71e66066.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-24",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "2a51671e-14fa-46c8-bce4-bcfd71e66066",
+        "identifier": "CO-581",
+        "url": "https://linear.app/asabeko/issue/CO-581"
+      },
+      "doc_class": "task_mirror",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-24",
+      "next_review": "2026-06-23",
+      "notes": "CO-581 docs-first packet for exact-key retained May 19 docs freshness cohort owner."
+    },
+    {
       "path": "tasks/tasks-linear-2a8f00cf-a39a-4b15-aeca-23bacd618af1.md",
       "owner": "Codex",
       "status": "archived",
@@ -42261,6 +42700,22 @@
       "status": "active",
       "last_review": "2026-05-18",
       "cadence_days": 30
+    },
+    {
+      "path": "tasks/tasks-linear-2fe8fdb4-928d-4861-9f73-44021e1a4d0b.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-21",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "2fe8fdb4-928d-4861-9f73-44021e1a4d0b",
+        "identifier": "CO-551",
+        "url": "https://linear.app/asabeko/issue/CO-551"
+      },
+      "doc_class": "task_mirror",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-21",
+      "next_review": "2026-06-20"
     },
     {
       "path": "tasks/tasks-linear-30d86aaa-8afb-4e47-8de1-f2ab493a15a9.md",
@@ -42757,6 +43212,23 @@
       "cadence_days": 365
     },
     {
+      "path": "tasks/tasks-linear-5634bf98-fe59-41f5-8623-60c9ef0b2993.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-24",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "5634bf98-fe59-41f5-8623-60c9ef0b2993",
+        "identifier": "CO-579",
+        "url": "https://linear.app/asabeko/issue/CO-579"
+      },
+      "doc_class": "task_mirror",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-24",
+      "next_review": "2026-06-23",
+      "notes": "CO-579 docs-first packet for replacing terminal CO-575 as docs:freshness:maintain global owner."
+    },
+    {
       "path": "tasks/tasks-linear-56395d00-0da1-447e-8d2d-68b195e8a3dc.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "archived",
@@ -43235,11 +43707,44 @@
       "cadence_days": 30
     },
     {
+      "path": "tasks/tasks-linear-7847b2be-ae34-4256-977f-f2c291f31938.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-23",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "7847b2be-ae34-4256-977f-f2c291f31938",
+        "identifier": "CO-563",
+        "url": "https://linear.app/asabeko/issue/CO-563"
+      },
+      "doc_class": "task_mirror",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-23",
+      "next_review": "2026-06-22",
+      "notes": "CO-563 docs-first packet for co-status terminal worker proof reconciliation."
+    },
+    {
       "path": "tasks/tasks-linear-7896d3c1-7a62-4b79-97df-a71984fab5b2.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "archived",
       "last_review": "2026-05-18",
       "cadence_days": 365
+    },
+    {
+      "path": "tasks/tasks-linear-795a9aa4-02fd-4f2f-8942-7df40ae865ce.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-22",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "795a9aa4-02fd-4f2f-8942-7df40ae865ce",
+        "identifier": "CO-578",
+        "url": "https://linear.app/asabeko/issue/CO-578/co-snapshot-mutable-review-manifest-evidence-before-contract"
+      },
+      "doc_class": "task_mirror",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-22",
+      "next_review": "2026-06-21"
     },
     {
       "path": "tasks/tasks-linear-7988e9a6-8258-4cff-b585-fadc31741ce1.md",
@@ -43255,6 +43760,23 @@
       "status": "active",
       "last_review": "2026-05-14",
       "cadence_days": 30
+    },
+    {
+      "path": "tasks/tasks-linear-7aeca30c-c52c-4213-9d40-0ac0cf81b316.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-21",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "7aeca30c-c52c-4213-9d40-0ac0cf81b316",
+        "identifier": "CO-570",
+        "url": "https://linear.app/asabeko/issue/CO-570"
+      },
+      "doc_class": "task_mirror",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-21",
+      "next_review": "2026-06-20",
+      "notes": "CO-570 docs-first packet for explicit docs-review/change-bundle review scope."
     },
     {
       "path": "tasks/tasks-linear-7b3de1c1-f420-4203-bb8c-494dadecaa88.md",
@@ -43348,6 +43870,22 @@
       "status": "archived",
       "last_review": "2026-05-18",
       "cadence_days": 365
+    },
+    {
+      "path": "tasks/tasks-linear-813d1f69-7777-4dd4-8709-90d9121339d4.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-22",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "813d1f69-7777-4dd4-8709-90d9121339d4",
+        "identifier": "CO-567",
+        "url": "https://linear.app/asabeko/issue/CO-567/co-enforce-generated-runtime-freshness-after-shared-root-fast-forward"
+      },
+      "doc_class": "task_mirror",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-22",
+      "next_review": "2026-06-21"
     },
     {
       "path": "tasks/tasks-linear-850b66b4-6a56-426a-947e-ce45d7f12a96.md",
@@ -43575,6 +44113,23 @@
       "lifecycle_state": "active",
       "created_at": "2026-05-22",
       "next_review": "2026-06-21"
+    },
+    {
+      "path": "tasks/tasks-linear-91fd1820-50cd-4d33-97b6-8d62b64ce22f.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-22",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "91fd1820-50cd-4d33-97b6-8d62b64ce22f",
+        "identifier": "CO-574",
+        "url": "https://linear.app/asabeko/issue/CO-574/co-stop-control-host-machine-status-endpoint-stalls-under-active"
+      },
+      "doc_class": "task_packet",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-21",
+      "next_review": "2026-06-21",
+      "notes": "CO-574 docs-first packet for control-host machine-status probe timeout and accepted/no-run provider recovery recurrence; CO-575 docs freshness owner repair remains blocked by this lane."
     },
     {
       "path": "tasks/tasks-linear-93785af4-9df9-4713-8a63-b0caddb5796f.md",
@@ -44058,9 +44613,9 @@
     {
       "path": "tasks/tasks-linear-ac7cefc8-ed87-4591-86cf-63b07bc20c2c.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-22",
-      "cadence_days": 30,
+      "status": "archived",
+      "last_review": "2026-05-25",
+      "cadence_days": 365,
       "notes": "CO-580 lifecycle resolver migration: terminal source evidence remains active because local open checklist obligations prevent archive readiness. Linked open checklist obligation groups=1.",
       "lifecycle_state": "active"
     },
@@ -44896,6 +45451,23 @@
       "cadence_days": 30
     },
     {
+      "path": "tasks/tasks-linear-e8f55d3d-1975-4da0-9b33-4307f7d63a08.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-24",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "e8f55d3d-1975-4da0-9b33-4307f7d63a08",
+        "identifier": "CO-568",
+        "url": "https://linear.app/asabeko/issue/CO-568"
+      },
+      "doc_class": "task_mirror",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-24",
+      "next_review": "2026-06-23",
+      "notes": "CO-568 docs-first packet for exact-key retained May 19 docs freshness cohort owner."
+    },
+    {
       "path": "tasks/tasks-linear-e913b2ab-2be9-4891-bf54-0ac4642ba012.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -45025,6 +45597,22 @@
       "status": "active",
       "last_review": "2026-05-06",
       "cadence_days": 30
+    },
+    {
+      "path": "tasks/tasks-linear-f42d51e8-18ab-469a-9155-a272e8eaee70.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-22",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "f42d51e8-18ab-469a-9155-a272e8eaee70",
+        "identifier": "CO-577",
+        "url": "https://linear.app/asabeko/issue/CO-577/co-fix-quota-hygiene-degraded-machine-status-classification"
+      },
+      "doc_class": "task_mirror",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-22",
+      "next_review": "2026-06-21"
     },
     {
       "path": "tasks/tasks-linear-f43c6213-a14e-4c3f-ab51-2c539a4d2c90.md",
@@ -45214,594 +45802,6 @@
       "status": "active",
       "last_review": "2026-05-05",
       "cadence_days": 30
-    },
-    {
-      "path": ".agent/task/linear-813d1f69-7777-4dd4-8709-90d9121339d4.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-22",
-      "cadence_days": 30,
-      "source_issue": {
-        "id": "813d1f69-7777-4dd4-8709-90d9121339d4",
-        "identifier": "CO-567",
-        "url": "https://linear.app/asabeko/issue/CO-567/co-enforce-generated-runtime-freshness-after-shared-root-fast-forward"
-      },
-      "doc_class": "task_mirror",
-      "lifecycle_state": "active",
-      "created_at": "2026-05-22",
-      "next_review": "2026-06-21"
-    },
-    {
-      "path": "docs/ACTION_PLAN-linear-813d1f69-7777-4dd4-8709-90d9121339d4.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-22",
-      "cadence_days": 30,
-      "source_issue": {
-        "id": "813d1f69-7777-4dd4-8709-90d9121339d4",
-        "identifier": "CO-567",
-        "url": "https://linear.app/asabeko/issue/CO-567/co-enforce-generated-runtime-freshness-after-shared-root-fast-forward"
-      },
-      "doc_class": "task_packet",
-      "lifecycle_state": "active",
-      "created_at": "2026-05-22",
-      "next_review": "2026-06-21"
-    },
-    {
-      "path": "docs/PRD-linear-813d1f69-7777-4dd4-8709-90d9121339d4.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-22",
-      "cadence_days": 30,
-      "source_issue": {
-        "id": "813d1f69-7777-4dd4-8709-90d9121339d4",
-        "identifier": "CO-567",
-        "url": "https://linear.app/asabeko/issue/CO-567/co-enforce-generated-runtime-freshness-after-shared-root-fast-forward"
-      },
-      "doc_class": "task_packet",
-      "lifecycle_state": "active",
-      "created_at": "2026-05-22",
-      "next_review": "2026-06-21"
-    },
-    {
-      "path": "docs/TECH_SPEC-linear-813d1f69-7777-4dd4-8709-90d9121339d4.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-22",
-      "cadence_days": 30,
-      "source_issue": {
-        "id": "813d1f69-7777-4dd4-8709-90d9121339d4",
-        "identifier": "CO-567",
-        "url": "https://linear.app/asabeko/issue/CO-567/co-enforce-generated-runtime-freshness-after-shared-root-fast-forward"
-      },
-      "doc_class": "task_packet",
-      "lifecycle_state": "active",
-      "created_at": "2026-05-22",
-      "next_review": "2026-06-21"
-    },
-    {
-      "path": "tasks/specs/linear-813d1f69-7777-4dd4-8709-90d9121339d4.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-22",
-      "cadence_days": 30,
-      "source_issue": {
-        "id": "813d1f69-7777-4dd4-8709-90d9121339d4",
-        "identifier": "CO-567",
-        "url": "https://linear.app/asabeko/issue/CO-567/co-enforce-generated-runtime-freshness-after-shared-root-fast-forward"
-      },
-      "doc_class": "active_spec",
-      "lifecycle_state": "active",
-      "created_at": "2026-05-22",
-      "next_review": "2026-06-21"
-    },
-    {
-      "path": "tasks/tasks-linear-813d1f69-7777-4dd4-8709-90d9121339d4.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-22",
-      "cadence_days": 30,
-      "source_issue": {
-        "id": "813d1f69-7777-4dd4-8709-90d9121339d4",
-        "identifier": "CO-567",
-        "url": "https://linear.app/asabeko/issue/CO-567/co-enforce-generated-runtime-freshness-after-shared-root-fast-forward"
-      },
-      "doc_class": "task_mirror",
-      "lifecycle_state": "active",
-      "created_at": "2026-05-22",
-      "next_review": "2026-06-21"
-    },
-    {
-      "path": ".agent/task/linear-7aeca30c-c52c-4213-9d40-0ac0cf81b316.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-21",
-      "cadence_days": 30,
-      "source_issue": {
-        "id": "7aeca30c-c52c-4213-9d40-0ac0cf81b316",
-        "identifier": "CO-570",
-        "url": "https://linear.app/asabeko/issue/CO-570"
-      },
-      "doc_class": "task_mirror",
-      "lifecycle_state": "active",
-      "created_at": "2026-05-21",
-      "next_review": "2026-06-20",
-      "notes": "CO-570 docs-first packet for explicit docs-review/change-bundle review scope."
-    },
-    {
-      "path": "docs/ACTION_PLAN-linear-7aeca30c-c52c-4213-9d40-0ac0cf81b316.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-21",
-      "cadence_days": 30,
-      "source_issue": {
-        "id": "7aeca30c-c52c-4213-9d40-0ac0cf81b316",
-        "identifier": "CO-570",
-        "url": "https://linear.app/asabeko/issue/CO-570"
-      },
-      "doc_class": "task_packet",
-      "lifecycle_state": "active",
-      "created_at": "2026-05-21",
-      "next_review": "2026-06-20",
-      "notes": "CO-570 docs-first packet for explicit docs-review/change-bundle review scope."
-    },
-    {
-      "path": "docs/PRD-linear-7aeca30c-c52c-4213-9d40-0ac0cf81b316.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-21",
-      "cadence_days": 30,
-      "source_issue": {
-        "id": "7aeca30c-c52c-4213-9d40-0ac0cf81b316",
-        "identifier": "CO-570",
-        "url": "https://linear.app/asabeko/issue/CO-570"
-      },
-      "doc_class": "task_packet",
-      "lifecycle_state": "active",
-      "created_at": "2026-05-21",
-      "next_review": "2026-06-20",
-      "notes": "CO-570 docs-first packet for explicit docs-review/change-bundle review scope."
-    },
-    {
-      "path": "docs/TECH_SPEC-linear-7aeca30c-c52c-4213-9d40-0ac0cf81b316.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-21",
-      "cadence_days": 30,
-      "source_issue": {
-        "id": "7aeca30c-c52c-4213-9d40-0ac0cf81b316",
-        "identifier": "CO-570",
-        "url": "https://linear.app/asabeko/issue/CO-570"
-      },
-      "doc_class": "task_packet",
-      "lifecycle_state": "active",
-      "created_at": "2026-05-21",
-      "next_review": "2026-06-20",
-      "notes": "CO-570 docs-first packet for explicit docs-review/change-bundle review scope."
-    },
-    {
-      "path": "tasks/specs/linear-7aeca30c-c52c-4213-9d40-0ac0cf81b316.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-21",
-      "cadence_days": 30,
-      "source_issue": {
-        "id": "7aeca30c-c52c-4213-9d40-0ac0cf81b316",
-        "identifier": "CO-570",
-        "url": "https://linear.app/asabeko/issue/CO-570"
-      },
-      "doc_class": "active_spec",
-      "lifecycle_state": "active",
-      "created_at": "2026-05-21",
-      "next_review": "2026-06-20",
-      "notes": "CO-570 docs-first packet for explicit docs-review/change-bundle review scope."
-    },
-    {
-      "path": "tasks/tasks-linear-7aeca30c-c52c-4213-9d40-0ac0cf81b316.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-21",
-      "cadence_days": 30,
-      "source_issue": {
-        "id": "7aeca30c-c52c-4213-9d40-0ac0cf81b316",
-        "identifier": "CO-570",
-        "url": "https://linear.app/asabeko/issue/CO-570"
-      },
-      "doc_class": "task_mirror",
-      "lifecycle_state": "active",
-      "created_at": "2026-05-21",
-      "next_review": "2026-06-20",
-      "notes": "CO-570 docs-first packet for explicit docs-review/change-bundle review scope."
-    },
-    {
-      "path": "docs/PRD-linear-91fd1820-50cd-4d33-97b6-8d62b64ce22f.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-22",
-      "cadence_days": 30,
-      "source_issue": {
-        "id": "91fd1820-50cd-4d33-97b6-8d62b64ce22f",
-        "identifier": "CO-574",
-        "url": "https://linear.app/asabeko/issue/CO-574/co-stop-control-host-machine-status-endpoint-stalls-under-active"
-      },
-      "doc_class": "task_packet",
-      "lifecycle_state": "active",
-      "created_at": "2026-05-21",
-      "next_review": "2026-06-21",
-      "notes": "CO-574 docs-first packet for control-host machine-status probe timeout and accepted/no-run provider recovery recurrence; CO-575 docs freshness owner repair remains blocked by this lane."
-    },
-    {
-      "path": "docs/TECH_SPEC-linear-91fd1820-50cd-4d33-97b6-8d62b64ce22f.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-22",
-      "cadence_days": 30,
-      "source_issue": {
-        "id": "91fd1820-50cd-4d33-97b6-8d62b64ce22f",
-        "identifier": "CO-574",
-        "url": "https://linear.app/asabeko/issue/CO-574/co-stop-control-host-machine-status-endpoint-stalls-under-active"
-      },
-      "doc_class": "task_packet",
-      "lifecycle_state": "active",
-      "created_at": "2026-05-21",
-      "next_review": "2026-06-21",
-      "notes": "CO-574 docs-first packet for control-host machine-status probe timeout and accepted/no-run provider recovery recurrence; CO-575 docs freshness owner repair remains blocked by this lane."
-    },
-    {
-      "path": "docs/ACTION_PLAN-linear-91fd1820-50cd-4d33-97b6-8d62b64ce22f.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-22",
-      "cadence_days": 30,
-      "source_issue": {
-        "id": "91fd1820-50cd-4d33-97b6-8d62b64ce22f",
-        "identifier": "CO-574",
-        "url": "https://linear.app/asabeko/issue/CO-574/co-stop-control-host-machine-status-endpoint-stalls-under-active"
-      },
-      "doc_class": "task_packet",
-      "lifecycle_state": "active",
-      "created_at": "2026-05-21",
-      "next_review": "2026-06-21",
-      "notes": "CO-574 docs-first packet for control-host machine-status probe timeout and accepted/no-run provider recovery recurrence; CO-575 docs freshness owner repair remains blocked by this lane."
-    },
-    {
-      "path": "tasks/specs/linear-91fd1820-50cd-4d33-97b6-8d62b64ce22f.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-22",
-      "cadence_days": 30,
-      "source_issue": {
-        "id": "91fd1820-50cd-4d33-97b6-8d62b64ce22f",
-        "identifier": "CO-574",
-        "url": "https://linear.app/asabeko/issue/CO-574/co-stop-control-host-machine-status-endpoint-stalls-under-active"
-      },
-      "doc_class": "task_packet",
-      "lifecycle_state": "active",
-      "created_at": "2026-05-21",
-      "next_review": "2026-06-21",
-      "notes": "CO-574 docs-first packet for control-host machine-status probe timeout and accepted/no-run provider recovery recurrence; CO-575 docs freshness owner repair remains blocked by this lane."
-    },
-    {
-      "path": "tasks/tasks-linear-91fd1820-50cd-4d33-97b6-8d62b64ce22f.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-22",
-      "cadence_days": 30,
-      "source_issue": {
-        "id": "91fd1820-50cd-4d33-97b6-8d62b64ce22f",
-        "identifier": "CO-574",
-        "url": "https://linear.app/asabeko/issue/CO-574/co-stop-control-host-machine-status-endpoint-stalls-under-active"
-      },
-      "doc_class": "task_packet",
-      "lifecycle_state": "active",
-      "created_at": "2026-05-21",
-      "next_review": "2026-06-21",
-      "notes": "CO-574 docs-first packet for control-host machine-status probe timeout and accepted/no-run provider recovery recurrence; CO-575 docs freshness owner repair remains blocked by this lane."
-    },
-    {
-      "path": ".agent/task/linear-91fd1820-50cd-4d33-97b6-8d62b64ce22f.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-22",
-      "cadence_days": 30,
-      "source_issue": {
-        "id": "91fd1820-50cd-4d33-97b6-8d62b64ce22f",
-        "identifier": "CO-574",
-        "url": "https://linear.app/asabeko/issue/CO-574/co-stop-control-host-machine-status-endpoint-stalls-under-active"
-      },
-      "doc_class": "task_packet",
-      "lifecycle_state": "active",
-      "created_at": "2026-05-21",
-      "next_review": "2026-06-21",
-      "notes": "CO-574 docs-first packet for control-host machine-status probe timeout and accepted/no-run provider recovery recurrence; CO-575 docs freshness owner repair remains blocked by this lane."
-    },
-    {
-      "path": ".agent/task/linear-2fe8fdb4-928d-4861-9f73-44021e1a4d0b.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-21",
-      "cadence_days": 30,
-      "source_issue": {
-        "id": "2fe8fdb4-928d-4861-9f73-44021e1a4d0b",
-        "identifier": "CO-551",
-        "url": "https://linear.app/asabeko/issue/CO-551"
-      },
-      "doc_class": "task_mirror",
-      "lifecycle_state": "active",
-      "created_at": "2026-05-21",
-      "next_review": "2026-06-20"
-    },
-    {
-      "path": "docs/ACTION_PLAN-linear-2fe8fdb4-928d-4861-9f73-44021e1a4d0b.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-21",
-      "cadence_days": 30,
-      "source_issue": {
-        "id": "2fe8fdb4-928d-4861-9f73-44021e1a4d0b",
-        "identifier": "CO-551",
-        "url": "https://linear.app/asabeko/issue/CO-551"
-      },
-      "doc_class": "task_packet",
-      "lifecycle_state": "active",
-      "created_at": "2026-05-21",
-      "next_review": "2026-06-20"
-    },
-    {
-      "path": "docs/PRD-linear-2fe8fdb4-928d-4861-9f73-44021e1a4d0b.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-21",
-      "cadence_days": 30,
-      "source_issue": {
-        "id": "2fe8fdb4-928d-4861-9f73-44021e1a4d0b",
-        "identifier": "CO-551",
-        "url": "https://linear.app/asabeko/issue/CO-551"
-      },
-      "doc_class": "task_packet",
-      "lifecycle_state": "active",
-      "created_at": "2026-05-21",
-      "next_review": "2026-06-20"
-    },
-    {
-      "path": "docs/TECH_SPEC-linear-2fe8fdb4-928d-4861-9f73-44021e1a4d0b.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-21",
-      "cadence_days": 30,
-      "source_issue": {
-        "id": "2fe8fdb4-928d-4861-9f73-44021e1a4d0b",
-        "identifier": "CO-551",
-        "url": "https://linear.app/asabeko/issue/CO-551"
-      },
-      "doc_class": "task_packet",
-      "lifecycle_state": "active",
-      "created_at": "2026-05-21",
-      "next_review": "2026-06-20"
-    },
-    {
-      "path": "tasks/specs/linear-2fe8fdb4-928d-4861-9f73-44021e1a4d0b.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-21",
-      "cadence_days": 30,
-      "source_issue": {
-        "id": "2fe8fdb4-928d-4861-9f73-44021e1a4d0b",
-        "identifier": "CO-551",
-        "url": "https://linear.app/asabeko/issue/CO-551"
-      },
-      "doc_class": "active_spec",
-      "lifecycle_state": "active",
-      "created_at": "2026-05-21",
-      "next_review": "2026-06-20"
-    },
-    {
-      "path": "tasks/tasks-linear-2fe8fdb4-928d-4861-9f73-44021e1a4d0b.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-21",
-      "cadence_days": 30,
-      "source_issue": {
-        "id": "2fe8fdb4-928d-4861-9f73-44021e1a4d0b",
-        "identifier": "CO-551",
-        "url": "https://linear.app/asabeko/issue/CO-551"
-      },
-      "doc_class": "task_mirror",
-      "lifecycle_state": "active",
-      "created_at": "2026-05-21",
-      "next_review": "2026-06-20"
-    },
-    {
-      "path": ".agent/task/linear-f42d51e8-18ab-469a-9155-a272e8eaee70.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-22",
-      "cadence_days": 30,
-      "source_issue": {
-        "id": "f42d51e8-18ab-469a-9155-a272e8eaee70",
-        "identifier": "CO-577",
-        "url": "https://linear.app/asabeko/issue/CO-577/co-fix-quota-hygiene-degraded-machine-status-classification"
-      },
-      "doc_class": "task_mirror",
-      "lifecycle_state": "active",
-      "created_at": "2026-05-22",
-      "next_review": "2026-06-21"
-    },
-    {
-      "path": "docs/ACTION_PLAN-linear-f42d51e8-18ab-469a-9155-a272e8eaee70.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-22",
-      "cadence_days": 30,
-      "source_issue": {
-        "id": "f42d51e8-18ab-469a-9155-a272e8eaee70",
-        "identifier": "CO-577",
-        "url": "https://linear.app/asabeko/issue/CO-577/co-fix-quota-hygiene-degraded-machine-status-classification"
-      },
-      "doc_class": "task_packet",
-      "lifecycle_state": "active",
-      "created_at": "2026-05-22",
-      "next_review": "2026-06-21"
-    },
-    {
-      "path": "docs/PRD-linear-f42d51e8-18ab-469a-9155-a272e8eaee70.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-22",
-      "cadence_days": 30,
-      "source_issue": {
-        "id": "f42d51e8-18ab-469a-9155-a272e8eaee70",
-        "identifier": "CO-577",
-        "url": "https://linear.app/asabeko/issue/CO-577/co-fix-quota-hygiene-degraded-machine-status-classification"
-      },
-      "doc_class": "task_packet",
-      "lifecycle_state": "active",
-      "created_at": "2026-05-22",
-      "next_review": "2026-06-21"
-    },
-    {
-      "path": "docs/TECH_SPEC-linear-f42d51e8-18ab-469a-9155-a272e8eaee70.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-22",
-      "cadence_days": 30,
-      "source_issue": {
-        "id": "f42d51e8-18ab-469a-9155-a272e8eaee70",
-        "identifier": "CO-577",
-        "url": "https://linear.app/asabeko/issue/CO-577/co-fix-quota-hygiene-degraded-machine-status-classification"
-      },
-      "doc_class": "task_packet",
-      "lifecycle_state": "active",
-      "created_at": "2026-05-22",
-      "next_review": "2026-06-21"
-    },
-    {
-      "path": "tasks/specs/linear-f42d51e8-18ab-469a-9155-a272e8eaee70.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-22",
-      "cadence_days": 30,
-      "source_issue": {
-        "id": "f42d51e8-18ab-469a-9155-a272e8eaee70",
-        "identifier": "CO-577",
-        "url": "https://linear.app/asabeko/issue/CO-577/co-fix-quota-hygiene-degraded-machine-status-classification"
-      },
-      "doc_class": "active_spec",
-      "lifecycle_state": "active",
-      "created_at": "2026-05-22",
-      "next_review": "2026-06-21"
-    },
-    {
-      "path": "tasks/tasks-linear-f42d51e8-18ab-469a-9155-a272e8eaee70.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-22",
-      "cadence_days": 30,
-      "source_issue": {
-        "id": "f42d51e8-18ab-469a-9155-a272e8eaee70",
-        "identifier": "CO-577",
-        "url": "https://linear.app/asabeko/issue/CO-577/co-fix-quota-hygiene-degraded-machine-status-classification"
-      },
-      "doc_class": "task_mirror",
-      "lifecycle_state": "active",
-      "created_at": "2026-05-22",
-      "next_review": "2026-06-21"
-    },
-    {
-      "path": ".agent/task/linear-795a9aa4-02fd-4f2f-8942-7df40ae865ce.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-22",
-      "cadence_days": 30,
-      "source_issue": {
-        "id": "795a9aa4-02fd-4f2f-8942-7df40ae865ce",
-        "identifier": "CO-578",
-        "url": "https://linear.app/asabeko/issue/CO-578/co-snapshot-mutable-review-manifest-evidence-before-contract"
-      },
-      "doc_class": "task_mirror",
-      "lifecycle_state": "active",
-      "created_at": "2026-05-22",
-      "next_review": "2026-06-21"
-    },
-    {
-      "path": "docs/ACTION_PLAN-linear-795a9aa4-02fd-4f2f-8942-7df40ae865ce.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-22",
-      "cadence_days": 30,
-      "source_issue": {
-        "id": "795a9aa4-02fd-4f2f-8942-7df40ae865ce",
-        "identifier": "CO-578",
-        "url": "https://linear.app/asabeko/issue/CO-578/co-snapshot-mutable-review-manifest-evidence-before-contract"
-      },
-      "doc_class": "action_plan",
-      "lifecycle_state": "active",
-      "created_at": "2026-05-22",
-      "next_review": "2026-06-21"
-    },
-    {
-      "path": "docs/PRD-linear-795a9aa4-02fd-4f2f-8942-7df40ae865ce.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-22",
-      "cadence_days": 30,
-      "source_issue": {
-        "id": "795a9aa4-02fd-4f2f-8942-7df40ae865ce",
-        "identifier": "CO-578",
-        "url": "https://linear.app/asabeko/issue/CO-578/co-snapshot-mutable-review-manifest-evidence-before-contract"
-      },
-      "doc_class": "prd",
-      "lifecycle_state": "active",
-      "created_at": "2026-05-22",
-      "next_review": "2026-06-21"
-    },
-    {
-      "path": "docs/TECH_SPEC-linear-795a9aa4-02fd-4f2f-8942-7df40ae865ce.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-22",
-      "cadence_days": 30,
-      "source_issue": {
-        "id": "795a9aa4-02fd-4f2f-8942-7df40ae865ce",
-        "identifier": "CO-578",
-        "url": "https://linear.app/asabeko/issue/CO-578/co-snapshot-mutable-review-manifest-evidence-before-contract"
-      },
-      "doc_class": "tech_spec_mirror",
-      "lifecycle_state": "active",
-      "created_at": "2026-05-22",
-      "next_review": "2026-06-21"
-    },
-    {
-      "path": "tasks/specs/linear-795a9aa4-02fd-4f2f-8942-7df40ae865ce.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-22",
-      "cadence_days": 30,
-      "source_issue": {
-        "id": "795a9aa4-02fd-4f2f-8942-7df40ae865ce",
-        "identifier": "CO-578",
-        "url": "https://linear.app/asabeko/issue/CO-578/co-snapshot-mutable-review-manifest-evidence-before-contract"
-      },
-      "doc_class": "tech_spec",
-      "lifecycle_state": "active",
-      "created_at": "2026-05-22",
-      "next_review": "2026-06-21"
-    },
-    {
-      "path": "tasks/tasks-linear-795a9aa4-02fd-4f2f-8942-7df40ae865ce.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-22",
-      "cadence_days": 30,
-      "source_issue": {
-        "id": "795a9aa4-02fd-4f2f-8942-7df40ae865ce",
-        "identifier": "CO-578",
-        "url": "https://linear.app/asabeko/issue/CO-578/co-snapshot-mutable-review-manifest-evidence-before-contract"
-      },
-      "doc_class": "task_mirror",
-      "lifecycle_state": "active",
-      "created_at": "2026-05-22",
-      "next_review": "2026-06-21"
     }
   ]
 }
