@@ -7,7 +7,12 @@ import {
   cloneProviderWorkflowStatusPayload,
   type ProviderWorkflowConfigStore
 } from './providerWorkflowConfigStore.js';
-import type { ControlMachineStatusSnapshot } from './controlMachineStatusPresenter.js';
+import {
+  buildMachineStatusDataset,
+  cloneMachineStatusDataset,
+  type ControlMachineStatusDataset,
+  type ControlMachineStatusSnapshot
+} from './controlMachineStatusPresenter.js';
 import { readDocsFreshnessMaintainRepoGate } from './docsFreshnessRepoGate.js';
 import type { LinearBudgetStatus } from './linearBudgetState.js';
 import {
@@ -116,6 +121,7 @@ interface InternalControlCompatibilityRuntimeSnapshot extends ControlCompatibili
 
 export interface ControlRuntimeSnapshot {
   readSelectedRunSnapshot(): Promise<ControlSelectedRunRuntimeSnapshot>;
+  readCommittedMachineStatusDataset(): ControlMachineStatusDataset;
   readMachineStatus(signal?: AbortSignal): Promise<ControlMachineStatusSnapshot>;
   readCompatibilityProjection(signal?: AbortSignal): Promise<ControlCompatibilityProjectionSnapshot>;
   readDispatchEvaluation(): Promise<{
@@ -199,6 +205,8 @@ function createControlRuntimeSnapshot(
     issueIdentifier: string | null;
     evaluation: DispatchPilotEvaluation;
   }> | null = null;
+  let committedMachineStatusFingerprint: string | null = null;
+  let committedMachineStatusDataset: ControlMachineStatusDataset | null = null;
 
   async function readSelectedRunSnapshot(): Promise<ControlSelectedRunRuntimeSnapshot> {
     const providerIntakeAuthority = readProviderIntakeAuthorityState(context);
@@ -402,20 +410,21 @@ function createControlRuntimeSnapshot(
     };
   }
 
-  async function readMachineStatus(signal?: AbortSignal): Promise<ControlMachineStatusSnapshot> {
-    throwIfAborted(signal);
-    const providerIntakeAuthority = readProviderIntakeAuthorityState(context);
+  function buildMachineStatusSnapshot(): ControlMachineStatusSnapshot {
+    const providerIntakeAuthority = readProviderIntakeAuthorityState(context, {
+      skipSourceFreshnessPolicy: true
+    });
     const authorityContext = buildProviderIntakeAuthorityContext(context, providerIntakeAuthority);
     const providerIntake = buildProviderIntakeSummary(providerIntakeAuthority.state);
     const providerWorkflow = context.providerWorkflowConfigStore?.snapshot() ?? null;
-    const snapshot = {
+    return {
       providerIntake,
       runningClaims: (providerIntakeAuthority.state?.claims ?? []).filter(
         (claim) => claim.state === 'running' && isActiveProviderIntakeClaim(claim)
       ),
       providerIntakeUnavailable: providerIntakeAuthority.unavailable,
       providerWorkflow,
-      polling: readProviderPollingSnapshot(authorityContext),
+      polling: readProviderPollingSnapshot(authorityContext, { refreshOwnership: false }),
       maxConcurrentAgents: resolveProviderPollDispatchLimits(
         context.controlStore.snapshot().feature_toggles,
         {
@@ -423,6 +432,21 @@ function createControlRuntimeSnapshot(
         }
       ).maxConcurrentAgents
     };
+  }
+
+  function readCommittedMachineStatusDataset(): ControlMachineStatusDataset {
+    const snapshot = buildMachineStatusSnapshot();
+    const fingerprint = JSON.stringify(snapshot);
+    if (!committedMachineStatusDataset || committedMachineStatusFingerprint !== fingerprint) {
+      committedMachineStatusDataset = buildMachineStatusDataset(snapshot);
+      committedMachineStatusFingerprint = fingerprint;
+    }
+    return cloneMachineStatusDataset(committedMachineStatusDataset);
+  }
+
+  async function readMachineStatus(signal?: AbortSignal): Promise<ControlMachineStatusSnapshot> {
+    throwIfAborted(signal);
+    const snapshot = buildMachineStatusSnapshot();
     throwIfAborted(signal);
     return snapshot;
   }
@@ -461,6 +485,7 @@ function createControlRuntimeSnapshot(
 
   return {
     readSelectedRunSnapshot,
+    readCommittedMachineStatusDataset,
     readMachineStatus,
     readCompatibilityProjection,
     readDispatchEvaluation,
@@ -585,13 +610,14 @@ function readProviderIntakeAuthorityState(
   context: Pick<
     ControlRuntimeContext,
     'providerIntakeState' | 'readPersistedProviderIntakeState' | 'readProviderIssueHandoff'
-  >
+  >,
+  options: { skipSourceFreshnessPolicy?: boolean } = {}
 ): ProviderIntakeAuthoritySnapshot {
   if (context.readPersistedProviderIntakeState) {
     try {
       const state = context.readPersistedProviderIntakeState();
       return state
-        ? buildProviderIntakeAuthorityStateFromState(state, context)
+        ? buildProviderIntakeAuthorityStateFromState(state, context, options)
         : {
             state: null,
             unavailable: {
@@ -612,6 +638,7 @@ function readProviderIntakeAuthorityState(
   const state = context.providerIntakeState ?? null;
   if (state) {
     return buildProviderIntakeAuthorityStateFromState(state, context, {
+      skipSourceFreshnessPolicy: options.skipSourceFreshnessPolicy,
       requireActiveWipForSourcePolicy: true
     });
   }
@@ -624,10 +651,11 @@ function readProviderIntakeAuthorityState(
 function buildProviderIntakeAuthorityStateFromState(
   state: ProviderIntakeState,
   context: Pick<ControlRuntimeContext, 'readProviderIssueHandoff'>,
-  options: { requireActiveWipForSourcePolicy?: boolean } = {}
+  options: { requireActiveWipForSourcePolicy?: boolean; skipSourceFreshnessPolicy?: boolean } = {}
 ): ProviderIntakeAuthoritySnapshot {
   const sourceFreshnessPolicy =
-    options.requireActiveWipForSourcePolicy && !hasActiveProviderIntakeAuthorityWip(state)
+    options.skipSourceFreshnessPolicy === true ||
+    (options.requireActiveWipForSourcePolicy && !hasActiveProviderIntakeAuthorityWip(state))
       ? null
       : resolveProviderIntakeSourceFreshnessPolicy(state, context);
   if (sourceFreshnessPolicy) {
@@ -752,19 +780,25 @@ async function refreshProviderWorkflowStatusPayload(
 }
 
 function readProviderPollingSnapshot(
-  context: Pick<ControlRuntimeContext, 'providerIntakeState' | 'readProviderIssueHandoff'>
+  context: Pick<ControlRuntimeContext, 'providerIntakeState' | 'readProviderIssueHandoff'>,
+  options: { refreshOwnership?: boolean } = {}
 ): ControlPollingHealthPayload | null {
   const livePolling = readProviderPollingHealth(context.readProviderIssueHandoff?.() ?? null);
   const persistedPolling = normalizePersistedProviderPollingSnapshot(
-    context.providerIntakeState?.polling
+    context.providerIntakeState?.polling,
+    { refreshOwnership: options.refreshOwnership }
   );
+  const finalize = (polling: ControlPollingHealthPayload | null) =>
+    options.refreshOwnership === false
+      ? polling
+      : refreshProviderPollingSnapshotOwnership(polling);
   if (persistedPolling && livePolling?.updated_at === null) {
-    return refreshProviderPollingSnapshotOwnership({
+    return finalize({
       ...persistedPolling,
       control_host_owner: livePolling.control_host_owner ?? persistedPolling.control_host_owner
     });
   }
-  return refreshProviderPollingSnapshotOwnership(livePolling ?? persistedPolling);
+  return finalize(livePolling ?? persistedPolling);
 }
 
 function refreshProviderPollingSnapshotOwnership(
@@ -780,7 +814,8 @@ function refreshProviderPollingSnapshotOwnership(
 }
 
 function normalizePersistedProviderPollingSnapshot(
-  polling: ProviderIntakeState['polling'] | null | undefined
+  polling: ProviderIntakeState['polling'] | null | undefined,
+  options: { refreshOwnership?: boolean } = {}
 ): ControlPollingHealthPayload | null {
   if (!isRecordLike(polling)) {
     return null;
@@ -849,9 +884,12 @@ function normalizePersistedProviderPollingSnapshot(
     restart_required: polling.restart_required === true,
     reason: typeof polling.reason === 'string' ? polling.reason : null,
     linear_budget: linearBudget,
-    control_host_owner: refreshControlHostOwnershipPollingPayload(
-      normalizeControlHostOwnershipPollingPayload(polling.control_host_owner)
-    )
+    control_host_owner:
+      options.refreshOwnership === false
+        ? normalizeControlHostOwnershipPollingPayload(polling.control_host_owner)
+        : refreshControlHostOwnershipPollingPayload(
+            normalizeControlHostOwnershipPollingPayload(polling.control_host_owner)
+          )
   };
 }
 

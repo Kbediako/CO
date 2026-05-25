@@ -50,6 +50,7 @@ function createInput() {
     headers: {}
   } as unknown as http.IncomingMessage;
   const context = {
+    token: 'control-token',
     config: { ui: { allowedBindHosts: ['localhost'] } },
     sessionTokens: {
       issue: vi.fn(() => ({ token: 'session-token', expiresAt: '2026-03-10T03:00:00.000Z' }))
@@ -72,7 +73,10 @@ function createInput() {
     req,
     res,
     context,
-    runtimeSnapshot: { kind: 'runtime-snapshot' } as never,
+    runtimeSnapshot: {
+      kind: 'runtime-snapshot',
+      readCommittedMachineStatusDataset: vi.fn()
+    } as never,
     presenterContext: { kind: 'presenter-context' } as never
   };
 }
@@ -95,7 +99,10 @@ describe('handleControlRequestRouteDispatch', () => {
     expect(handlePublicControlRoute).toHaveBeenCalledWith({
       pathname: '/api/v1/state',
       search: '?view=compact',
-      res: input.res
+      req: input.req,
+      res: input.res,
+      controlToken: 'control-token',
+      readCommittedMachineStatusDataset: expect.any(Function)
     });
     expect(handleControlUiSessionAdmission).not.toHaveBeenCalled();
     expect(handleLinearWebhookRequest).not.toHaveBeenCalled();

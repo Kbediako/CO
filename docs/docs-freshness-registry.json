@@ -3,6 +3,108 @@
   "generated_at": "2026-05-25",
   "entries": [
     {
+      "path": ".agent/task/linear-fccf02b5-d6d7-488f-9dd3-1eb6f54aa4d4.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-25",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "fccf02b5-d6d7-488f-9dd3-1eb6f54aa4d4",
+        "identifier": "CO-583",
+        "url": "https://linear.app/asabeko/issue/CO-583"
+      },
+      "doc_class": "task_mirror",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-25",
+      "next_review": "2026-06-24",
+      "notes": "CO-583 docs-first packet for replacing the control-host machine-status same-endpoint timeout patch with a snapshot-only status plane; protects source-root freshness, stale owner freshness, /healthz, /readyz, co-status, live_host, supervision, and terminal CO-574 historical-owner handling. Source anchor: ctx:sha256:687a20fdf718f72e2f87044a8a517a50912c6a1325dac159ee8adfb6b6be454b#chunk:c000001."
+    },
+    {
+      "path": "docs/ACTION_PLAN-linear-fccf02b5-d6d7-488f-9dd3-1eb6f54aa4d4.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-25",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "fccf02b5-d6d7-488f-9dd3-1eb6f54aa4d4",
+        "identifier": "CO-583",
+        "url": "https://linear.app/asabeko/issue/CO-583"
+      },
+      "doc_class": "task_packet",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-25",
+      "next_review": "2026-06-24",
+      "notes": "CO-583 docs-first packet for replacing the control-host machine-status same-endpoint timeout patch with a snapshot-only status plane; protects source-root freshness, stale owner freshness, /healthz, /readyz, co-status, live_host, supervision, and terminal CO-574 historical-owner handling. Source anchor: ctx:sha256:687a20fdf718f72e2f87044a8a517a50912c6a1325dac159ee8adfb6b6be454b#chunk:c000001."
+    },
+    {
+      "path": "docs/PRD-linear-fccf02b5-d6d7-488f-9dd3-1eb6f54aa4d4.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-25",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "fccf02b5-d6d7-488f-9dd3-1eb6f54aa4d4",
+        "identifier": "CO-583",
+        "url": "https://linear.app/asabeko/issue/CO-583"
+      },
+      "doc_class": "task_packet",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-25",
+      "next_review": "2026-06-24",
+      "notes": "CO-583 docs-first packet for replacing the control-host machine-status same-endpoint timeout patch with a snapshot-only status plane; protects source-root freshness, stale owner freshness, /healthz, /readyz, co-status, live_host, supervision, and terminal CO-574 historical-owner handling. Source anchor: ctx:sha256:687a20fdf718f72e2f87044a8a517a50912c6a1325dac159ee8adfb6b6be454b#chunk:c000001."
+    },
+    {
+      "path": "docs/TECH_SPEC-linear-fccf02b5-d6d7-488f-9dd3-1eb6f54aa4d4.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-25",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "fccf02b5-d6d7-488f-9dd3-1eb6f54aa4d4",
+        "identifier": "CO-583",
+        "url": "https://linear.app/asabeko/issue/CO-583"
+      },
+      "doc_class": "task_packet",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-25",
+      "next_review": "2026-06-24",
+      "notes": "CO-583 docs-first packet for replacing the control-host machine-status same-endpoint timeout patch with a snapshot-only status plane; protects source-root freshness, stale owner freshness, /healthz, /readyz, co-status, live_host, supervision, and terminal CO-574 historical-owner handling. Source anchor: ctx:sha256:687a20fdf718f72e2f87044a8a517a50912c6a1325dac159ee8adfb6b6be454b#chunk:c000001."
+    },
+    {
+      "path": "tasks/specs/linear-fccf02b5-d6d7-488f-9dd3-1eb6f54aa4d4.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-25",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "fccf02b5-d6d7-488f-9dd3-1eb6f54aa4d4",
+        "identifier": "CO-583",
+        "url": "https://linear.app/asabeko/issue/CO-583"
+      },
+      "doc_class": "active_spec",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-25",
+      "next_review": "2026-06-24",
+      "notes": "CO-583 docs-first packet for replacing the control-host machine-status same-endpoint timeout patch with a snapshot-only status plane; protects source-root freshness, stale owner freshness, /healthz, /readyz, co-status, live_host, supervision, and terminal CO-574 historical-owner handling. Source anchor: ctx:sha256:687a20fdf718f72e2f87044a8a517a50912c6a1325dac159ee8adfb6b6be454b#chunk:c000001."
+    },
+    {
+      "path": "tasks/tasks-linear-fccf02b5-d6d7-488f-9dd3-1eb6f54aa4d4.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-25",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "fccf02b5-d6d7-488f-9dd3-1eb6f54aa4d4",
+        "identifier": "CO-583",
+        "url": "https://linear.app/asabeko/issue/CO-583"
+      },
+      "doc_class": "task_mirror",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-25",
+      "next_review": "2026-06-24",
+      "notes": "CO-583 docs-first packet for replacing the control-host machine-status same-endpoint timeout patch with a snapshot-only status plane; protects source-root freshness, stale owner freshness, /healthz, /readyz, co-status, live_host, supervision, and terminal CO-574 historical-owner handling. Source anchor: ctx:sha256:687a20fdf718f72e2f87044a8a517a50912c6a1325dac159ee8adfb6b6be454b#chunk:c000001."
+    },
+    {
       "path": "tasks/tasks-linear-d2e17480-ee95-4eab-b83d-21be17e58993.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",

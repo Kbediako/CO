@@ -813,9 +813,7 @@ async function probeControlHostHealth(
       config.runId,
       '--format',
       'json',
-      '--machine-status',
-      '--machine-status-max-age-ms',
-      String(config.healthIntervalSeconds * config.unhealthyThreshold * 1_000)
+      '--healthz'
     ],
     {
       cwd: config.repoRoot,
@@ -826,54 +824,33 @@ async function probeControlHostHealth(
   const probeDurationMs = Math.max(0, Date.now() - probeStartedAt);
   if (result.timedOut === true) {
     const diagnostic = await readControlHostSupervisionProbeTimeoutDiagnostic(config, env);
-    const timeoutQuarantine = evaluateControlHostSupervisionProbeTimeoutDiagnostic(diagnostic, {
-      minPollingUpdatedAt: options.minPollingUpdatedAt ?? null,
-      restartHistory: options.restartHistory ?? null,
-      maxZeroWipPollingAgeMs: config.healthIntervalSeconds * config.unhealthyThreshold * 1_000,
-      now: options.now ?? null
-    });
-    if (timeoutQuarantine) {
-      return {
-        healthy: timeoutQuarantine.healthy,
-        reason: timeoutQuarantine.reason,
-        message: timeoutQuarantine.message,
-        probeDurationMs,
-        diagnostic
-      };
-    }
     return {
       healthy: false,
       reason: 'probe_timeout',
-      message: `co-status probe timed out after ${Math.round(probeTimeoutMs / 1_000)}s.`,
+      message: `co-status healthz probe timed out after ${Math.round(probeTimeoutMs / 1_000)}s.`,
       probeDurationMs,
       diagnostic
     };
   }
   if (result.exitCode !== 0) {
     const detail = result.stderr.trim() || result.stdout.trim() || 'co-status command failed.';
-    if (isCoStatusProbeTimeoutFailure(detail)) {
+    if (isCoStatusHealthzProbeTimeoutFailure(detail)) {
       const diagnostic = await readControlHostSupervisionProbeTimeoutDiagnostic(config, env);
-      const timeoutQuarantine = evaluateControlHostSupervisionProbeTimeoutDiagnostic(diagnostic, {
-        minPollingUpdatedAt: options.minPollingUpdatedAt ?? null,
-        restartHistory: options.restartHistory ?? null,
-        maxZeroWipPollingAgeMs: config.healthIntervalSeconds * config.unhealthyThreshold * 1_000,
-        now: options.now ?? null
-      });
-      if (timeoutQuarantine) {
-        return {
-          healthy: timeoutQuarantine.healthy,
-          reason: timeoutQuarantine.reason,
-          message: timeoutQuarantine.message,
-          probeDurationMs,
-          diagnostic
-        };
-      }
       return {
         healthy: false,
         reason: 'probe_timeout',
-        message: `co-status probe timed out: ${detail}`,
+        message: `co-status healthz probe timed out: ${detail}`,
         probeDurationMs,
         diagnostic
+      };
+    }
+    if (isCoStatusLegacyMachineStatusProbeTimeoutFailure(detail)) {
+      return {
+        healthy: false,
+        reason: 'probe_timeout',
+        message: `co-status legacy machine-status probe timed out: ${detail}`,
+        probeDurationMs,
+        diagnostic: null
       };
     }
     return {
@@ -893,6 +870,16 @@ async function probeControlHostHealth(
       healthy: false,
       reason: 'invalid_payload',
       message: `co-status probe returned invalid JSON: ${(error as Error).message}`,
+      probeDurationMs,
+      diagnostic: null
+    };
+  }
+
+  if (isControlHostLivenessPayload(payload)) {
+    return {
+      healthy: true,
+      reason: 'healthy',
+      message: 'control-host liveness ok.',
       probeDurationMs,
       diagnostic: null
     };
@@ -947,11 +934,23 @@ async function probeControlHostHealth(
   };
 }
 
-function isCoStatusProbeTimeoutFailure(detail: string): boolean {
+function isCoStatusHealthzProbeTimeoutFailure(detail: string): boolean {
+  return /\bcontrol-host healthz request timeout after\b/iu.test(detail);
+}
+
+function isCoStatusLegacyMachineStatusProbeTimeoutFailure(detail: string): boolean {
+  return /\bcontrol-host machine-status request timeout after\b/iu.test(detail);
+}
+
+function isControlHostLivenessPayload(payload: unknown): payload is {
+  status: 'ok';
+  mode: 'control_host_liveness';
+} {
   return (
-    /\b(?:timed out|timeout)\b/iu.test(detail) &&
-    /\bmachine-status\b/iu.test(detail) &&
-    /\bsame-endpoint current-endpoint timeout\b/iu.test(detail)
+    typeof payload === 'object' &&
+    payload !== null &&
+    (payload as { status?: unknown }).status === 'ok' &&
+    (payload as { mode?: unknown }).mode === 'control_host_liveness'
   );
 }
 

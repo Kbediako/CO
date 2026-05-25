@@ -56,7 +56,16 @@ export interface ControlMachineStatusDegradedPayload {
 }
 
 export interface ControlMachineStatusPresenterContext {
+  // Implementations may return a cached committed object; the presenter clones it
+  // before serving so callers cannot mutate the committed snapshot.
+  readCommittedMachineStatusDataset(): ControlMachineStatusDataset;
   readMachineStatus(signal?: AbortSignal): Promise<ControlMachineStatusSnapshot>;
+}
+
+export function readCommittedMachineStatusDataset(
+  context: ControlMachineStatusPresenterContext
+): ControlMachineStatusDataset {
+  return cloneMachineStatusDataset(context.readCommittedMachineStatusDataset());
 }
 
 export async function readMachineStatusDataset(
@@ -125,6 +134,12 @@ export function buildDegradedMachineStatusDataset(input: {
       timeout_ms: input.timeoutMs ?? null
     }
   };
+}
+
+export function cloneMachineStatusDataset(
+  dataset: ControlMachineStatusDataset
+): ControlMachineStatusDataset {
+  return JSON.parse(JSON.stringify(dataset)) as ControlMachineStatusDataset;
 }
 
 function compareProviderIntakeClaimsForStatus(

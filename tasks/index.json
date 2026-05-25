@@ -28634,6 +28634,60 @@
         "url": "https://linear.app/asabeko/issue/CO-574/co-stop-control-host-machine-status-endpoint-stalls-under-active"
       },
       "canonical_owner_key": "control-host:machine-status-active-worker-timeout-quarantine:v1"
+    },
+    {
+      "id": "20260525-linear-fccf02b5-d6d7-488f-9dd3-1eb6f54aa4d4",
+      "title": "CO-583 replace control-host machine-status timeout patch with snapshot status plane",
+      "relates_to": "tasks/tasks-linear-fccf02b5-d6d7-488f-9dd3-1eb6f54aa4d4.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "status": "in_progress",
+      "last_review": "2026-05-25",
+      "canonical_owner_key": "control-host:machine-status-active-worker-timeout-quarantine:v1",
+      "canonical_owner_marker": "codex-orchestrator:canonical-owner-key=control-host:machine-status-active-worker-timeout-quarantine:v1",
+      "evidence": [
+        "docs/PRD-linear-fccf02b5-d6d7-488f-9dd3-1eb6f54aa4d4.md",
+        "docs/TECH_SPEC-linear-fccf02b5-d6d7-488f-9dd3-1eb6f54aa4d4.md",
+        "docs/ACTION_PLAN-linear-fccf02b5-d6d7-488f-9dd3-1eb6f54aa4d4.md",
+        "tasks/specs/linear-fccf02b5-d6d7-488f-9dd3-1eb6f54aa4d4.md",
+        "tasks/tasks-linear-fccf02b5-d6d7-488f-9dd3-1eb6f54aa4d4.md",
+        ".agent/task/linear-fccf02b5-d6d7-488f-9dd3-1eb6f54aa4d4.md",
+        "tasks/index.json",
+        "docs/TASKS.md",
+        "docs/docs-freshness-registry.json"
+      ],
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue child lane docs-packet plus parent issue-contract correction",
+          "date": "2026-05-25",
+          "status": "accepted_for_parent_integration",
+          "source_anchor": "ctx:sha256:687a20fdf718f72e2f87044a8a517a50912c6a1325dac159ee8adfb6b6be454b#chunk:c000001",
+          "source_payload_status": "parent_prompt_source_anchor_applied_after_child_fallback_anchor",
+          "summary": "Docs-only child lane bootstrapped the packet; parent corrected the packet to the full CO-583 snapshot-only status-plane contract, including protected issue terms and non-goals."
+        }
+      },
+      "paths": {
+        "agent_task": ".agent/task/linear-fccf02b5-d6d7-488f-9dd3-1eb6f54aa4d4.md",
+        "prd": "docs/PRD-linear-fccf02b5-d6d7-488f-9dd3-1eb6f54aa4d4.md",
+        "docs": "docs/TECH_SPEC-linear-fccf02b5-d6d7-488f-9dd3-1eb6f54aa4d4.md",
+        "tech_spec_mirror": "docs/TECH_SPEC-linear-fccf02b5-d6d7-488f-9dd3-1eb6f54aa4d4.md",
+        "action_plan": "docs/ACTION_PLAN-linear-fccf02b5-d6d7-488f-9dd3-1eb6f54aa4d4.md",
+        "spec": "tasks/specs/linear-fccf02b5-d6d7-488f-9dd3-1eb6f54aa4d4.md",
+        "task": "tasks/tasks-linear-fccf02b5-d6d7-488f-9dd3-1eb6f54aa4d4.md"
+      },
+      "source_issue": {
+        "id": "fccf02b5-d6d7-488f-9dd3-1eb6f54aa4d4",
+        "identifier": "CO-583",
+        "url": "https://linear.app/asabeko/issue/CO-583"
+      },
+      "notes": {
+        "source_issue": "CO-583 replace control-host machine-status timeout patch with isolated snapshot status plane.",
+        "source_anchor": "ctx:sha256:687a20fdf718f72e2f87044a8a517a50912c6a1325dac159ee8adfb6b6be454b#chunk:c000001",
+        "source_payload_status": "Parent corrected the accepted docs child fallback anchor to the prompt-provided source anchor and full protected-term contract.",
+        "protected_terms": "control-host machine-status same-endpoint timeout; /ui/machine-status.json; snapshot-only status plane; source-root freshness; stale owner freshness; provider_refresh_lifecycle_stuck; dispatch_source_issue_by_id; node::SyncProcessRunner; uv_spawn; posix_spawn; /healthz; /readyz; CO-574; CO-572; CO-557; CO-579; CO-581; CO-569."
+      }
     }
   ]
 }

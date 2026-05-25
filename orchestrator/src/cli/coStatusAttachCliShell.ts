@@ -572,7 +572,7 @@ function formatSameEndpointTimeoutFailure(
 ): string {
   return [
     `${error.message}.`,
-    `The current resolved ${endpointPath} endpoint at ${target.baseUrl.toString()} timed out again after endpoint re-resolution returned the same endpoint/token; this is a same-endpoint current-endpoint timeout, not stale/dead endpoint ECONNREFUSED recovery or attach restart/rotation.`,
+    `The current resolved ${endpointPath} endpoint at ${target.baseUrl.toString()} timed out again after endpoint re-resolution returned the same endpoint/token; this is a same-endpoint current-endpoint timeout from endpoint starvation or snapshot-read blocking, not stale/dead endpoint ECONNREFUSED recovery or attach restart/rotation.`,
     'Inspect local control-host polling.stuck, polling.restart_required, and running claim evidence before treating the host as unhealthy.'
   ].join(' ');
 }
