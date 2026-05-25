@@ -63,6 +63,7 @@ import {
 } from './providerPollingHealth.js';
 import {
   normalizeControlHostOwnershipPollingPayload,
+  isControlHostOwnershipFreshnessAtLeastAsRecent,
   resolveControlHostAuthoritativeSourceFreshness,
   resolveControlHostSourceFreshnessPolicyFromPolling
 } from './controlHostOwnership.js';
@@ -587,6 +588,13 @@ export function createProviderIssueHandoffService(
     return Boolean(lifecycleScope && lifecycleScope.epoch !== refreshLifecycleEpoch);
   };
   const resolveProviderHandoffSourceFreshnessPolicy = () => {
+    const persistedControlHostOwner = normalizeControlHostOwnershipPollingPayload(
+      options.state.polling?.control_host_owner
+    );
+    const persistedPolicy = resolveControlHostSourceFreshnessPolicyFromPolling(
+      persistedControlHostOwner,
+      { refresh: false }
+    );
     const liveControlHostOwner =
       readProviderPollingHealth(providerIssueHandoffService)?.control_host_owner ??
       null;
@@ -597,14 +605,15 @@ export function createProviderIssueHandoffService(
         { refresh: false }
       );
       const liveFreshness = resolveControlHostAuthoritativeSourceFreshness(refreshedLiveOwner);
-      if (livePolicy || isAuthoritativeProviderHandoffLiveControlHostFreshness(liveFreshness)) {
+      if (
+        livePolicy ||
+        (isAuthoritativeProviderHandoffLiveControlHostFreshness(liveFreshness) &&
+          isControlHostOwnershipFreshnessAtLeastAsRecent(refreshedLiveOwner, persistedControlHostOwner))
+      ) {
         return livePolicy;
       }
     }
-    return resolveControlHostSourceFreshnessPolicyFromPolling(
-      options.state.polling?.control_host_owner,
-      { refresh: false }
-    );
+    return persistedPolicy;
   };
   const isAuthoritativeProviderHandoffLiveControlHostFreshness = (
     freshness: ReturnType<typeof resolveControlHostAuthoritativeSourceFreshness>

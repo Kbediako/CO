@@ -365,6 +365,28 @@ export function resolveControlHostSourceFreshnessPolicy(
   };
 }
 
+export function isControlHostOwnershipFreshnessAtLeastAsRecent(
+  candidate: ControlHostOwnershipPollingPayload | null,
+  baseline: ControlHostOwnershipPollingPayload | null
+): boolean {
+  const baselineTimestamp = resolveControlHostOwnershipFreshnessTimestamp(baseline);
+  if (baselineTimestamp === null) {
+    return true;
+  }
+  const candidateTimestamp = resolveControlHostOwnershipFreshnessTimestamp(candidate);
+  return candidateTimestamp !== null && candidateTimestamp >= baselineTimestamp;
+}
+
+function resolveControlHostOwnershipFreshnessTimestamp(
+  payload: ControlHostOwnershipPollingPayload | null
+): number | null {
+  return maxTimestamp(
+    payload?.updated_at,
+    payload?.owner?.updated_at,
+    payload?.attempted_owner?.updated_at
+  );
+}
+
 export function resolveControlHostAuthoritativeSourceFreshness(
   payload: ControlHostOwnershipPollingPayload | null
 ): SourceRootFreshnessInspection | null {
@@ -386,6 +408,18 @@ function isAuthoritativeControlHostSourceFreshness(
 ): boolean {
   const freshness = resolveControlHostAuthoritativeSourceFreshness(payload);
   return freshness?.status === 'current' || freshness?.status === 'warning';
+}
+
+function maxTimestamp(...values: Array<string | null | undefined>): number | null {
+  let latest: number | null = null;
+  for (const value of values) {
+    const parsed = typeof value === 'string' ? Date.parse(value) : Number.NaN;
+    if (!Number.isFinite(parsed)) {
+      continue;
+    }
+    latest = latest === null ? parsed : Math.max(latest, parsed);
+  }
+  return latest;
 }
 
 function isRestartSafeStaleSupervisedSourceRoot(
