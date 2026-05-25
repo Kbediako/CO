@@ -11,6 +11,22 @@
 - Pre-implementation issue-quality review: CO-576 is not a micro-task because correctness depends on exact provider-intake artifact names, terminal closeout semantics, retained audit history, and live Linear/GitHub authority ordering.
 - Fallback / refactor decision: remove the stale cached current-projection seam; justify retaining completed-claim audit history as a steady-state audit record.
 
+## CO-382 Fallback Decision Table
+- Large-refactor decision: no large refactor is warranted because CO-576 removes one stale current-projection branch inside the existing provider-intake completed-run rehydrate authority; it does not add a new source of truth or split queue/status/PR lifecycle ownership.
+- Minor-seam decision: remove the stale current-projection seam now; retain only the existing completed-claim audit record as a durable audit contract.
+
+| Surface | Fallback / seam | Decision | Owner | Trigger | Introduced date | Review date | Maximum lifetime | Removal condition | Validation |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `provider-intake current projection` | Completed promoted-review rows can project cached `Merging` / open review truth after PR merge and Linear terminal closeout. | `remove fallback` | CO-576 | Post-CO-516 recurrence for merged PRs with retained completed claims. | 2026-05-22 | 2026-05-25 | Removed in this issue | Current projection uses fresh Linear `Done` truth or explicit stale/degraded provenance, and terminal rows do not consume active work paths. | `orchestrator/tests/ProviderIssueHandoff.test.ts` focused stale promoted-review rehydrate regression plus full provider handoff suite. |
+| `provider-intake completed-claim audit retention` | Completed claim history remains in `provider-intake-state.json` for audit and diagnosis. | `justify retaining fallback` | CO-576 | Historical provider-worker claims are intentionally retained after closeout. | 2026-05-22 | 2026-05-25 | Non-expiring durable audit retention only with rationale | Retention stays audit-only and never overrides live Linear/GitHub closeout truth. | Regression asserts the stale standalone promoted-review residue is cleared from current projection while released merge-closeout audit retention remains intact. |
+
+Durable retention evidence:
+- Contract name: `provider-intake completed-claim audit retention`.
+- Owning surface: provider-intake state and status projection.
+- Steady-state proof: retained completed rows remain readable for diagnostics while current projection comes from fresh Linear/GitHub truth or source-labeled degraded reads.
+- Tests/docs: `orchestrator/tests/ProviderIssueHandoff.test.ts` stale promoted-review regression plus existing released merge-closeout audit-retention coverage; this CO-576 PRD, TECH_SPEC, ACTION_PLAN, and task checklist.
+- Non-expiring rationale: completed-claim retention is the audit artifact, not an active fallback; only stale current projection is removed.
+
 ## Milestones & Sequencing
 1. Reproduce the stale residue shape from retained completed promoted-review claims.
 2. Trace provider-intake current projection, active-capacity accounting, retry/blocker, and stale alarm consumers.
