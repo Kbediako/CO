@@ -324,15 +324,17 @@ export async function refreshControlHostOwnershipPollingPayloadInChild(
     refreshControlHostOwnerSummaryInChild(payload.owner, options),
     attemptedOwnerPromise
   ]);
-  const updatedAt =
-    owner?.source_root_freshness?.observed_at ??
-    attemptedOwner?.source_root_freshness?.observed_at ??
-    payload.updated_at;
-  return {
+  const refreshedPayload: ControlHostOwnershipPollingPayload = {
     ...payload,
-    updated_at: updatedAt,
     owner,
     ...(attemptedOwner !== undefined ? { attempted_owner: attemptedOwner } : {})
+  };
+  const updatedAt =
+    resolveControlHostAuthoritativeSourceFreshnessOwner(refreshedPayload)
+      ?.source_root_freshness?.observed_at ?? payload.updated_at;
+  return {
+    ...refreshedPayload,
+    updated_at: updatedAt
   };
 }
 
@@ -460,6 +462,42 @@ export function isControlHostSourceFreshnessAuthorityAdmissionValid(
   authority: ControlHostSourceFreshnessAuthority | null | undefined
 ): boolean {
   return Boolean(payload && authority && resolveControlHostSourceFreshnessAdmissionPolicy(payload, authority) === null);
+}
+
+export function selectControlHostSourceFreshnessAuthorityForOwner(
+  controlHostOwner: ControlHostOwnershipPollingPayload | null,
+  primaryAuthority: ControlHostSourceFreshnessAuthority | null,
+  fallbackAuthority: ControlHostSourceFreshnessAuthority | null
+): ControlHostSourceFreshnessAuthority | null {
+  if (isControlHostSourceFreshnessAuthorityAdmissionValid(controlHostOwner, primaryAuthority)) {
+    return primaryAuthority;
+  }
+  if (isControlHostSourceFreshnessAuthorityAdmissionValid(controlHostOwner, fallbackAuthority)) {
+    return fallbackAuthority;
+  }
+  return primaryAuthority ?? fallbackAuthority;
+}
+
+export function resolvePollingSourceRootFreshnessAuthority(
+  polling: unknown
+): ControlHostSourceFreshnessAuthority | null {
+  if (!polling || typeof polling !== 'object') {
+    return null;
+  }
+  const record = polling as Record<string, unknown>;
+  return {
+    verified_at: readOptionalStringField(record, 'source_root_freshness_verified_at'),
+    source_root_freshness_observed_at: readOptionalStringField(record, 'source_root_freshness_observed_at'),
+    expires_at: readOptionalStringField(record, 'source_root_freshness_expires_at'),
+    owner_token: readOptionalStringField(record, 'source_root_freshness_owner_token'),
+    run_id: readOptionalStringField(record, 'source_root_freshness_run_id'),
+    source_root_realpath: readOptionalStringField(record, 'source_root_freshness_source_root_realpath')
+  };
+}
+
+function readOptionalStringField(record: Record<string, unknown>, key: string): string | null {
+  const value = record[key];
+  return typeof value === 'string' ? value : null;
 }
 
 function buildUnverifiedSourceRootFreshnessPolicy(

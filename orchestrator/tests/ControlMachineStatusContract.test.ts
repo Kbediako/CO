@@ -201,7 +201,7 @@ describe('control machine status contract', () => {
 
     expect(source).not.toMatch(/\bPromise\.race\s*\(/u);
     expect(source).not.toMatch(/\b(?:spawnSync|execSync|execFileSync)\b/u);
-    expect(source).not.toMatch(/\brefreshControlHostOwnershipPollingPayload\s*\(/u);
+    expect(source).not.toMatch(/\brefreshControlHostOwnershipPollingPayload(?:InChild)?\s*\(/u);
     expect(source).not.toMatch(/\brefreshSourceRootFreshnessInspection\s*\(/u);
   });
 
@@ -222,7 +222,7 @@ describe('control machine status contract', () => {
     ).map(({ file, text }) => `// ${file}\n${text}`).join('\n');
 
     expect(source).not.toMatch(/\b(?:spawnSync|execSync|execFileSync)\b/u);
-    expect(source).not.toMatch(/\brefreshControlHostOwnershipPollingPayload\s*\(/u);
+    expect(source).not.toMatch(/\brefreshControlHostOwnershipPollingPayload(?:InChild)?\s*\(/u);
     expect(source).not.toMatch(/\brefreshSourceRootFreshnessInspection\s*\(/u);
   });
 

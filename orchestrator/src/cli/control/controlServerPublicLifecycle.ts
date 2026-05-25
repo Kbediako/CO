@@ -48,7 +48,7 @@ import { prepareControlServerStartupInputs } from './controlServerStartupInputPr
 import {
   acquireControlHostOwnership,
   refreshControlHostOwnershipPollingPayloadInChild,
-  type ControlHostSourceFreshnessAuthority,
+  resolvePollingSourceRootFreshnessAuthority,
   type ControlHostOwnershipPollingPayload,
   type ControlHostOwnershipHandle
 } from './controlHostOwnership.js';
@@ -206,7 +206,10 @@ export async function startControlServerPublicLifecycle(
       startupInputs.requestContextShared.providerIssueHandoff && readControlHostOwner
         ? createSourceRootFreshnessVerificationHandle(
             startupInputs.requestContextShared.providerIssueHandoff,
-            readControlHostOwner
+            readControlHostOwner,
+            (refreshedOwner) => {
+              controlHostOwnershipForPolling!.polling = refreshedOwner;
+            }
           )
         : null;
 
@@ -853,8 +856,17 @@ function createProviderRefreshCoordinator(
       ? await context.refreshSourceRootFreshness()
       : null;
     if (
+      stopped ||
+      (sourceRootFreshnessOutcome?.kind === 'skipped' &&
+        sourceRootFreshnessOutcome.reason === 'stopped')
+    ) {
+      clearScheduledTrigger();
+      return;
+    }
+    if (
       sourceRootFreshnessOutcome?.kind === 'pending' ||
-      sourceRootFreshnessOutcome?.kind === 'failed'
+      sourceRootFreshnessOutcome?.kind === 'failed' ||
+      sourceRootFreshnessOutcome?.kind === 'skipped'
     ) {
       clearScheduledTrigger();
       await scheduleNextTriggerAsync(sourceRootFreshnessOutcome.reason);
@@ -954,7 +966,8 @@ function scheduleStartupProviderRefresh(trigger: () => Promise<void>): NodeJS.Ti
 
 function createSourceRootFreshnessVerificationHandle(
   providerIssueHandoff: ProviderIssueHandoffService,
-  readControlHostOwner: () => ControlHostOwnershipPollingPayload | null
+  readControlHostOwner: () => ControlHostOwnershipPollingPayload | null,
+  writeControlHostOwner?: (owner: ControlHostOwnershipPollingPayload) => void
 ): SourceRootFreshnessVerificationHandle {
   let stopped = false;
   let inFlight: Promise<SourceRootFreshnessVerificationOutcome> | null = null;
@@ -977,6 +990,7 @@ function createSourceRootFreshnessVerificationHandle(
             reason: stopped ? 'stopped' : 'source_root_freshness_verification_failed'
           } as SourceRootFreshnessVerificationOutcome;
         }
+        writeControlHostOwner?.(refreshedOwner);
         markProviderPollingControlHostOwnerFreshnessVerified(providerIssueHandoff, {
           controlHostOwner: refreshedOwner
         });
@@ -1032,41 +1046,6 @@ function scheduleStartupSourceRootFreshnessVerification(
   }, 0);
   startupTrigger.unref?.();
   return startupTrigger;
-}
-
-function resolvePollingSourceRootFreshnessAuthority(
-  polling: unknown
-): ControlHostSourceFreshnessAuthority | null {
-  if (!polling || typeof polling !== 'object') {
-    return null;
-  }
-  const record = polling as Record<string, unknown>;
-  return {
-    verified_at:
-      typeof record.source_root_freshness_verified_at === 'string'
-        ? record.source_root_freshness_verified_at
-        : null,
-    source_root_freshness_observed_at:
-      typeof record.source_root_freshness_observed_at === 'string'
-        ? record.source_root_freshness_observed_at
-        : null,
-    expires_at:
-      typeof record.source_root_freshness_expires_at === 'string'
-        ? record.source_root_freshness_expires_at
-        : null,
-    owner_token:
-      typeof record.source_root_freshness_owner_token === 'string'
-        ? record.source_root_freshness_owner_token
-        : null,
-    run_id:
-      typeof record.source_root_freshness_run_id === 'string'
-        ? record.source_root_freshness_run_id
-        : null,
-    source_root_realpath:
-      typeof record.source_root_freshness_source_root_realpath === 'string'
-        ? record.source_root_freshness_source_root_realpath
-        : null
-  };
 }
 
 function resolveProviderIssueHandoffWatchdogDelayMs(

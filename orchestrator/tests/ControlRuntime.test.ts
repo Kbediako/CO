@@ -8790,6 +8790,8 @@ describe('ControlRuntime', () => {
   });
 
   it('falls back to newer persisted stale authority when live current freshness is older', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-05-18T23:09:30.000Z'));
     const fixture = await createFixture({ taskId: 'local-mcp' });
     const providerIssueHandoff = {
       handleAcceptedTrackedIssue: vi.fn(),
@@ -8834,7 +8836,7 @@ describe('ControlRuntime', () => {
     });
     markProviderPollingControlHostOwnerFreshnessVerified(providerIssueHandoff, {
       controlHostOwner: liveOwner,
-      atMs: Date.now()
+      atMs: Date.parse('2026-05-18T23:05:00.000Z')
     });
 
     const providerIntakeState = createProviderIntakeState([
@@ -8892,6 +8894,8 @@ describe('ControlRuntime', () => {
   });
 
   it('does not treat provider polling success as newer source-root freshness evidence', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-05-18T23:09:30.000Z'));
     const fixture = await createFixture({ taskId: 'local-mcp' });
     const providerIssueHandoff = {
       handleAcceptedTrackedIssue: vi.fn(),
@@ -8970,7 +8974,7 @@ describe('ControlRuntime', () => {
 
     markProviderPollingControlHostOwnerFreshnessVerified(providerIssueHandoff, {
       controlHostOwner: liveOwner,
-      atMs: Date.now()
+      atMs: Date.parse('2026-05-18T23:05:00.000Z')
     });
 
     const projection = await runtime.snapshot().readCompatibilityProjection();
@@ -9074,6 +9078,8 @@ describe('ControlRuntime', () => {
   });
 
   it('preserves persisted source-root freshness authority metadata in polling projection', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-05-18T22:55:30.000Z'));
     const fixture = await createFixture({ taskId: 'local-mcp' });
     const repoRoot = await createSourceRootRepo('control-runtime-persisted-authority-projection-');
     const sourceRootFreshness = inspectSourceRootFreshness({
@@ -9116,7 +9122,7 @@ describe('ControlRuntime', () => {
       control_host_owner: controlHostOwner,
       source_root_freshness_verified_at: '2026-05-18T22:55:00.000Z',
       source_root_freshness_observed_at: '2026-05-18T22:55:00.000Z',
-      source_root_freshness_expires_at: new Date(Date.now() + 60_000).toISOString(),
+      source_root_freshness_expires_at: '2026-05-18T23:00:30.000Z',
       source_root_freshness_owner_token: 'owner-token',
       source_root_freshness_run_id: 'control-host',
       source_root_freshness_source_root_realpath: repoRoot
@@ -9141,6 +9147,8 @@ describe('ControlRuntime', () => {
   });
 
   it('clears persisted source-root authority when startup live ownership replaces the persisted owner', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-05-18T22:55:45.000Z'));
     const fixture = await createFixture({ taskId: 'local-mcp' });
     const repoRoot = await createSourceRootRepo('control-runtime-startup-live-owner-authority-');
     const sourceRootFreshness = inspectSourceRootFreshness({
@@ -9177,7 +9185,7 @@ describe('ControlRuntime', () => {
       control_host_owner: persistedOwner,
       source_root_freshness_verified_at: '2026-05-18T22:55:30.000Z',
       source_root_freshness_observed_at: '2026-05-18T22:55:00.000Z',
-      source_root_freshness_expires_at: new Date(Date.now() + 60_000).toISOString(),
+      source_root_freshness_expires_at: '2026-05-18T23:00:45.000Z',
       source_root_freshness_owner_token: 'persisted-owner-token',
       source_root_freshness_run_id: 'persisted-run',
       source_root_freshness_source_root_realpath: repoRoot
@@ -9238,7 +9246,7 @@ describe('ControlRuntime', () => {
     });
     markProviderPollingControlHostOwnerFreshnessVerified(providerIssueHandoff, {
       controlHostOwner: liveOwner,
-      atMs: Date.now()
+      atMs: Date.parse('2026-05-18T23:05:00.000Z')
     });
     await writeFile(join(repoRoot, 'co-556-main-advance.txt'), 'main advanced\n', 'utf8');
     git(repoRoot, ['add', '.']);
@@ -9383,6 +9391,8 @@ describe('ControlRuntime', () => {
   );
 
   it('trusts committed live owner freshness when a hot refresh would be unavailable', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-05-18T23:09:30.000Z'));
     const fixture = await createFixture({ taskId: 'local-mcp' });
     const providerIssueHandoff = {
       handleAcceptedTrackedIssue: vi.fn(),
@@ -9425,7 +9435,7 @@ describe('ControlRuntime', () => {
     });
     markProviderPollingControlHostOwnerFreshnessVerified(providerIssueHandoff, {
       controlHostOwner: liveOwner,
-      atMs: Date.now()
+      atMs: Date.parse('2026-05-18T23:09:00.000Z')
     });
     await writeFile(join(repoRoot, 'co-556-main-advance.txt'), 'main advanced\n', 'utf8');
     git(repoRoot, ['add', '.']);
@@ -9482,6 +9492,8 @@ describe('ControlRuntime', () => {
   });
 
   it('clears persisted stale provider-intake authority when live control-host ownership is current', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-05-18T23:12:45.000Z'));
     const fixture = await createFixture();
     const providerIssueHandoff = {
       handleAcceptedTrackedIssue: vi.fn(),
@@ -9524,7 +9536,7 @@ describe('ControlRuntime', () => {
     });
     markProviderPollingControlHostOwnerFreshnessVerified(providerIssueHandoff, {
       controlHostOwner: liveOwner,
-      atMs: Date.now()
+      atMs: Date.parse('2026-05-18T23:13:00.000Z')
     });
 
     const persistedOwner = refreshControlHostOwnershipPollingPayload(

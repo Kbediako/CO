@@ -15,9 +15,13 @@ import {
   recordProviderPollingProgress,
   resolveControlPollingNextRefreshProjection
 } from '../src/cli/control/providerPollingHealth.js';
+import type { ControlHostOwnershipPollingPayload } from '../src/cli/control/controlHostOwnership.js';
 import type { LinearBudgetStatus } from '../src/cli/control/linearBudgetState.js';
 import type { ProviderIssueHandoffService } from '../src/cli/control/providerIssueHandoff.js';
-import { inspectSourceRootFreshness } from '../src/cli/utils/sourceRootFreshness.js';
+import {
+  inspectSourceRootFreshness,
+  type SourceRootFreshnessInspection
+} from '../src/cli/utils/sourceRootFreshness.js';
 
 function buildLinearBudget(
   overrides: Partial<LinearBudgetStatus> = {}
@@ -567,7 +571,10 @@ async function createSourceRootRepo(prefix: string): Promise<string> {
   return root;
 }
 
-function createControlHostOwnerPayload(repoRoot: string, sourceRootFreshness: unknown) {
+function createControlHostOwnerPayload(
+  repoRoot: string,
+  sourceRootFreshness: SourceRootFreshnessInspection | null
+): ControlHostOwnershipPollingPayload {
   return {
     status: 'owned',
     reason: null,

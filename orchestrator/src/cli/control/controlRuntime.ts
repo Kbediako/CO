@@ -22,12 +22,12 @@ import {
 import {
   normalizeControlHostOwnershipPollingPayload,
   isControlHostOwnershipFreshnessAtLeastAsRecent,
-  isControlHostSourceFreshnessAuthorityAdmissionValid,
   resolveControlHostAuthoritativeSourceFreshness,
+  resolvePollingSourceRootFreshnessAuthority,
   resolveControlHostSourceFreshnessAdmissionPolicy,
-  resolveControlHostSourceFreshnessPolicyFromPolling
+  resolveControlHostSourceFreshnessPolicyFromPolling,
+  selectControlHostSourceFreshnessAuthorityForOwner
 } from './controlHostOwnership.js';
-import type { ControlHostSourceFreshnessAuthority } from './controlHostOwnership.js';
 import {
   buildProviderIntakeSummary,
   hasQueuedProviderIntakeRetry,
@@ -692,11 +692,9 @@ function resolveProviderIntakeSourceFreshnessPolicy(
   state: ProviderIntakeState | null,
   context: Pick<ControlRuntimeContext, 'readProviderIssueHandoff'>
 ) {
-  const persistedControlHostOwner =
-    state?.polling && isRecordLike(state.polling)
-      ? normalizeControlHostOwnershipPollingPayload(state.polling.control_host_owner)
-      : null;
-  const persistedAuthority = resolvePollingSourceRootFreshnessAuthority(state?.polling ?? null);
+  const persistedPolling = normalizePersistedProviderPollingSnapshot(state?.polling);
+  const persistedControlHostOwner = persistedPolling?.control_host_owner ?? null;
+  const persistedAuthority = resolvePollingSourceRootFreshnessAuthority(persistedPolling);
   const persistedPolicy = resolveControlHostSourceFreshnessPolicyFromPolling(
     persistedControlHostOwner,
     { refresh: false }
@@ -718,7 +716,14 @@ function resolveProviderIntakeSourceFreshnessPolicy(
     }
     if (
       isAuthoritativeLiveControlHostFreshness(liveFreshness) &&
-      isControlHostOwnershipFreshnessAtLeastAsRecent(refreshedLiveOwner, persistedControlHostOwner)
+      isControlHostOwnershipFreshnessAtLeastAsRecent(
+        refreshedLiveOwner,
+        persistedControlHostOwner,
+        {
+          candidateSnapshotUpdatedAt: livePolling?.updated_at ?? null,
+          baselineSnapshotUpdatedAt: persistedPolling?.updated_at ?? null
+        }
+      )
     ) {
       const liveAuthority = selectControlHostSourceFreshnessAuthorityForOwner(
         refreshedLiveOwner,
@@ -732,65 +737,6 @@ function resolveProviderIntakeSourceFreshnessPolicy(
     }
   }
   return persistedPolicy;
-}
-
-function selectControlHostSourceFreshnessAuthorityForOwner(
-  controlHostOwner: ReturnType<typeof normalizeControlHostOwnershipPollingPayload>,
-  primaryAuthority: ControlHostSourceFreshnessAuthority | null,
-  fallbackAuthority: ControlHostSourceFreshnessAuthority | null
-): ControlHostSourceFreshnessAuthority | null {
-  if (
-    isControlHostSourceFreshnessAuthorityAdmissionValid(
-      controlHostOwner,
-      primaryAuthority
-    )
-  ) {
-    return primaryAuthority;
-  }
-  if (
-    isControlHostSourceFreshnessAuthorityAdmissionValid(
-      controlHostOwner,
-      fallbackAuthority
-    )
-  ) {
-    return fallbackAuthority;
-  }
-  return primaryAuthority ?? fallbackAuthority;
-}
-
-function resolvePollingSourceRootFreshnessAuthority(
-  polling: unknown
-): ControlHostSourceFreshnessAuthority | null {
-  if (!polling || typeof polling !== 'object') {
-    return null;
-  }
-  const record = polling as Record<string, unknown>;
-  return {
-    verified_at:
-      typeof record.source_root_freshness_verified_at === 'string'
-        ? record.source_root_freshness_verified_at
-        : null,
-    source_root_freshness_observed_at:
-      typeof record.source_root_freshness_observed_at === 'string'
-        ? record.source_root_freshness_observed_at
-        : null,
-    expires_at:
-      typeof record.source_root_freshness_expires_at === 'string'
-        ? record.source_root_freshness_expires_at
-        : null,
-    owner_token:
-      typeof record.source_root_freshness_owner_token === 'string'
-        ? record.source_root_freshness_owner_token
-        : null,
-    run_id:
-      typeof record.source_root_freshness_run_id === 'string'
-        ? record.source_root_freshness_run_id
-        : null,
-    source_root_realpath:
-      typeof record.source_root_freshness_source_root_realpath === 'string'
-        ? record.source_root_freshness_source_root_realpath
-        : null
-  };
 }
 
 function isAuthoritativeLiveControlHostFreshness(

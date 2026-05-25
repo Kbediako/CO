@@ -284,9 +284,20 @@ function recordSourceRootFreshnessAuthority(
 ): void {
   const owner = resolveControlHostAuthoritativeSourceFreshnessOwner(controlHostOwner ?? null);
   const freshness = owner?.source_root_freshness ?? null;
+  const ownerToken = normalizeOptionalString(owner?.owner_token);
+  const runId = normalizeOptionalString(owner?.run_id);
+  const sourceRootRealpath = normalizeOptionalString(freshness?.source_root_realpath);
   const observedAtMs = parseIsoToMs(freshness?.observed_at ?? null);
   const verifiedAtMs = fallbackAtMs ?? observedAtMs;
-  if (!owner || !freshness || observedAtMs === null || verifiedAtMs === null) {
+  if (
+    !owner ||
+    !freshness ||
+    observedAtMs === null ||
+    verifiedAtMs === null ||
+    ownerToken === null ||
+    runId === null ||
+    sourceRootRealpath === null
+  ) {
     clearSourceRootFreshnessAuthority(state);
     return;
   }
@@ -294,9 +305,9 @@ function recordSourceRootFreshnessAuthority(
   state.sourceRootFreshnessObservedAtMs = observedAtMs;
   state.sourceRootFreshnessExpiresAtMs =
     verifiedAtMs + CONTROL_HOST_SOURCE_FRESHNESS_AUTHORITY_TTL_MS;
-  state.sourceRootFreshnessOwnerToken = owner?.owner_token ?? null;
-  state.sourceRootFreshnessRunId = owner?.run_id ?? null;
-  state.sourceRootFreshnessSourceRootRealpath = freshness?.source_root_realpath ?? null;
+  state.sourceRootFreshnessOwnerToken = ownerToken;
+  state.sourceRootFreshnessRunId = runId;
+  state.sourceRootFreshnessSourceRootRealpath = sourceRootRealpath;
 }
 
 function recordPersistedSourceRootFreshnessAuthority(

@@ -1235,6 +1235,8 @@ describe('createProviderIssueHandoffService', () => {
   });
 
   it('uses live recovered owner freshness before stale persisted polling for direct starts', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-05-18T23:20:45.000Z'));
     const { paths } = await createHostPaths();
     const state = createProviderIntakeState();
     state.polling = { control_host_owner: createStaleSupervisedControlHostOwner() };
@@ -1268,7 +1270,7 @@ describe('createProviderIssueHandoffService', () => {
     });
     markProviderPollingControlHostOwnerFreshnessVerified(service, {
       controlHostOwner: liveOwner,
-      atMs: Date.now()
+      atMs: Date.parse('2026-05-18T23:20:40.000Z')
     });
 
     const result = await service.handleAcceptedTrackedIssue({
@@ -1298,6 +1300,8 @@ describe('createProviderIssueHandoffService', () => {
   });
 
   it('uses valid persisted source-root authority when live owner matches but has not been seeded', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-05-18T23:20:45.000Z'));
     const { paths } = await createHostPaths();
     const state = createProviderIntakeState();
     const liveRepoRoot = await createSourceRootRepo('provider-handoff-live-matching-authority-');
@@ -1320,9 +1324,9 @@ describe('createProviderIssueHandoffService', () => {
       updated_at: '2026-05-18T23:20:30.000Z',
       restart_required: false,
       control_host_owner: liveOwner,
-      source_root_freshness_verified_at: new Date(Date.now()).toISOString(),
+      source_root_freshness_verified_at: '2026-05-18T23:20:40.000Z',
       source_root_freshness_observed_at: '2026-05-18T23:20:00.000Z',
-      source_root_freshness_expires_at: new Date(Date.now() + 60_000).toISOString(),
+      source_root_freshness_expires_at: '2026-05-18T23:21:40.000Z',
       source_root_freshness_owner_token: 'current-at-acquisition-owner-token',
       source_root_freshness_run_id: 'control-host',
       source_root_freshness_source_root_realpath: liveSourceRootRealpath
@@ -38601,6 +38605,8 @@ describe('createProviderIssueHandoffService', () => {
   });
 
   it('does not fail refresh closed only because polling success is newer than live owner freshness', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-05-18T23:12:30.000Z'));
     const { paths } = await createHostPaths();
     const state = createProviderIntakeState();
     const liveOwner = await createCurrentAtAcquisitionOwnerThatBecomesStale(
@@ -38670,7 +38676,7 @@ describe('createProviderIssueHandoffService', () => {
 
     markProviderPollingControlHostOwnerFreshnessVerified(service, {
       controlHostOwner: liveOwner,
-      atMs: Date.now()
+      atMs: Date.parse('2026-05-18T23:12:20.000Z')
     });
 
     await service.refresh();
