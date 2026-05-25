@@ -38,7 +38,7 @@ last_review: 2026-05-25
 - Acceptance criteria:
   - `/ui/machine-status.json` serves a committed immutable snapshot only.
   - Freshness/status collection runs outside the serving event loop with bounded async operations, cancellation, no same-root overlap, and stale-on-failure snapshot semantics.
-  - Provider-intake admission accepts current source-root freshness only when provider polling health carries a collector-verified authority tuple (`source_root_freshness_verified_at`, owner token, run id, source-root realpath) bound to the same control-host owner/run and not older than the freshness observation; provider polling success or `updated_at` timestamps are not source-root evidence.
+  - Provider-intake admission accepts current source-root freshness only when provider polling health carries a collector-verified authority tuple (`source_root_freshness_verified_at`, `source_root_freshness_observed_at`, `source_root_freshness_expires_at`, owner token, run id, source-root realpath) bound to the same control-host owner/run/source-root snapshot, not older than the freshness observation, not expired, and preserved across later provider refresh starts unless a collector replaces the owner snapshot; provider polling success or `updated_at` timestamps are not source-root evidence.
   - `/healthz` is control-token-authenticated cheap liveness, `/readyz` is degraded readiness, and machine-status is snapshot diagnostics.
   - `co-status`, `live_host`, supervision, and UI machine-status expose the same current freshness/owner generation with superseded facts historical only.
   - Dirty isolated worker workspaces do not count as shared checkout drift when the shared root is clean/current.
@@ -52,7 +52,7 @@ last_review: 2026-05-25
   - Serve `/ui/machine-status.json` from an immutable committed machine-status snapshot only.
   - Run source-root freshness, owner resolution, provider state refresh, and expensive Git/process work outside the serving event loop with bounded async commands, cancellation, no overlapping same-root refreshes, and stale-on-failure commits.
   - Record source-root freshness authority through explicit collector verification metadata on provider polling health, not through routine provider poll completion, poll success, or snapshot write timestamps.
-  - Fail provider-intake closed when the current source-root freshness snapshot is missing collector verification, has malformed verification time, predates the freshness observation, or is not bound to the same owner token, run id, and source-root realpath.
+  - Fail provider-intake closed when the current source-root freshness snapshot is missing collector verification, lacks a source-root realpath, has malformed verification or expiry time, predates the freshness observation, carries a different `source_root_freshness_observed_at`, loses authority during a later provider refresh start, carries authority from a previous owner after startup live-owner replacement, or is not bound to the same owner token, run id, and source-root realpath.
   - Keep `/healthz` and `/readyz` semantics separate: control-token-authenticated cheap liveness versus degraded readiness.
   - Ensure `co-status` exposes the same current source-root freshness and owner generation as UI machine-status, `live_host`, and supervision.
   - Preserve superseded dirty owner/source-root facts as historical evidence that cannot drive gates.
@@ -84,7 +84,7 @@ last_review: 2026-05-25
 
 ## Architecture & Data
 - Architecture / design adjustments: Represent committed machine-status snapshots as the request-path authority. Status collection may refresh source-root freshness, stale owner freshness, provider state, and owner facts asynchronously, but serving handlers must not initiate those operations.
-- Data model changes / migrations: Provider polling health may add source-root freshness authority metadata fields (`source_root_freshness_verified_at`, owner token, run id, source-root realpath) plus quarantine reason, degraded read source, freshness verdict, and lower-authority evidence as needed.
+- Data model changes / migrations: Provider polling health may add source-root freshness authority metadata fields (`source_root_freshness_verified_at`, `source_root_freshness_observed_at`, `source_root_freshness_expires_at`, owner token, run id, source-root realpath) plus quarantine reason, degraded read source, freshness verdict, and lower-authority evidence as needed.
 - External dependencies / integrations: None for this docs packet.
 
 ## Validation Plan

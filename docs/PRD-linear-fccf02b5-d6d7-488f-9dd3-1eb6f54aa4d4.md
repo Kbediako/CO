@@ -31,7 +31,7 @@
 ## Acceptance Criteria
 - `/ui/machine-status.json` serves a committed immutable snapshot and does not invoke source-root freshness, provider refresh, owner resolution, or sync process/filesystem work.
 - Freshness/status collection runs outside the serving event loop with bounded async operations, cancellation, no same-root overlap, and stale-on-failure snapshot semantics.
-- Provider-intake admission does not infer source-root freshness from provider poll success, poll completion, or polling `updated_at`; it requires explicit collector verification bound to the same owner token, run id, and source-root realpath, and fails closed when that authority is missing or stale.
+- Provider-intake admission does not infer source-root freshness from provider poll success, poll completion, or polling `updated_at`; it requires explicit collector verification bound to the same owner token, run id, non-empty source-root realpath, matching freshness observation, and expiry, preserves verified authority across later provider refresh starts unless a collector replaces the owner snapshot, and fails closed when that authority is missing, stale, or bound to a previous owner snapshot.
 - `/healthz` is control-token-authenticated cheap liveness, `/readyz` is degraded readiness, and machine-status is snapshot diagnostics; supervision restarts only on liveness failure or unreachable process, not collector staleness alone.
 - `co-status`, `live_host`, supervision, and UI machine-status expose the same current freshness/owner generation; superseded facts are visibly historical and cannot drive gates.
 - Dirty isolated worker workspaces do not count as shared checkout drift when the shared root is clean/current.

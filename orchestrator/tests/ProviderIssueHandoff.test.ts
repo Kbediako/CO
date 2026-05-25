@@ -1297,6 +1297,71 @@ describe('createProviderIssueHandoffService', () => {
     });
   });
 
+  it('uses valid persisted source-root authority when live owner matches but has not been seeded', async () => {
+    const { paths } = await createHostPaths();
+    const state = createProviderIntakeState();
+    const liveRepoRoot = await createSourceRootRepo('provider-handoff-live-matching-authority-');
+    const liveOwner = createControlHostOwnerForRepo(
+      liveRepoRoot,
+      inspectSourceRootFreshness({
+        intendedRepoRoot: liveRepoRoot,
+        packageRoot: liveRepoRoot,
+        argv: ['node', join(liveRepoRoot, 'bin', 'codex-orchestrator.ts')],
+        cwd: liveRepoRoot,
+        now: () => '2026-05-18T23:20:00.000Z'
+      })
+    );
+    const liveSourceRootRealpath =
+      liveOwner.owner?.source_root_freshness?.source_root_realpath ?? null;
+    if (!liveSourceRootRealpath) {
+      throw new Error('Expected live source-root realpath.');
+    }
+    state.polling = {
+      updated_at: '2026-05-18T23:20:30.000Z',
+      restart_required: false,
+      control_host_owner: liveOwner,
+      source_root_freshness_verified_at: new Date(Date.now()).toISOString(),
+      source_root_freshness_observed_at: '2026-05-18T23:20:00.000Z',
+      source_root_freshness_expires_at: new Date(Date.now() + 60_000).toISOString(),
+      source_root_freshness_owner_token: 'current-at-acquisition-owner-token',
+      source_root_freshness_run_id: 'control-host',
+      source_root_freshness_source_root_realpath: liveSourceRootRealpath
+    };
+    const persist = vi.fn(async () => undefined);
+    const launcher = {
+      start: vi.fn(async () => null),
+      resume: vi.fn(async () => undefined)
+    };
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      startPipelineId: 'diagnostics'
+    });
+    initializeProviderPollingHealth(service, {
+      intervalMs: 15_000,
+      controlHostOwner: liveOwner,
+      skipInitialUpdate: true
+    });
+
+    const result = await service.handleAcceptedTrackedIssue({
+      trackedIssue: createTrackedIssue(),
+      deliveryId: 'delivery-live-owner-matching-persisted-authority',
+      event: 'Issue',
+      action: 'update',
+      webhookTimestamp: 1_742_360_000_000
+    });
+
+    expect(result.kind).toBe('start');
+    expect(launcher.start).toHaveBeenCalledWith(expect.objectContaining({
+      taskId: 'linear-lin-issue-1',
+      issueId: 'lin-issue-1',
+      issueIdentifier: 'CO-2'
+    }));
+    expect(launcher.resume).not.toHaveBeenCalled();
+  });
+
   it('recovers a specific issue through the control-host handoff path with launch-token truth', async () => {
     const { paths } = await createHostPaths();
     const state = createProviderIntakeState();

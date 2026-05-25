@@ -121,6 +121,7 @@ export interface ControlHostSourceFreshnessPolicy {
 
 export interface ControlHostSourceFreshnessAuthority {
   verified_at: string | null;
+  source_root_freshness_observed_at: string | null;
   expires_at: string | null;
   owner_token: string | null;
   run_id: string | null;
@@ -415,7 +416,7 @@ export function resolveControlHostSourceFreshnessAdmissionPolicy(
   if (!payload) {
     return null;
   }
-  const owner = payload.owner ?? payload.attempted_owner ?? null;
+  const owner = resolveControlHostAuthoritativeSourceFreshnessOwner(payload);
   const freshness = resolveControlHostAuthoritativeSourceFreshness(payload);
   if (!owner || !freshness || freshness.status !== 'current') {
     return buildUnverifiedSourceRootFreshnessPolicy(payload, freshness, authority);
@@ -436,7 +437,10 @@ export function resolveControlHostSourceFreshnessAdmissionPolicy(
     return buildUnverifiedSourceRootFreshnessPolicy(payload, freshness, authority);
   }
   const sourceRootRealpath = freshness.source_root_realpath ?? null;
-  if (sourceRootRealpath && authority.source_root_realpath !== sourceRootRealpath) {
+  if (!sourceRootRealpath || authority.source_root_realpath !== sourceRootRealpath) {
+    return buildUnverifiedSourceRootFreshnessPolicy(payload, freshness, authority);
+  }
+  if (authority.source_root_freshness_observed_at !== freshness.observed_at) {
     return buildUnverifiedSourceRootFreshnessPolicy(payload, freshness, authority);
   }
   const observedAt = Date.parse(freshness.observed_at);
@@ -448,6 +452,13 @@ export function resolveControlHostSourceFreshnessAdmissionPolicy(
     return buildUnverifiedSourceRootFreshnessPolicy(payload, freshness, authority);
   }
   return null;
+}
+
+export function isControlHostSourceFreshnessAuthorityAdmissionValid(
+  payload: ControlHostOwnershipPollingPayload | null,
+  authority: ControlHostSourceFreshnessAuthority | null | undefined
+): boolean {
+  return Boolean(payload && authority && resolveControlHostSourceFreshnessAdmissionPolicy(payload, authority) === null);
 }
 
 function buildUnverifiedSourceRootFreshnessPolicy(
@@ -515,17 +526,19 @@ function resolveControlHostOwnershipFreshnessTimestamp(
 export function resolveControlHostAuthoritativeSourceFreshness(
   payload: ControlHostOwnershipPollingPayload | null
 ): SourceRootFreshnessInspection | null {
+  return resolveControlHostAuthoritativeSourceFreshnessOwner(payload)?.source_root_freshness ?? null;
+}
+
+export function resolveControlHostAuthoritativeSourceFreshnessOwner(
+  payload: ControlHostOwnershipPollingPayload | null
+): ControlHostOwnerSummary | null {
   if (!payload) {
     return null;
   }
   if (payload.status === 'stale_reclaimed') {
-    return (
-      payload.attempted_owner?.source_root_freshness ??
-      payload.owner?.source_root_freshness ??
-      null
-    );
+    return payload.attempted_owner ?? payload.owner ?? null;
   }
-  return payload.owner?.source_root_freshness ?? null;
+  return payload.owner ?? null;
 }
 
 function isAuthoritativeControlHostSourceFreshness(

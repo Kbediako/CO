@@ -64,6 +64,7 @@ import {
 import {
   normalizeControlHostOwnershipPollingPayload,
   isControlHostOwnershipFreshnessAtLeastAsRecent,
+  isControlHostSourceFreshnessAuthorityAdmissionValid,
   resolveControlHostAuthoritativeSourceFreshness,
   resolveControlHostSourceFreshnessAdmissionPolicy,
   resolveControlHostSourceFreshnessPolicyFromPolling
@@ -593,12 +594,15 @@ export function createProviderIssueHandoffService(
     const persistedControlHostOwner = normalizeControlHostOwnershipPollingPayload(
       options.state.polling?.control_host_owner
     );
+    const persistedAuthority = resolvePollingSourceRootFreshnessAuthority(
+      options.state.polling ?? null
+    );
     const persistedPolicy = resolveControlHostSourceFreshnessPolicyFromPolling(
       persistedControlHostOwner,
       { refresh: false }
     ) ?? resolveControlHostSourceFreshnessAdmissionPolicy(
       persistedControlHostOwner,
-      resolvePollingSourceRootFreshnessAuthority(options.state.polling ?? null)
+      persistedAuthority
     );
     const livePolling = readProviderPollingHealth(providerIssueHandoffService);
     const liveControlHostOwner = livePolling?.control_host_owner ?? null;
@@ -619,13 +623,41 @@ export function createProviderIssueHandoffService(
           persistedControlHostOwner
         )
       ) {
+        const liveAuthority = selectControlHostSourceFreshnessAuthorityForOwner(
+          refreshedLiveOwner,
+          resolvePollingSourceRootFreshnessAuthority(livePolling),
+          persistedAuthority
+        );
         return resolveControlHostSourceFreshnessAdmissionPolicy(
           refreshedLiveOwner,
-          resolvePollingSourceRootFreshnessAuthority(livePolling)
+          liveAuthority
         );
       }
     }
     return persistedPolicy;
+  };
+  const selectControlHostSourceFreshnessAuthorityForOwner = (
+    controlHostOwner: ReturnType<typeof normalizeControlHostOwnershipPollingPayload>,
+    primaryAuthority: ControlHostSourceFreshnessAuthority | null,
+    fallbackAuthority: ControlHostSourceFreshnessAuthority | null
+  ): ControlHostSourceFreshnessAuthority | null => {
+    if (
+      isControlHostSourceFreshnessAuthorityAdmissionValid(
+        controlHostOwner,
+        primaryAuthority
+      )
+    ) {
+      return primaryAuthority;
+    }
+    if (
+      isControlHostSourceFreshnessAuthorityAdmissionValid(
+        controlHostOwner,
+        fallbackAuthority
+      )
+    ) {
+      return fallbackAuthority;
+    }
+    return primaryAuthority ?? fallbackAuthority;
   };
   const resolvePollingSourceRootFreshnessAuthority = (
     polling: unknown
@@ -638,6 +670,10 @@ export function createProviderIssueHandoffService(
       verified_at:
         typeof record.source_root_freshness_verified_at === 'string'
           ? record.source_root_freshness_verified_at
+          : null,
+      source_root_freshness_observed_at:
+        typeof record.source_root_freshness_observed_at === 'string'
+          ? record.source_root_freshness_observed_at
           : null,
       expires_at:
         typeof record.source_root_freshness_expires_at === 'string'

@@ -3,6 +3,9 @@ import { logger } from '../../logger.js';
 import type { LinearBudgetStatus } from './linearBudgetState.js';
 import {
   CONTROL_HOST_SOURCE_FRESHNESS_AUTHORITY_TTL_MS,
+  isControlHostSourceFreshnessAuthorityAdmissionValid,
+  resolveControlHostAuthoritativeSourceFreshnessOwner,
+  type ControlHostSourceFreshnessAuthority,
   type ControlHostOwnershipPollingPayload
 } from './controlHostOwnership.js';
 
@@ -43,6 +46,7 @@ export interface ControlPollingHealthPayload {
   linear_budget: LinearBudgetStatus | null;
   control_host_owner?: ControlHostOwnershipPollingPayload | null;
   source_root_freshness_verified_at?: string | null;
+  source_root_freshness_observed_at?: string | null;
   source_root_freshness_expires_at?: string | null;
   source_root_freshness_owner_token?: string | null;
   source_root_freshness_run_id?: string | null;
@@ -73,6 +77,7 @@ interface MutableProviderPollingHealthState {
   linearBudget: LinearBudgetStatus | null;
   controlHostOwner: ControlHostOwnershipPollingPayload | null;
   sourceRootFreshnessVerifiedAtMs: number | null;
+  sourceRootFreshnessObservedAtMs: number | null;
   sourceRootFreshnessExpiresAtMs: number | null;
   sourceRootFreshnessOwnerToken: string | null;
   sourceRootFreshnessRunId: string | null;
@@ -94,6 +99,7 @@ export function initializeProviderPollingHealth(
     intervalMs: number | null;
     stuckAfterMs?: number | null;
     controlHostOwner?: ControlHostOwnershipPollingPayload | null;
+    sourceRootFreshnessAuthority?: ControlHostSourceFreshnessAuthority | null;
     onUpdate?: ((payload: ControlPollingHealthPayload) => Promise<void> | void) | null;
     skipInitialUpdate?: boolean;
   }
@@ -107,7 +113,14 @@ export function initializeProviderPollingHealth(
     state.onUpdate = input.onUpdate;
   }
   if (input.controlHostOwner !== undefined) {
-    state.controlHostOwner = input.controlHostOwner;
+    replaceControlHostOwnerSnapshot(state, input.controlHostOwner);
+  }
+  if (input.sourceRootFreshnessAuthority !== undefined) {
+    recordPersistedSourceRootFreshnessAuthority(
+      state,
+      input.controlHostOwner ?? state.controlHostOwner,
+      input.sourceRootFreshnessAuthority
+    );
   }
   if (state.nextPollAtMs === null && input.intervalMs !== null) {
     state.nextPollAtMs = Date.now();
@@ -151,7 +164,7 @@ export function markProviderPollingStarted(
   const atMs = input.atMs ?? Date.now();
   const state = getOrCreateProviderPollingHealthState(providerIssueHandoff);
   if (input.controlHostOwner !== undefined) {
-    state.controlHostOwner = input.controlHostOwner;
+    replaceControlHostOwnerSnapshot(state, input.controlHostOwner);
   }
   state.lastMode = input.mode;
   state.lastRequestedAtMs = atMs;
@@ -269,18 +282,92 @@ function recordSourceRootFreshnessAuthority(
   controlHostOwner: ControlHostOwnershipPollingPayload | null | undefined,
   fallbackAtMs: number | null = null
 ): void {
-  const owner = controlHostOwner?.owner ?? controlHostOwner?.attempted_owner ?? null;
+  const owner = resolveControlHostAuthoritativeSourceFreshnessOwner(controlHostOwner ?? null);
   const freshness = owner?.source_root_freshness ?? null;
   const observedAtMs = parseIsoToMs(freshness?.observed_at ?? null);
-  const verifiedAtMs = observedAtMs ?? fallbackAtMs;
+  const verifiedAtMs = fallbackAtMs ?? observedAtMs;
+  if (!owner || !freshness || observedAtMs === null || verifiedAtMs === null) {
+    clearSourceRootFreshnessAuthority(state);
+    return;
+  }
   state.sourceRootFreshnessVerifiedAtMs = verifiedAtMs;
+  state.sourceRootFreshnessObservedAtMs = observedAtMs;
   state.sourceRootFreshnessExpiresAtMs =
-    verifiedAtMs === null || fallbackAtMs === null
-      ? null
-      : fallbackAtMs + CONTROL_HOST_SOURCE_FRESHNESS_AUTHORITY_TTL_MS;
+    verifiedAtMs + CONTROL_HOST_SOURCE_FRESHNESS_AUTHORITY_TTL_MS;
   state.sourceRootFreshnessOwnerToken = owner?.owner_token ?? null;
   state.sourceRootFreshnessRunId = owner?.run_id ?? null;
   state.sourceRootFreshnessSourceRootRealpath = freshness?.source_root_realpath ?? null;
+}
+
+function recordPersistedSourceRootFreshnessAuthority(
+  state: MutableProviderPollingHealthState,
+  controlHostOwner: ControlHostOwnershipPollingPayload | null | undefined,
+  authority: ControlHostSourceFreshnessAuthority | null | undefined
+): void {
+  if (!isControlHostSourceFreshnessAuthorityAdmissionValid(controlHostOwner ?? null, authority)) {
+    clearSourceRootFreshnessAuthority(state);
+    return;
+  }
+  const verifiedAtMs = parseIsoToMs(authority?.verified_at ?? null);
+  const observedAtMs = parseIsoToMs(authority?.source_root_freshness_observed_at ?? null);
+  const expiresAtMs = parseIsoToMs(authority?.expires_at ?? null);
+  if (verifiedAtMs === null || observedAtMs === null || expiresAtMs === null) {
+    clearSourceRootFreshnessAuthority(state);
+    return;
+  }
+  state.sourceRootFreshnessVerifiedAtMs = verifiedAtMs;
+  state.sourceRootFreshnessObservedAtMs = observedAtMs;
+  state.sourceRootFreshnessExpiresAtMs = expiresAtMs;
+  state.sourceRootFreshnessOwnerToken = authority?.owner_token ?? null;
+  state.sourceRootFreshnessRunId = authority?.run_id ?? null;
+  state.sourceRootFreshnessSourceRootRealpath = authority?.source_root_realpath ?? null;
+}
+
+function replaceControlHostOwnerSnapshot(
+  state: MutableProviderPollingHealthState,
+  controlHostOwner: ControlHostOwnershipPollingPayload | null
+): void {
+  state.controlHostOwner = controlHostOwner;
+  if (!isSourceRootFreshnessAuthorityBoundToOwnerSnapshot(state, controlHostOwner)) {
+    clearSourceRootFreshnessAuthority(state);
+  }
+}
+
+function isSourceRootFreshnessAuthorityBoundToOwnerSnapshot(
+  state: MutableProviderPollingHealthState,
+  controlHostOwner: ControlHostOwnershipPollingPayload | null
+): boolean {
+  if (
+    state.sourceRootFreshnessVerifiedAtMs === null &&
+    state.sourceRootFreshnessObservedAtMs === null &&
+    state.sourceRootFreshnessExpiresAtMs === null &&
+    state.sourceRootFreshnessOwnerToken === null &&
+    state.sourceRootFreshnessRunId === null &&
+    state.sourceRootFreshnessSourceRootRealpath === null
+  ) {
+    return true;
+  }
+  const owner = resolveControlHostAuthoritativeSourceFreshnessOwner(controlHostOwner);
+  const freshness = owner?.source_root_freshness ?? null;
+  const observedAtMs = parseIsoToMs(freshness?.observed_at ?? null);
+  return (
+    owner !== null &&
+    freshness !== null &&
+    observedAtMs !== null &&
+    state.sourceRootFreshnessObservedAtMs === observedAtMs &&
+    state.sourceRootFreshnessOwnerToken === owner.owner_token &&
+    state.sourceRootFreshnessRunId === owner.run_id &&
+    state.sourceRootFreshnessSourceRootRealpath === (freshness.source_root_realpath ?? null)
+  );
+}
+
+function clearSourceRootFreshnessAuthority(state: MutableProviderPollingHealthState): void {
+  state.sourceRootFreshnessVerifiedAtMs = null;
+  state.sourceRootFreshnessObservedAtMs = null;
+  state.sourceRootFreshnessExpiresAtMs = null;
+  state.sourceRootFreshnessOwnerToken = null;
+  state.sourceRootFreshnessRunId = null;
+  state.sourceRootFreshnessSourceRootRealpath = null;
 }
 
 export function scheduleProviderPolling(
@@ -462,6 +549,9 @@ function buildProviderPollingHealthPayload(
     source_root_freshness_verified_at: toIsoTimestamp(
       state.sourceRootFreshnessVerifiedAtMs
     ),
+    source_root_freshness_observed_at: toIsoTimestamp(
+      state.sourceRootFreshnessObservedAtMs
+    ),
     source_root_freshness_expires_at: toIsoTimestamp(
       state.sourceRootFreshnessExpiresAtMs
     ),
@@ -576,6 +666,7 @@ function getOrCreateProviderPollingHealthState(
     linearBudget: null,
     controlHostOwner: null,
     sourceRootFreshnessVerifiedAtMs: null,
+    sourceRootFreshnessObservedAtMs: null,
     sourceRootFreshnessExpiresAtMs: null,
     sourceRootFreshnessOwnerToken: null,
     sourceRootFreshnessRunId: null,

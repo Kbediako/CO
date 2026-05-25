@@ -48,6 +48,7 @@ import { prepareControlServerStartupInputs } from './controlServerStartupInputPr
 import {
   acquireControlHostOwnership,
   refreshControlHostOwnershipPollingPayloadInChild,
+  type ControlHostSourceFreshnessAuthority,
   type ControlHostOwnershipPollingPayload,
   type ControlHostOwnershipHandle
 } from './controlHostOwnership.js';
@@ -62,6 +63,7 @@ const PROVIDER_WORKER_RECOVER_OPERATION_WAIT_MS = PROVIDER_REFRESH_STUCK_AFTER_M
 const PROVIDER_WORKER_RECOVER_OPERATION_TOTAL_WAIT_MS = 90_000;
 const PROVIDER_CLOSE_STUCK_DRAIN_GRACE_MS = 1_000;
 const PROVIDER_FULL_RECOVERY_SWEEP_INTERVAL_MS = 10 * 60 * 1000;
+const SOURCE_ROOT_FRESHNESS_VERIFICATION_WAIT_MS = 10_000;
 const SESSION_TTL_MS = 15 * 60 * 1000;
 interface ProviderIssueHandoffOperationState {
   active: Promise<void> | null;
@@ -89,7 +91,7 @@ interface ProviderWorkerRecoverRestartRequiredContext {
 interface ProviderPollTrackedIssueContext {
   readFeatureToggles: (() => ControlState['feature_toggles']) | null;
   readControlHostOwner: (() => ControlHostOwnershipPollingPayload | null) | null;
-  refreshSourceRootFreshness: (() => void) | null;
+  refreshSourceRootFreshness: (() => Promise<SourceRootFreshnessVerificationOutcome>) | null;
 }
 
 interface ProviderRefreshTimerHandle {
@@ -97,9 +99,15 @@ interface ProviderRefreshTimerHandle {
 }
 
 interface SourceRootFreshnessVerificationHandle {
-  trigger(): void;
+  trigger(): Promise<SourceRootFreshnessVerificationOutcome>;
   cancel(): void;
 }
+
+type SourceRootFreshnessVerificationOutcome =
+  | { kind: 'verified'; controlHostOwner: ControlHostOwnershipPollingPayload }
+  | { kind: 'skipped'; reason: 'missing_control_host_owner' | 'stopped' }
+  | { kind: 'pending'; reason: 'source_root_freshness_verification_pending' }
+  | { kind: 'failed'; reason: 'source_root_freshness_verification_failed' };
 
 const providerIssueHandoffOperations = new WeakMap<
   ProviderIssueHandoffService,
@@ -227,6 +235,9 @@ export async function startControlServerPublicLifecycle(
         intervalMs: PROVIDER_REFRESH_INTERVAL_MS,
         stuckAfterMs: PROVIDER_REFRESH_STUCK_AFTER_MS,
         controlHostOwner: controlHostOwnership?.polling ?? null,
+        sourceRootFreshnessAuthority: resolvePollingSourceRootFreshnessAuthority(
+          persistedPollingSnapshot
+        ),
         skipInitialUpdate: persistedPollingSnapshot !== null,
         onUpdate:
           startupInputs.requestContextShared.providerIntakeState && persistProviderIntakePolling
@@ -780,7 +791,7 @@ function createProviderRefreshCoordinator(
     timer = null;
   };
 
-  const scheduleNextTriggerAsync = async (): Promise<void> => {
+  const scheduleNextTriggerAsync = async (reasonOverride?: string | null): Promise<void> => {
     if (stopped || timer) {
       return;
     }
@@ -794,7 +805,7 @@ function createProviderRefreshCoordinator(
     }
     scheduleProviderPolling(providerIssueHandoff, {
       intervalMs: schedule.interval_ms,
-      reason: schedule.reason,
+      reason: reasonOverride ?? schedule.reason,
       linearBudget: schedule.linear_budget
     });
     timer = setTimeout(() => {
@@ -828,7 +839,6 @@ function createProviderRefreshCoordinator(
     if (stopped) {
       return;
     }
-    context.refreshSourceRootFreshness?.();
     const preflightSchedule = await resolveProviderRefreshSchedule().catch(() => null);
     if (stopped) {
       clearScheduledTrigger();
@@ -837,6 +847,17 @@ function createProviderRefreshCoordinator(
     if (preflightSchedule?.linear_budget?.cooldown_active) {
       clearScheduledTrigger();
       await scheduleNextTriggerAsync();
+      return;
+    }
+    const sourceRootFreshnessOutcome = context.refreshSourceRootFreshness
+      ? await context.refreshSourceRootFreshness()
+      : null;
+    if (
+      sourceRootFreshnessOutcome?.kind === 'pending' ||
+      sourceRootFreshnessOutcome?.kind === 'failed'
+    ) {
+      clearScheduledTrigger();
+      await scheduleNextTriggerAsync(sourceRootFreshnessOutcome.reason);
       return;
     }
     if (isProviderPollingStuck(providerIssueHandoff)) {
@@ -894,8 +915,7 @@ function createProviderRefreshCoordinator(
         },
         undefined,
         {
-          mode: providerIssueHandoff.poll && context.readFeatureToggles ? 'poll' : 'refresh',
-          controlHostOwner: context.readControlHostOwner?.() ?? undefined
+          mode: providerIssueHandoff.poll && context.readFeatureToggles ? 'poll' : 'refresh'
         }
       );
       await waitForProviderIssueHandoffPendingWithWatchdog(
@@ -937,29 +957,45 @@ function createSourceRootFreshnessVerificationHandle(
   readControlHostOwner: () => ControlHostOwnershipPollingPayload | null
 ): SourceRootFreshnessVerificationHandle {
   let stopped = false;
-  let inFlight = false;
-  const trigger = (): void => {
-    if (stopped || inFlight) {
-      return;
+  let inFlight: Promise<SourceRootFreshnessVerificationOutcome> | null = null;
+  const startVerification = (): Promise<SourceRootFreshnessVerificationOutcome> => {
+    if (stopped) {
+      return Promise.resolve({ kind: 'skipped', reason: 'stopped' });
+    }
+    if (inFlight) {
+      return inFlight;
     }
     const controlHostOwner = readControlHostOwner();
     if (!controlHostOwner) {
-      return;
+      return Promise.resolve({ kind: 'skipped', reason: 'missing_control_host_owner' });
     }
-    inFlight = true;
-    void refreshControlHostOwnershipPollingPayloadInChild(controlHostOwner)
+    inFlight = refreshControlHostOwnershipPollingPayloadInChild(controlHostOwner)
       .then((refreshedOwner) => {
-        if (stopped) {
-          return;
+        if (stopped || !refreshedOwner) {
+          return {
+            kind: stopped ? 'skipped' : 'failed',
+            reason: stopped ? 'stopped' : 'source_root_freshness_verification_failed'
+          } as SourceRootFreshnessVerificationOutcome;
         }
         markProviderPollingControlHostOwnerFreshnessVerified(providerIssueHandoff, {
           controlHostOwner: refreshedOwner
         });
+        return { kind: 'verified', controlHostOwner: refreshedOwner } as const;
       })
-      .catch(() => undefined)
+      .catch(
+        (): SourceRootFreshnessVerificationOutcome => ({
+          kind: 'failed',
+          reason: 'source_root_freshness_verification_failed'
+        })
+      )
       .finally(() => {
-        inFlight = false;
+        inFlight = null;
       });
+    return inFlight;
+  };
+  const trigger = async (): Promise<SourceRootFreshnessVerificationOutcome> => {
+    const verification = startVerification();
+    return await waitForSourceRootFreshnessVerification(verification);
   };
   return {
     trigger,
@@ -969,14 +1005,68 @@ function createSourceRootFreshnessVerificationHandle(
   };
 }
 
+async function waitForSourceRootFreshnessVerification(
+  verification: Promise<SourceRootFreshnessVerificationOutcome>
+): Promise<SourceRootFreshnessVerificationOutcome> {
+  let timeout: NodeJS.Timeout | null = null;
+  const timeoutOutcome = new Promise<SourceRootFreshnessVerificationOutcome>((resolve) => {
+    timeout = setTimeout(() => {
+      resolve({ kind: 'pending', reason: 'source_root_freshness_verification_pending' });
+    }, SOURCE_ROOT_FRESHNESS_VERIFICATION_WAIT_MS);
+    timeout.unref?.();
+  });
+  try {
+    return await Promise.race([verification, timeoutOutcome]);
+  } finally {
+    if (timeout) {
+      clearTimeout(timeout);
+    }
+  }
+}
+
 function scheduleStartupSourceRootFreshnessVerification(
-  trigger: () => void
+  trigger: () => Promise<SourceRootFreshnessVerificationOutcome>
 ): NodeJS.Timeout {
   const startupTrigger = setTimeout(() => {
-    trigger();
+    void trigger();
   }, 0);
   startupTrigger.unref?.();
   return startupTrigger;
+}
+
+function resolvePollingSourceRootFreshnessAuthority(
+  polling: unknown
+): ControlHostSourceFreshnessAuthority | null {
+  if (!polling || typeof polling !== 'object') {
+    return null;
+  }
+  const record = polling as Record<string, unknown>;
+  return {
+    verified_at:
+      typeof record.source_root_freshness_verified_at === 'string'
+        ? record.source_root_freshness_verified_at
+        : null,
+    source_root_freshness_observed_at:
+      typeof record.source_root_freshness_observed_at === 'string'
+        ? record.source_root_freshness_observed_at
+        : null,
+    expires_at:
+      typeof record.source_root_freshness_expires_at === 'string'
+        ? record.source_root_freshness_expires_at
+        : null,
+    owner_token:
+      typeof record.source_root_freshness_owner_token === 'string'
+        ? record.source_root_freshness_owner_token
+        : null,
+    run_id:
+      typeof record.source_root_freshness_run_id === 'string'
+        ? record.source_root_freshness_run_id
+        : null,
+    source_root_realpath:
+      typeof record.source_root_freshness_source_root_realpath === 'string'
+        ? record.source_root_freshness_source_root_realpath
+        : null
+  };
 }
 
 function resolveProviderIssueHandoffWatchdogDelayMs(

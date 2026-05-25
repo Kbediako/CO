@@ -22,6 +22,7 @@ import {
 import {
   normalizeControlHostOwnershipPollingPayload,
   isControlHostOwnershipFreshnessAtLeastAsRecent,
+  isControlHostSourceFreshnessAuthorityAdmissionValid,
   resolveControlHostAuthoritativeSourceFreshness,
   resolveControlHostSourceFreshnessAdmissionPolicy,
   resolveControlHostSourceFreshnessPolicyFromPolling
@@ -695,12 +696,13 @@ function resolveProviderIntakeSourceFreshnessPolicy(
     state?.polling && isRecordLike(state.polling)
       ? normalizeControlHostOwnershipPollingPayload(state.polling.control_host_owner)
       : null;
+  const persistedAuthority = resolvePollingSourceRootFreshnessAuthority(state?.polling ?? null);
   const persistedPolicy = resolveControlHostSourceFreshnessPolicyFromPolling(
     persistedControlHostOwner,
     { refresh: false }
   ) ?? resolveControlHostSourceFreshnessAdmissionPolicy(
     persistedControlHostOwner,
-    resolvePollingSourceRootFreshnessAuthority(state?.polling ?? null)
+    persistedAuthority
   );
   const livePolling = readProviderPollingHealth(context.readProviderIssueHandoff?.() ?? null);
   const liveControlHostOwner = livePolling?.control_host_owner ?? null;
@@ -718,13 +720,42 @@ function resolveProviderIntakeSourceFreshnessPolicy(
       isAuthoritativeLiveControlHostFreshness(liveFreshness) &&
       isControlHostOwnershipFreshnessAtLeastAsRecent(refreshedLiveOwner, persistedControlHostOwner)
     ) {
+      const liveAuthority = selectControlHostSourceFreshnessAuthorityForOwner(
+        refreshedLiveOwner,
+        resolvePollingSourceRootFreshnessAuthority(livePolling),
+        persistedAuthority
+      );
       return resolveControlHostSourceFreshnessAdmissionPolicy(
         refreshedLiveOwner,
-        resolvePollingSourceRootFreshnessAuthority(livePolling)
+        liveAuthority
       );
     }
   }
   return persistedPolicy;
+}
+
+function selectControlHostSourceFreshnessAuthorityForOwner(
+  controlHostOwner: ReturnType<typeof normalizeControlHostOwnershipPollingPayload>,
+  primaryAuthority: ControlHostSourceFreshnessAuthority | null,
+  fallbackAuthority: ControlHostSourceFreshnessAuthority | null
+): ControlHostSourceFreshnessAuthority | null {
+  if (
+    isControlHostSourceFreshnessAuthorityAdmissionValid(
+      controlHostOwner,
+      primaryAuthority
+    )
+  ) {
+    return primaryAuthority;
+  }
+  if (
+    isControlHostSourceFreshnessAuthorityAdmissionValid(
+      controlHostOwner,
+      fallbackAuthority
+    )
+  ) {
+    return fallbackAuthority;
+  }
+  return primaryAuthority ?? fallbackAuthority;
 }
 
 function resolvePollingSourceRootFreshnessAuthority(
@@ -738,6 +769,10 @@ function resolvePollingSourceRootFreshnessAuthority(
     verified_at:
       typeof record.source_root_freshness_verified_at === 'string'
         ? record.source_root_freshness_verified_at
+        : null,
+    source_root_freshness_observed_at:
+      typeof record.source_root_freshness_observed_at === 'string'
+        ? record.source_root_freshness_observed_at
         : null,
     expires_at:
       typeof record.source_root_freshness_expires_at === 'string'
@@ -832,12 +867,43 @@ function readProviderPollingSnapshot(
   const livePolling = readProviderPollingHealth(context.readProviderIssueHandoff?.() ?? null);
   const persistedPolling = normalizePersistedProviderPollingSnapshot(context.providerIntakeState?.polling);
   if (persistedPolling && livePolling?.updated_at === null) {
-    return {
-      ...persistedPolling,
-      control_host_owner: livePolling.control_host_owner ?? persistedPolling.control_host_owner
-    };
+    return mergeStartupLiveControlHostOwnerIntoPersistedPolling(persistedPolling, livePolling);
   }
   return livePolling ?? persistedPolling;
+}
+
+function mergeStartupLiveControlHostOwnerIntoPersistedPolling(
+  persistedPolling: ControlPollingHealthPayload,
+  livePolling: ControlPollingHealthPayload
+): ControlPollingHealthPayload {
+  if (!livePolling.control_host_owner) {
+    return persistedPolling;
+  }
+  const mergedPolling = {
+    ...persistedPolling,
+    control_host_owner: livePolling.control_host_owner
+  };
+  const authorityPolicy = resolveControlHostSourceFreshnessAdmissionPolicy(
+    mergedPolling.control_host_owner,
+    resolvePollingSourceRootFreshnessAuthority(mergedPolling)
+  );
+  return authorityPolicy
+    ? clearProviderPollingSourceRootFreshnessAuthority(mergedPolling)
+    : mergedPolling;
+}
+
+function clearProviderPollingSourceRootFreshnessAuthority(
+  polling: ControlPollingHealthPayload
+): ControlPollingHealthPayload {
+  return {
+    ...polling,
+    source_root_freshness_verified_at: null,
+    source_root_freshness_observed_at: null,
+    source_root_freshness_expires_at: null,
+    source_root_freshness_owner_token: null,
+    source_root_freshness_run_id: null,
+    source_root_freshness_source_root_realpath: null
+  };
 }
 
 function normalizePersistedProviderPollingSnapshot(
@@ -910,7 +976,31 @@ function normalizePersistedProviderPollingSnapshot(
     restart_required: polling.restart_required === true,
     reason: typeof polling.reason === 'string' ? polling.reason : null,
     linear_budget: linearBudget,
-    control_host_owner: normalizeControlHostOwnershipPollingPayload(polling.control_host_owner)
+    control_host_owner: normalizeControlHostOwnershipPollingPayload(polling.control_host_owner),
+    source_root_freshness_verified_at:
+      typeof polling.source_root_freshness_verified_at === 'string'
+        ? polling.source_root_freshness_verified_at
+        : null,
+    source_root_freshness_observed_at:
+      typeof polling.source_root_freshness_observed_at === 'string'
+        ? polling.source_root_freshness_observed_at
+        : null,
+    source_root_freshness_expires_at:
+      typeof polling.source_root_freshness_expires_at === 'string'
+        ? polling.source_root_freshness_expires_at
+        : null,
+    source_root_freshness_owner_token:
+      typeof polling.source_root_freshness_owner_token === 'string'
+        ? polling.source_root_freshness_owner_token
+        : null,
+    source_root_freshness_run_id:
+      typeof polling.source_root_freshness_run_id === 'string'
+        ? polling.source_root_freshness_run_id
+        : null,
+    source_root_freshness_source_root_realpath:
+      typeof polling.source_root_freshness_source_root_realpath === 'string'
+        ? polling.source_root_freshness_source_root_realpath
+        : null
   };
 }
 

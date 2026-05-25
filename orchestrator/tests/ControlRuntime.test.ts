@@ -9073,6 +9073,142 @@ describe('ControlRuntime', () => {
     }
   });
 
+  it('preserves persisted source-root freshness authority metadata in polling projection', async () => {
+    const fixture = await createFixture({ taskId: 'local-mcp' });
+    const repoRoot = await createSourceRootRepo('control-runtime-persisted-authority-projection-');
+    const sourceRootFreshness = inspectSourceRootFreshness({
+      intendedRepoRoot: repoRoot,
+      packageRoot: repoRoot,
+      argv: ['node', join(repoRoot, 'bin', 'codex-orchestrator.ts')],
+      cwd: repoRoot,
+      now: () => '2026-05-18T22:55:00.000Z'
+    });
+    const controlHostOwner = createControlHostOwnerPayload(repoRoot, sourceRootFreshness);
+    const providerIntakeState = createProviderIntakeState([
+      {
+        provider: 'linear',
+        provider_key: 'linear:lin-issue-512',
+        issue_id: 'lin-issue-512',
+        issue_identifier: 'CO-512',
+        issue_title: 'Active worker under persisted authority metadata',
+        issue_state: 'In Progress',
+        issue_state_type: 'started',
+        issue_updated_at: '2026-05-01T00:00:30.000Z',
+        task_id: 'linear-co-512',
+        mapping_source: 'provider_id_fallback',
+        state: 'running',
+        reason: 'provider_issue_rehydrated_active_run',
+        accepted_at: '2026-05-01T00:00:30.000Z',
+        updated_at: '2026-05-01T00:00:30.000Z',
+        last_delivery_id: 'delivery-512',
+        last_event: 'Issue',
+        last_action: 'update',
+        last_webhook_timestamp: 1_746_057_630_000,
+        run_id: 'run-512',
+        run_manifest_path: '/tmp/run-512-manifest.json',
+        launch_source: 'control-host',
+        launch_token: 'launch-512'
+      }
+    ]);
+    providerIntakeState.polling = {
+      updated_at: '2026-05-18T22:55:30.000Z',
+      restart_required: false,
+      control_host_owner: controlHostOwner,
+      source_root_freshness_verified_at: '2026-05-18T22:55:00.000Z',
+      source_root_freshness_observed_at: '2026-05-18T22:55:00.000Z',
+      source_root_freshness_expires_at: new Date(Date.now() + 60_000).toISOString(),
+      source_root_freshness_owner_token: 'owner-token',
+      source_root_freshness_run_id: 'control-host',
+      source_root_freshness_source_root_realpath: repoRoot
+    };
+    const runtime = createControlRuntime({
+      controlStore: fixture.controlStore,
+      questionQueue: { list: () => [] },
+      paths: fixture.paths,
+      linearAdvisoryState: { tracked_issue: null },
+      providerIntakeState
+    });
+
+    const projection = await runtime.snapshot().readCompatibilityProjection();
+
+    expect(projection.polling).toMatchObject({
+      source_root_freshness_verified_at: '2026-05-18T22:55:00.000Z',
+      source_root_freshness_observed_at: '2026-05-18T22:55:00.000Z',
+      source_root_freshness_owner_token: 'owner-token',
+      source_root_freshness_run_id: 'control-host',
+      source_root_freshness_source_root_realpath: repoRoot
+    });
+  });
+
+  it('clears persisted source-root authority when startup live ownership replaces the persisted owner', async () => {
+    const fixture = await createFixture({ taskId: 'local-mcp' });
+    const repoRoot = await createSourceRootRepo('control-runtime-startup-live-owner-authority-');
+    const sourceRootFreshness = inspectSourceRootFreshness({
+      intendedRepoRoot: repoRoot,
+      packageRoot: repoRoot,
+      argv: ['node', join(repoRoot, 'bin', 'codex-orchestrator.ts')],
+      cwd: repoRoot,
+      now: () => '2026-05-18T22:55:00.000Z'
+    });
+    const persistedOwner = createControlHostOwnerPayload(repoRoot, sourceRootFreshness);
+    const liveOwner = createControlHostOwnerPayload(repoRoot, sourceRootFreshness);
+    if (!persistedOwner.owner || !liveOwner.owner) {
+      throw new Error('Expected persisted and live control-host owner test payloads.');
+    }
+    persistedOwner.owner.owner_token = 'persisted-owner-token';
+    persistedOwner.owner.run_id = 'persisted-run';
+    liveOwner.owner.owner_token = 'live-owner-token';
+    liveOwner.owner.run_id = 'live-run';
+    const providerIssueHandoff = {
+      handleAcceptedTrackedIssue: vi.fn(),
+      rehydrate: vi.fn(async () => {}),
+      refresh: vi.fn(async () => {})
+    } as unknown as ProviderIssueHandoffService;
+    initializeProviderPollingHealth(providerIssueHandoff, {
+      intervalMs: 15000,
+      stuckAfterMs: 45000,
+      skipInitialUpdate: true,
+      controlHostOwner: liveOwner
+    });
+    const providerIntakeState = createProviderIntakeState();
+    providerIntakeState.polling = {
+      updated_at: '2026-05-18T22:55:30.000Z',
+      restart_required: false,
+      control_host_owner: persistedOwner,
+      source_root_freshness_verified_at: '2026-05-18T22:55:30.000Z',
+      source_root_freshness_observed_at: '2026-05-18T22:55:00.000Z',
+      source_root_freshness_expires_at: new Date(Date.now() + 60_000).toISOString(),
+      source_root_freshness_owner_token: 'persisted-owner-token',
+      source_root_freshness_run_id: 'persisted-run',
+      source_root_freshness_source_root_realpath: repoRoot
+    };
+    const runtime = createControlRuntime({
+      controlStore: fixture.controlStore,
+      questionQueue: { list: () => [] },
+      paths: fixture.paths,
+      linearAdvisoryState: { tracked_issue: null },
+      providerIntakeState,
+      readProviderIssueHandoff: () => providerIssueHandoff
+    });
+
+    const projection = await runtime.snapshot().readCompatibilityProjection();
+
+    expect(projection.polling).toMatchObject({
+      control_host_owner: {
+        owner: {
+          owner_token: 'live-owner-token',
+          run_id: 'live-run'
+        }
+      },
+      source_root_freshness_verified_at: null,
+      source_root_freshness_observed_at: null,
+      source_root_freshness_expires_at: null,
+      source_root_freshness_owner_token: null,
+      source_root_freshness_run_id: null,
+      source_root_freshness_source_root_realpath: null
+    });
+  });
+
   it('falls back to persisted stale authority when live ownership has no freshness signal', async () => {
     const fixture = await createFixture({ taskId: 'local-mcp' });
     const providerIssueHandoff = {

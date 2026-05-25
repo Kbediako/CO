@@ -7,6 +7,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   initializeProviderPollingHealth,
+  markProviderPollingControlHostOwnerFreshnessVerified,
   markProviderPollingCompleted,
   markProviderPollingStarted,
   markProviderPollingStuck,
@@ -435,6 +436,119 @@ describe('providerPollingHealth next-refresh projection', () => {
       await rm(repoRoot, { recursive: true, force: true });
     }
   });
+
+  it('clears source-root authority when replacing the verified owner snapshot', async () => {
+    const service = {} as ProviderIssueHandoffService;
+    const repoRoot = await createSourceRootRepo('provider-polling-authority-binding-');
+
+    try {
+      const acquisitionFreshness = inspectSourceRootFreshness({
+        intendedRepoRoot: repoRoot,
+        packageRoot: repoRoot,
+        argv: ['node', join(repoRoot, 'bin', 'codex-orchestrator.ts')],
+        cwd: repoRoot,
+        now: () => '2026-05-01T00:00:00.000Z'
+      });
+      const verifiedFreshness = {
+        ...acquisitionFreshness,
+        observed_at: '2026-05-01T00:05:00.000Z',
+        status: 'warning',
+        drift_classes: ['supervised_source_root_drift']
+      };
+      const acquisitionOwner = createControlHostOwnerPayload(repoRoot, acquisitionFreshness);
+      const verifiedOwner = createControlHostOwnerPayload(repoRoot, verifiedFreshness);
+
+      initializeProviderPollingHealth(service, {
+        intervalMs: 15_000,
+        controlHostOwner: verifiedOwner,
+        skipInitialUpdate: true
+      });
+      markProviderPollingControlHostOwnerFreshnessVerified(service, {
+        controlHostOwner: verifiedOwner,
+        atMs: Date.parse('2026-05-01T00:05:30.000Z')
+      });
+      expect(readProviderPollingHealth(service)).toMatchObject({
+        source_root_freshness_verified_at: '2026-05-01T00:05:30.000Z',
+        source_root_freshness_observed_at: '2026-05-01T00:05:00.000Z'
+      });
+
+      markProviderPollingStarted(service, {
+        mode: 'refresh',
+        controlHostOwner: acquisitionOwner,
+        atMs: Date.parse('2026-05-01T00:06:00.000Z')
+      });
+
+      expect(readProviderPollingHealth(service)).toMatchObject({
+        control_host_owner: {
+          owner: {
+            source_root_freshness: {
+              status: 'current',
+              observed_at: '2026-05-01T00:00:00.000Z'
+            }
+          }
+        },
+        source_root_freshness_verified_at: null,
+        source_root_freshness_observed_at: null,
+        source_root_freshness_expires_at: null,
+        source_root_freshness_owner_token: null,
+        source_root_freshness_run_id: null,
+        source_root_freshness_source_root_realpath: null
+      });
+    } finally {
+      await rm(repoRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('binds stale-reclaimed source-root authority to the attempted owner snapshot', async () => {
+    const service = {} as ProviderIssueHandoffService;
+    const repoRoot = await createSourceRootRepo('provider-polling-stale-reclaimed-authority-');
+
+    try {
+      const staleFreshness = inspectSourceRootFreshness({
+        intendedRepoRoot: repoRoot,
+        packageRoot: repoRoot,
+        argv: ['node', join(repoRoot, 'bin', 'codex-orchestrator.ts')],
+        cwd: repoRoot,
+        now: () => '2026-05-01T00:00:00.000Z'
+      });
+      const attemptedFreshness = {
+        ...staleFreshness,
+        observed_at: '2026-05-01T00:07:00.000Z',
+        status: 'warning',
+        drift_classes: ['supervised_source_root_drift']
+      };
+      const staleOwner = createControlHostOwnerPayload(repoRoot, staleFreshness);
+      const attemptedOwner = createControlHostOwnerPayload(repoRoot, attemptedFreshness);
+      const staleReclaimedOwner = {
+        ...attemptedOwner,
+        status: 'stale_reclaimed' as const,
+        owner: {
+          ...staleOwner.owner!,
+          owner_token: 'stale-owner-token',
+          run_id: 'stale-run'
+        },
+        attempted_owner: {
+          ...attemptedOwner.owner!,
+          owner_token: 'attempted-owner-token',
+          run_id: 'attempted-run'
+        }
+      };
+
+      markProviderPollingControlHostOwnerFreshnessVerified(service, {
+        controlHostOwner: staleReclaimedOwner,
+        atMs: Date.parse('2026-05-01T00:07:30.000Z')
+      });
+
+      expect(readProviderPollingHealth(service)).toMatchObject({
+        source_root_freshness_verified_at: '2026-05-01T00:07:30.000Z',
+        source_root_freshness_observed_at: '2026-05-01T00:07:00.000Z',
+        source_root_freshness_owner_token: 'attempted-owner-token',
+        source_root_freshness_run_id: 'attempted-run'
+      });
+    } finally {
+      await rm(repoRoot, { recursive: true, force: true });
+    }
+  });
 });
 
 async function createSourceRootRepo(prefix: string): Promise<string> {
@@ -451,6 +565,35 @@ async function createSourceRootRepo(prefix: string): Promise<string> {
   git(root, ['commit', '-m', 'base']);
   git(root, ['update-ref', 'refs/remotes/origin/main', 'HEAD']);
   return root;
+}
+
+function createControlHostOwnerPayload(repoRoot: string, sourceRootFreshness: unknown) {
+  return {
+    status: 'owned',
+    reason: null,
+    updated_at: '2026-05-01T00:00:00.000Z',
+    diagnostic_path: null,
+    lock_dir: join(repoRoot, '.runs', 'control-host-owner.lock'),
+    owner_path: join(repoRoot, '.runs', 'control-host-owner.json'),
+    owner: {
+      owner_token: 'owner-token',
+      status: 'owned',
+      pid: 123,
+      ppid: 1,
+      hostname: 'host.local',
+      acquired_at: '2026-05-01T00:00:00.000Z',
+      updated_at: '2026-05-01T00:00:00.000Z',
+      released_at: null,
+      repo_root: repoRoot,
+      task_id: 'local-mcp',
+      run_id: 'control-host',
+      run_dir: join(repoRoot, '.runs', 'local-mcp', 'cli', 'control-host'),
+      pipeline_id: 'provider-linear-worker',
+      source_root_freshness: sourceRootFreshness,
+      lock_dir: join(repoRoot, '.runs', 'control-host-owner.lock'),
+      owner_path: join(repoRoot, '.runs', 'control-host-owner.json')
+    }
+  };
 }
 
 function git(cwd: string, args: string[]): { stdout: string } {
