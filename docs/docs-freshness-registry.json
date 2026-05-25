@@ -3,6 +3,108 @@
   "generated_at": "2026-05-25",
   "entries": [
     {
+      "path": ".agent/task/linear-632b3471-6b55-4a0b-a778-0ca4001cf2b9.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-25",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "632b3471-6b55-4a0b-a778-0ca4001cf2b9",
+        "identifier": "CO-557",
+        "url": "https://linear.app/asabeko/issue/CO-557"
+      },
+      "doc_class": "task_mirror",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-25",
+      "next_review": "2026-06-24",
+      "notes": "CO-557 docs-first packet for provider docs-review task-key authority and control-host root drift."
+    },
+    {
+      "path": "docs/ACTION_PLAN-linear-632b3471-6b55-4a0b-a778-0ca4001cf2b9.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-25",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "632b3471-6b55-4a0b-a778-0ca4001cf2b9",
+        "identifier": "CO-557",
+        "url": "https://linear.app/asabeko/issue/CO-557"
+      },
+      "doc_class": "task_packet",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-25",
+      "next_review": "2026-06-24",
+      "notes": "CO-557 docs-first packet for provider docs-review task-key authority and control-host root drift."
+    },
+    {
+      "path": "docs/PRD-linear-632b3471-6b55-4a0b-a778-0ca4001cf2b9.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-25",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "632b3471-6b55-4a0b-a778-0ca4001cf2b9",
+        "identifier": "CO-557",
+        "url": "https://linear.app/asabeko/issue/CO-557"
+      },
+      "doc_class": "task_packet",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-25",
+      "next_review": "2026-06-24",
+      "notes": "CO-557 docs-first packet for provider docs-review task-key authority and control-host root drift."
+    },
+    {
+      "path": "docs/TECH_SPEC-linear-632b3471-6b55-4a0b-a778-0ca4001cf2b9.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-25",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "632b3471-6b55-4a0b-a778-0ca4001cf2b9",
+        "identifier": "CO-557",
+        "url": "https://linear.app/asabeko/issue/CO-557"
+      },
+      "doc_class": "task_packet",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-25",
+      "next_review": "2026-06-24",
+      "notes": "CO-557 docs-first packet for provider docs-review task-key authority and control-host root drift."
+    },
+    {
+      "path": "tasks/specs/linear-632b3471-6b55-4a0b-a778-0ca4001cf2b9.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-25",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "632b3471-6b55-4a0b-a778-0ca4001cf2b9",
+        "identifier": "CO-557",
+        "url": "https://linear.app/asabeko/issue/CO-557"
+      },
+      "doc_class": "active_spec",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-25",
+      "next_review": "2026-06-24",
+      "notes": "CO-557 docs-first packet for provider docs-review task-key authority and control-host root drift."
+    },
+    {
+      "path": "tasks/tasks-linear-632b3471-6b55-4a0b-a778-0ca4001cf2b9.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-25",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "632b3471-6b55-4a0b-a778-0ca4001cf2b9",
+        "identifier": "CO-557",
+        "url": "https://linear.app/asabeko/issue/CO-557"
+      },
+      "doc_class": "task_mirror",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-25",
+      "next_review": "2026-06-24",
+      "notes": "CO-557 docs-first packet for provider docs-review task-key authority and control-host root drift."
+    },
+    {
       "path": ".agent/task/linear-fccf02b5-d6d7-488f-9dd3-1eb6f54aa4d4.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",

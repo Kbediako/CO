@@ -87,6 +87,139 @@
       }
     },
     {
+      "id": "20260525-linear-632b3471-6b55-4a0b-a778-0ca4001cf2b9",
+      "title": "CO-557 provider docs-review task-key and control-host root drift",
+      "relates_to": "tasks/tasks-linear-632b3471-6b55-4a0b-a778-0ca4001cf2b9.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "status": "review_clean_pr_pending",
+      "last_review": "2026-05-25",
+      "canonical_owner_key": "provider-docs-review:task-key-control-host-root-drift:v1",
+      "evidence": [
+        "docs/PRD-linear-632b3471-6b55-4a0b-a778-0ca4001cf2b9.md",
+        "docs/TECH_SPEC-linear-632b3471-6b55-4a0b-a778-0ca4001cf2b9.md",
+        "docs/ACTION_PLAN-linear-632b3471-6b55-4a0b-a778-0ca4001cf2b9.md",
+        "tasks/specs/linear-632b3471-6b55-4a0b-a778-0ca4001cf2b9.md",
+        "tasks/tasks-linear-632b3471-6b55-4a0b-a778-0ca4001cf2b9.md",
+        ".agent/task/linear-632b3471-6b55-4a0b-a778-0ca4001cf2b9.md",
+        "orchestrator/src/cli/providerLinearChildLaneShell.ts",
+        "orchestrator/tests/ProviderLinearChildLaneShell.test.ts",
+        "orchestrator/src/cli/providerLinearChildStreamShell.ts",
+        "orchestrator/tests/ProviderLinearChildStreamShell.test.ts",
+        "orchestrator/src/cli/providerLinearWorkerRunner.ts",
+        "orchestrator/tests/ProviderLinearWorkerRunner.test.ts",
+        "scripts/delegation-guard.mjs",
+        "tests/delegation-guard.spec.ts",
+        "scripts/tasks-archive.mjs",
+        "tests/tasks-archive.spec.ts",
+        "tasks/index.json",
+        "docs/TASKS.md",
+        "docs/docs-freshness-registry.json",
+        ".runs/linear-632b3471-6b55-4a0b-a778-0ca4001cf2b9/cli/2026-05-25T02-31-12-055Z-1a22f5a4/review/telemetry.json",
+        ".runs/linear-632b3471-6b55-4a0b-a778-0ca4001cf2b9-docs-packet/cli/2026-05-25T00-00-10-716Z-9e3f52b4/manifest.json",
+        ".runs/linear-632b3471-6b55-4a0b-a778-0ca4001cf2b9-docs-packet/cli/2026-05-25T00-00-10-716Z-9e3f52b4/memory/source-0/source.txt"
+      ],
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue child lane docs-packet-2026-05-25T00-00-10-716Z-9e3f52b4",
+          "date": "2026-05-25",
+          "status": "produced_for_parent_import",
+          "manifest": ".runs/linear-632b3471-6b55-4a0b-a778-0ca4001cf2b9-docs-packet/cli/2026-05-25T00-00-10-716Z-9e3f52b4/manifest.json",
+          "source_anchor": "ctx:sha256:f4fea3716bf1621b4ad87a2bef18062ebd0576374e9ee30a9bdfc122fd2d0bcb#chunk:c000001",
+          "source_payload": ".runs/linear-632b3471-6b55-4a0b-a778-0ca4001cf2b9-docs-packet/cli/2026-05-25T00-00-10-716Z-9e3f52b4/memory/source-0/source.txt",
+          "summary": "Docs-only child lane created the CO-557 packet and registry mirrors for provider docs-review task-key authority and control-host root drift. The packet preserves CO-515 and CO-461 as reference contracts, rejects docs-review task keys derived from linear-<uuid>-docs-packet or linear-<uuid>-source-freshness-recheck, requires explicit shared control-host artifact root versus workspace-local .runs resolution, and keeps provider-intake-state.json as audit evidence."
+        },
+        "standalone_review_rework_findings": {
+          "reviewer": "codex-orchestrator review --uncommitted",
+          "date": "2026-05-25",
+          "status": "findings_reworked",
+          "manifest": ".runs/linear-632b3471-6b55-4a0b-a778-0ca4001cf2b9/cli/2026-05-25T02-31-12-055Z-1a22f5a4/manifest.json",
+          "telemetry": ".runs/linear-632b3471-6b55-4a0b-a778-0ca4001cf2b9/cli/2026-05-25T02-31-12-055Z-1a22f5a4/review/telemetry.json",
+          "review_outcome": "findings",
+          "summary": "Review found P1 CO557-CODE-001 / CO557-SPEC-001 because the accepted child-lane accept path still trusted only workspace-local child artifacts. Rework added root-aware accepted child-lane artifact resolution and focused shared-root/wrong-root regressions."
+        },
+        "standalone_review_rework_findings_foreign_root": {
+          "reviewer": "codex-orchestrator review --uncommitted",
+          "date": "2026-05-25",
+          "status": "findings_reworked",
+          "manifest": ".runs/linear-632b3471-6b55-4a0b-a778-0ca4001cf2b9/cli/2026-05-25T02-31-12-055Z-1a22f5a4/manifest.json",
+          "telemetry": ".runs/linear-632b3471-6b55-4a0b-a778-0ca4001cf2b9/cli/2026-05-25T02-31-12-055Z-1a22f5a4/review/telemetry.json",
+          "review_outcome": "findings",
+          "summary": "Review found P1 CO557-CODE-002 because active docs-review manifest workspace_path could route provider-intake proof lookup to a foreign clone. Rework made current CODEX_ORCHESTRATOR_ROOT authority outrank stale or foreign manifest workspace_path and added a foreign-root regression."
+        },
+        "standalone_review_clean": {
+          "reviewer": "codex-orchestrator review --uncommitted",
+          "date": "2026-05-25",
+          "status": "clean",
+          "manifest": ".runs/linear-632b3471-6b55-4a0b-a778-0ca4001cf2b9/cli/2026-05-25T02-31-12-055Z-1a22f5a4/manifest.json",
+          "telemetry": ".runs/linear-632b3471-6b55-4a0b-a778-0ca4001cf2b9/cli/2026-05-25T02-31-12-055Z-1a22f5a4/review/telemetry.json",
+          "contract": ".runs/linear-632b3471-6b55-4a0b-a778-0ca4001cf2b9/cli/2026-05-25T02-31-12-055Z-1a22f5a4/review/contract.json",
+          "review_outcome": "clean-success",
+          "review_verdict": "clean",
+          "contract_overall_verdict": "clean",
+          "summary": "Final model-backed review ran on Codex CLI 0.133.0 with gpt-5.5/xhigh via appserver and returned clean enforce-mode contract validation across spec_conformance, coding_standards, code_changes, and agent_loop."
+        }
+      },
+      "validation": {
+        "status": "review_clean_pr_pending",
+        "passed": [
+          "docs-first packet created",
+          "task registry and freshness mirrors updated",
+          "source anchor preserved from parent prompt",
+          "source payload path checked and absent in this child checkout",
+          "protected-term contract captured",
+          "child scoped protected-term check",
+          "child scoped JSON parse",
+          "child scoped trailing-whitespace check",
+          "child scoped git diff --check",
+          "child changed-file scope check",
+          "parent docs-review found P1 accepted child-lane accept-path root gap and rework addressed it",
+          "parent focused docs-review task-key, delegation-guard, child-lane accept-path, and tasks-archive matrix passed 593 tests",
+          "shared control-host accepted child-lane artifact root is accepted from provider workspace context",
+          "wrong accepted child-lane artifact root fails closed with workspace-local and shared control-host diagnostics",
+          "foreign active-manifest workspace_path cannot make delegation-guard accept provider-intake proof from another clone",
+          "npx vitest run tests/delegation-guard.spec.ts -t \"foreign workspace root\" passed",
+          "npx vitest run tests/delegation-guard.spec.ts orchestrator/tests/ProviderLinearChildLaneShell.test.ts tests/tasks-archive.spec.ts passed 168 tests",
+          "tasks/index.json status done is terminal for task archive eligibility",
+          "docs:archive-tasks restored docs/TASKS reserve without policy weakening",
+          "npm run build passed after foreign-root rework",
+          "node scripts/spec-guard.mjs --dry-run passed after rework metadata updates",
+          "npm run docs:check passed after rework metadata updates",
+          "npm run docs:freshness passed after rework metadata updates",
+          "npm run docs:freshness:maintain -- --check --format json passed with owned rolling debt and blocks_handoff=false",
+          "npm run lint passed after foreign-root rework with existing DelegationMcpHealth warnings only",
+          "npm run repo:stewardship passed with 0 action-required tracked surfaces",
+          "node scripts/diff-budget.mjs passed with explicit CO-557 override",
+          "npm run pack:smoke passed after foreign-root rework",
+          "npm run test -- --reporter=dot passed after foreign-root rework (367 files / 6353 tests)",
+          "codex-orchestrator review --uncommitted returned clean enforce-mode contract after accept-path and foreign-root rework"
+        ],
+        "pending": [
+          "parent PR lifecycle and Linear handoff"
+        ]
+      },
+      "paths": {
+        "agent_task": ".agent/task/linear-632b3471-6b55-4a0b-a778-0ca4001cf2b9.md",
+        "prd": "docs/PRD-linear-632b3471-6b55-4a0b-a778-0ca4001cf2b9.md",
+        "docs": "docs/TECH_SPEC-linear-632b3471-6b55-4a0b-a778-0ca4001cf2b9.md",
+        "tech_spec_mirror": "docs/TECH_SPEC-linear-632b3471-6b55-4a0b-a778-0ca4001cf2b9.md",
+        "action_plan": "docs/ACTION_PLAN-linear-632b3471-6b55-4a0b-a778-0ca4001cf2b9.md",
+        "spec": "tasks/specs/linear-632b3471-6b55-4a0b-a778-0ca4001cf2b9.md",
+        "task": "tasks/tasks-linear-632b3471-6b55-4a0b-a778-0ca4001cf2b9.md"
+      },
+      "source_issue": {
+        "id": "632b3471-6b55-4a0b-a778-0ca4001cf2b9",
+        "identifier": "CO-557",
+        "url": "https://linear.app/asabeko/issue/CO-557"
+      },
+      "notes": {
+        "protected_terms": "CO-515; CO-461; docs-review; delegation-guard; linear child-lane --action accept; linear child-stream --pipeline docs-review; linear-<uuid>-docs-packet; linear-<uuid>-source-freshness-recheck; tasks/index.json; provider-intake-state.json; shared control-host artifact root; workspace-local .runs; accepted child-lane manifest",
+        "parent_owned": "Parent owns authoritative issue workspace, source payload reconciliation, Linear/workpad state, source/tests, validation, PR lifecycle, and review handoff."
+      }
+    },
+    {
       "id": "20260524-linear-2a51671e-14fa-46c8-bce4-bcfd71e66066",
       "title": "CO-581 preserve CO-558 May 19 retained docs freshness cohort owner",
       "relates_to": "tasks/tasks-linear-2a51671e-14fa-46c8-bce4-bcfd71e66066.md",

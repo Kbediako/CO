@@ -21,21 +21,17 @@ afterEach(async () => {
     externalRoot = null;
   }
 });
-async function createProviderWorkerManifest(
-  pipelineId = 'provider-linear-worker',
-  runsDir = '.runs',
-  runsRootOverride: string | null = null
-) {
+async function createProviderWorkerManifest(pipelineId = 'provider-linear-worker', runsDir = '.runs', runsRootOverride: string | null = null, taskId = TASK_ID) {
   tempRoot = await mkdtemp(join(tmpdir(), 'provider-linear-child-stream-'));
   const runsRoot = runsRootOverride ?? tempRoot;
-  const runDir = join(runsRoot, runsDir, TASK_ID, 'cli', RUN_ID);
+  const runDir = join(runsRoot, runsDir, taskId, 'cli', RUN_ID);
   const manifestPath = join(runDir, 'manifest.json');
   await mkdir(runDir, { recursive: true });
   await writeFile(
     manifestPath,
     JSON.stringify({
       run_id: RUN_ID,
-      task_id: TASK_ID,
+      task_id: taskId,
       pipeline_id: pipelineId,
       ...ISSUE,
       issue_updated_at: '2026-03-26T14:32:20.815Z',
@@ -48,12 +44,12 @@ async function createProviderWorkerManifest(
   );
   return { manifestPath, runDir };
 }
-function buildProviderWorkerEnv(manifestPath: string, overrides: NodeJS.ProcessEnv = {}): NodeJS.ProcessEnv {
+function buildProviderWorkerEnv(manifestPath: string, overrides: NodeJS.ProcessEnv = {}, taskId = TASK_ID): NodeJS.ProcessEnv {
   return {
     CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath,
     CODEX_ORCHESTRATOR_ROOT: tempRoot ?? undefined,
     CODEX_ORCHESTRATOR_RUN_ID: RUN_ID,
-    CODEX_ORCHESTRATOR_TASK_ID: TASK_ID,
+    CODEX_ORCHESTRATOR_TASK_ID: taskId,
     CODEX_ORCHESTRATOR_PIPELINE_ID: 'provider-linear-worker',
     CODEX_ORCHESTRATOR_PROVIDER_LAUNCH_SOURCE: 'control-host',
     CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_TASK_ID: CONTROL_HOST_TASK_ID,
@@ -194,6 +190,34 @@ describe('runProviderLinearChildStreamShell', () => {
         recorded_at: '2026-03-27T01:05:00.000Z'
       })
     ]);
+  });
+
+  it('keeps docs-review task ids rooted at the registered provider issue key when the stream label is overridden', async () => {
+    const { manifestPath } = await createProviderWorkerManifest();
+    const execRunner = vi.fn(async () => createExecResult('docs-review', 'docs-run-1', 'docs-review passed'));
+    const result = await runProviderLinearChildStreamShell(
+      { pipelineId: 'docs-review', streamName: 'source-freshness-recheck', env: buildProviderWorkerEnv(manifestPath) },
+      { execRunner, now: () => '2026-03-27T01:00:00.000Z' }
+    );
+
+    expect(result).toMatchObject({ ok: true, stream: 'source-freshness-recheck', child_run: { task_id: `${TASK_ID}-docs-review` } });
+    const request = execRunner.mock.calls[0]?.[0];
+    expect(request?.args).toContain(`${TASK_ID}-docs-review`);
+    expect(request?.args).not.toContain(`${TASK_ID}-source-freshness-recheck`);
+    expect(request?.env.MCP_RUNNER_TASK_ID).toBe(`${TASK_ID}-docs-review`);
+  });
+
+  it('fails closed before docs-review launch when the parent task id drifted away from the registered issue key', async () => {
+    const driftedTaskId = `${TASK_ID}-docs-packet`;
+    const { manifestPath } = await createProviderWorkerManifest('provider-linear-worker', '.runs', null, driftedTaskId);
+    const execRunner = vi.fn();
+    const result = await runProviderLinearChildStreamShell(
+      { pipelineId: 'docs-review', env: buildProviderWorkerEnv(manifestPath, {}, driftedTaskId) },
+      { execRunner: execRunner as never }
+    );
+
+    expect(result).toMatchObject({ ok: false, ...ISSUE, pipeline_id: 'docs-review', child_run: null, error: { code: 'provider_worker_child_stream_parent_task_mismatch', status: 412 } });
+    expect(execRunner).not.toHaveBeenCalled();
   });
 
   it.each([

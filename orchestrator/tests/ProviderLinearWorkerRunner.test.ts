@@ -1553,6 +1553,11 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
       'add `--reachability-mode dns-public` only when you need explicit worker-local DNS public-resolution evidence. The default path stays deterministic and the helper fails closed when the permit disallows the origin or proof kind, when the proof URL is loopback/local-only, or when dns-public lookup yields non-public or unresolved answers.'
     );
     expect(continuationPrompt).toContain(`launch an audited child stream with \`${helperCommand} child-stream --pipeline <docs-review|implementation-gate|docs-relevance-advisory>\``);
+    expect(firstPrompt).toContain('Provider docs packet task keys and docs-review retry task ids must stay rooted at the registered provider issue task key `linear-lin-issue-1`');
+    expect(firstPrompt).toContain('`linear-lin-issue-1-docs-packet`');
+    expect(firstPrompt).toContain('`linear-lin-issue-1-docs-review`');
+    expect(firstPrompt).toContain('not generated suffix keys such as `linear-lin-issue-1-source-freshness-recheck`');
+    expect(continuationPrompt).toContain('Provider docs packet task keys and docs-review retry task ids must stay rooted at the registered provider issue task key `linear-lin-issue-1`');
     expect(continuationPrompt).toContain('workspace-scoped artifact root');
     expect(continuationPrompt).toContain('do not use blanket `DELEGATION_GUARD_OVERRIDE_REASON` text when they exist');
     expect(continuationPrompt).not.toContain('subagent spawning unavailable in-session for this provider worker');

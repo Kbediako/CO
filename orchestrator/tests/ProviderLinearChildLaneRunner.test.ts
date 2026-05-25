@@ -466,6 +466,32 @@ describe('provider linear child lane runner', () => {
     );
   });
 
+  it('tells docs-scoped provider child lanes to keep packet keys rooted at the issue task key', () => {
+    const prompt = childLaneRunnerTest.buildChildLanePrompt({
+      issueId: 'lin-issue-1',
+      issueIdentifier: 'CO-557',
+      taskId: 'linear-lin-issue-1-docs-packet',
+      stream: 'docs-packet',
+      purpose: 'Create a docs-first packet.',
+      scope: {
+        files: [
+          'docs/PRD-linear-lin-issue-1.md',
+          'tasks/tasks-linear-lin-issue-1.md',
+          'tasks/index.json'
+        ],
+        phases: ['docs']
+      },
+      runMemoryPromptLines: [],
+      instructions: null
+    });
+
+    expect(prompt).toContain('Provider docs packet task-key contract:');
+    expect(prompt).toContain('Use `linear-lin-issue-1` as the registered provider issue task key');
+    expect(prompt).toContain('Do not append issue-title, retry, or freshness suffixes');
+    expect(prompt).toContain('`linear-lin-issue-1-docs-packet`');
+    expect(prompt).toContain('`linear-lin-issue-1-docs-review`');
+  });
+
   it('times out appserver startup when no matching session log appears after runtime selection', async () => {
     const clock = createClock('2026-04-17T18:52:07.000Z');
     await expect(

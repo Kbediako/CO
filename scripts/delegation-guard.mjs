@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { access, readFile, readdir } from 'node:fs/promises';
-import { isAbsolute, join, relative, resolve, sep } from 'node:path';
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import process from 'node:process';
 import { parseArgs, hasFlag } from './lib/cli-args.js';
 import { normalizeTaskKey } from './lib/docs-helpers.js';
@@ -32,6 +32,7 @@ const SANCTIONED_PROVIDER_RUN_STATES = new Set([
   'completed'
 ]);
 const SANCTIONED_PROVIDER_PARENT_STATES = new Set(['starting', 'running', 'resuming', 'resumable']);
+const PROVIDER_DOCS_REVIEW_CHILD_SUFFIX = 'docs-review';
 
 function showUsage() {
   console.log(`Usage: node scripts/delegation-guard.mjs [--task <id>] [--dry-run]
@@ -69,6 +70,29 @@ function pickExampleTaskId(keys) {
     return '<task-id>';
   }
   return keys[keys.length - 1];
+}
+
+function isProviderIssueTaskKey(taskKey) {
+  return typeof taskKey === 'string' && taskKey.startsWith('linear-');
+}
+
+function getProviderChildTaskSuffix(parentKey, taskId) {
+  if (!isProviderIssueTaskKey(parentKey) || typeof taskId !== 'string') {
+    return '';
+  }
+  const prefix = `${parentKey}-`;
+  if (!taskId.startsWith(prefix)) {
+    return '';
+  }
+  return taskId.slice(prefix.length);
+}
+
+function describeForbiddenProviderDocsReviewTaskKey(taskId, parentKey, suffix) {
+  return `Provider docs-review task id '${taskId}' must not resolve through sibling provider task key '${parentKey}-${suffix}'; use '${parentKey}-${PROVIDER_DOCS_REVIEW_CHILD_SUFFIX}' with sanctioned provider parent proof`;
+}
+
+function providerIssueTaskKeyFromIssueId(issueId) {
+  return issueId ? `linear-${issueId}` : '';
 }
 
 async function collectSubagentCandidates(runsDir, taskId) {
@@ -329,7 +353,57 @@ function resolveControlHostProviderIntakeStatePath(runsDir, env, manifest = null
   };
 }
 
-async function loadControlHostProviderIntakeState(runsDir, env, manifest = null) {
+function resolveProviderWorkspacePath(env, manifest = null) {
+  const manifestWorkspacePath = manifest
+    ? readManifestString(manifest, 'workspace_path', 'workspacePath')
+    : '';
+  const envRoot = readNonEmptyString(env, 'CODEX_ORCHESTRATOR_ROOT');
+  if (!envRoot) {
+    return manifestWorkspacePath;
+  }
+  if (!manifestWorkspacePath) {
+    return envRoot;
+  }
+
+  const resolvedEnvRoot = resolve(envRoot);
+  const resolvedManifestWorkspacePath = resolve(manifestWorkspacePath);
+  if (resolvedManifestWorkspacePath === resolvedEnvRoot) {
+    return envRoot;
+  }
+
+  if (
+    basename(dirname(resolvedManifestWorkspacePath)) === '.workspaces' &&
+    dirname(dirname(resolvedManifestWorkspacePath)) === resolvedEnvRoot
+  ) {
+    return manifestWorkspacePath;
+  }
+
+  return envRoot;
+}
+
+function resolveSharedRunsDirForProviderWorkspace(workspacePath) {
+  if (!workspacePath) {
+    return '';
+  }
+  const resolvedWorkspacePath = resolve(workspacePath);
+  if (basename(dirname(resolvedWorkspacePath)) !== '.workspaces') {
+    return '';
+  }
+  return join(dirname(dirname(resolvedWorkspacePath)), '.runs');
+}
+
+function resolveControlHostProviderIntakeRunsDirs(runsDir, env, manifest = null) {
+  const candidates = [resolve(runsDir)];
+  const sharedRunsDir = resolveSharedRunsDirForProviderWorkspace(
+    resolveProviderWorkspacePath(env, manifest)
+  );
+  if (sharedRunsDir) {
+    candidates.push(resolve(sharedRunsDir));
+  }
+  return dedupeStrings(candidates);
+}
+
+async function loadControlHostProviderIntakeStateFromRunsDir(runsDir, env, manifest = null) {
   const { statePath, taskId, runId, explicit } = resolveControlHostProviderIntakeStatePath(
     runsDir,
     env,
@@ -363,7 +437,49 @@ async function loadControlHostProviderIntakeState(runsDir, env, manifest = null)
   }
 }
 
-async function discoverFallbackControlHostProviderIntakeStates(runsDir, excludedStatePath = '') {
+async function loadControlHostProviderIntakeState(runsDir, env, manifest = null) {
+  const candidateRunsDirs = resolveControlHostProviderIntakeRunsDirs(runsDir, env, manifest);
+  const attempts = [];
+  for (const candidateRunsDir of candidateRunsDirs) {
+    const result = await loadControlHostProviderIntakeStateFromRunsDir(candidateRunsDir, env, manifest);
+    attempts.push({ ...result, runsDir: candidateRunsDir, runsDirs: candidateRunsDirs });
+    if (result.state) {
+      return { ...result, runsDir: candidateRunsDir, runsDirs: candidateRunsDirs };
+    }
+  }
+  const firstError = attempts.find((attempt) => attempt.error);
+  return firstError ?? {
+    statePath: resolveControlHostProviderIntakeStatePath(candidateRunsDirs[0] ?? runsDir, env, manifest)
+      .statePath,
+    taskId: CONTROL_HOST_TASK_ID,
+    runId: CONTROL_HOST_RUN_ID,
+    explicit: false,
+    state: null,
+    error: null,
+    runsDir: candidateRunsDirs[0] ?? runsDir,
+    runsDirs: candidateRunsDirs
+  };
+}
+
+async function discoverFallbackControlHostProviderIntakeStates(runsDirs, excludedStatePath = '') {
+  const allCandidates = [];
+  let firstError = null;
+  const candidateRunsDirs = Array.isArray(runsDirs) ? runsDirs : [runsDirs];
+  const primaryRunsDir = candidateRunsDirs[0];
+  for (const runsDir of candidateRunsDirs) {
+    const { states, error } = await discoverFallbackControlHostProviderIntakeStatesInRunsDir(
+      runsDir,
+      excludedStatePath
+    );
+    if (error && runsDir === primaryRunsDir && !firstError) {
+      firstError = error;
+    }
+    allCandidates.push(...states);
+  }
+  return { states: allCandidates, error: firstError };
+}
+
+async function discoverFallbackControlHostProviderIntakeStatesInRunsDir(runsDir, excludedStatePath = '') {
   const candidates = [];
   let taskEntries;
   try {
@@ -416,6 +532,7 @@ async function discoverFallbackControlHostProviderIntakeStates(runsDir, excluded
           taskId: taskEntry.name,
           runId: runEntry.name,
           statePath,
+          runsDir,
           state: await loadJson(statePath)
         });
       } catch (error) {
@@ -666,6 +783,25 @@ async function collectProviderParentContracts(runsDir, state, taskId, statePath)
   return candidateContracts;
 }
 
+async function isActiveDocsReviewTask(taskId, env) {
+  if (readNonEmptyString(env, 'CODEX_ORCHESTRATOR_PIPELINE_ID') === PROVIDER_DOCS_REVIEW_CHILD_SUFFIX) {
+    return true;
+  }
+  const manifestPath = readNonEmptyString(env, 'CODEX_ORCHESTRATOR_MANIFEST_PATH');
+  if (!manifestPath) {
+    return false;
+  }
+  try {
+    const manifest = await loadJson(manifestPath);
+    return (
+      readManifestString(manifest, 'task_id', 'taskId') === taskId &&
+      readManifestString(manifest, 'pipeline_id', 'pipelineId') === PROVIDER_DOCS_REVIEW_CHILD_SUFFIX
+    );
+  } catch {
+    return false;
+  }
+}
+
 async function findProviderContractProof(runsDir, taskId, env) {
   const { manifestPath, manifest, error } = await loadActiveManifestForTask(
     taskId,
@@ -701,11 +837,14 @@ async function findProviderContractProof(runsDir, taskId, env) {
   contract.launchToken = launchContext.launchToken;
   contract.runsDir = runsDir;
 
-  const { statePath, explicit, state, error: stateError } = await loadControlHostProviderIntakeState(
-    runsDir,
-    env,
-    manifest
-  );
+  const {
+    statePath,
+    explicit,
+    state,
+    error: stateError,
+    runsDir: stateRunsDir,
+    runsDirs: intakeRunsDirs
+  } = await loadControlHostProviderIntakeState(runsDir, env, manifest);
   if (stateError) {
     return { matched: false, contract, statePath, error: stateError };
   }
@@ -718,7 +857,7 @@ async function findProviderContractProof(runsDir, taskId, env) {
   }
 
   const { states: fallbackStates, error: fallbackError } = await discoverFallbackControlHostProviderIntakeStates(
-    runsDir,
+    intakeRunsDirs ?? [stateRunsDir ?? runsDir],
     statePath
   );
   if (fallbackError) {
@@ -771,11 +910,14 @@ async function findProviderParentTaskProof(runsDir, taskId, env) {
     };
   }
 
-  const { statePath, explicit, state, error: stateError } = await loadControlHostProviderIntakeState(
-    runsDir,
-    env,
-    manifest
-  );
+  const {
+    statePath,
+    explicit,
+    state,
+    error: stateError,
+    runsDir: stateRunsDir,
+    runsDirs: intakeRunsDirs
+  } = await loadControlHostProviderIntakeState(runsDir, env, manifest);
   if (stateError) {
     return {
       matched: false,
@@ -784,7 +926,12 @@ async function findProviderParentTaskProof(runsDir, taskId, env) {
       error: stateError
     };
   }
-  const candidateContracts = await collectProviderParentContracts(runsDir, state, taskId, statePath);
+  const candidateContracts = await collectProviderParentContracts(
+    stateRunsDir ?? runsDir,
+    state,
+    taskId,
+    statePath
+  );
 
   let matchedStatePath = statePath;
   let fallbackError = null;
@@ -793,13 +940,13 @@ async function findProviderParentTaskProof(runsDir, taskId, env) {
     : false;
   if ((!childParentRunId || !hasMatchingParentRun) && !explicit) {
     const { states: fallbackStates, error: discoveredFallbackError } =
-      await discoverFallbackControlHostProviderIntakeStates(runsDir, statePath);
+      await discoverFallbackControlHostProviderIntakeStates(intakeRunsDirs ?? [stateRunsDir ?? runsDir], statePath);
     if (discoveredFallbackError) {
       fallbackError = discoveredFallbackError;
     } else {
       for (const fallbackState of fallbackStates) {
         const fallbackContracts = await collectProviderParentContracts(
-          runsDir,
+          fallbackState.runsDir ?? runsDir,
           fallbackState.state,
           taskId,
           fallbackState.statePath
@@ -860,6 +1007,7 @@ async function findProviderParentTaskProof(runsDir, taskId, env) {
       bestMatch = {
         matched: true,
         parentTaskId: contract.parentTaskId,
+        issueId: contract.issueId,
         statePath: contract.statePath ?? matchedStatePath,
         error: null
       };
@@ -935,6 +1083,46 @@ async function main() {
       ? taskId
       : taskKeys.find((key) => taskId.startsWith(`${key}-`));
     let providerParentProof = null;
+    const activeDocsReviewTask = await isActiveDocsReviewTask(taskId, process.env);
+
+    if (activeDocsReviewTask && parentKey === taskId && isProviderIssueTaskKey(taskId)) {
+      failures.push(
+        `Provider docs-review task id '${taskId}' must run as a child task '<registered-provider-issue-task>-${PROVIDER_DOCS_REVIEW_CHILD_SUFFIX}', not as a registered top-level task`
+      );
+    }
+
+    if (parentKey && parentKey !== taskId) {
+      const providerChildSuffix = getProviderChildTaskSuffix(parentKey, taskId);
+      if (providerChildSuffix === PROVIDER_DOCS_REVIEW_CHILD_SUFFIX) {
+        providerParentProof = await findProviderParentTaskProof(runsDir, taskId, process.env);
+        if (providerParentProof.error) {
+          failures.push(providerParentProof.error);
+        }
+        if (!providerParentProof.matched && !providerParentProof.error) {
+          failures.push(
+            `Provider docs-review task id '${taskId}' requires sanctioned provider parent proof for registered parent task '${parentKey}'`
+          );
+        }
+        if (providerParentProof.matched && providerParentProof.parentTaskId !== parentKey) {
+          failures.push(
+            `Provider docs-review task id '${taskId}' matched registered parent task '${parentKey}' but sanctioned provider parent proof matched '${providerParentProof.parentTaskId}'`
+          );
+        }
+        const expectedProviderIssueTaskKey = providerIssueTaskKeyFromIssueId(providerParentProof.issueId);
+        if (
+          activeDocsReviewTask &&
+          providerParentProof.matched &&
+          expectedProviderIssueTaskKey &&
+          providerParentProof.parentTaskId !== expectedProviderIssueTaskKey
+        ) {
+          failures.push(
+            `Provider docs-review task id '${taskId}' must use provider issue task key '${expectedProviderIssueTaskKey}' as its parent, not '${providerParentProof.parentTaskId}'`
+          );
+        }
+      } else if (activeDocsReviewTask && isProviderIssueTaskKey(parentKey)) {
+        failures.push(describeForbiddenProviderDocsReviewTaskKey(taskId, parentKey, providerChildSuffix));
+      }
+    }
 
     if (!parentKey) {
       providerParentProof = await findProviderParentTaskProof(runsDir, taskId, process.env);
@@ -942,11 +1130,21 @@ async function main() {
         failures.push(providerParentProof.error);
       }
       if (providerParentProof.matched) {
-        parentKey = providerParentProof.parentTaskId;
+        if (activeDocsReviewTask && !taskKeys.includes(providerParentProof.parentTaskId)) {
+          failures.push(
+            `Provider docs-review task id '${taskId}' matched sanctioned provider parent '${providerParentProof.parentTaskId}' but that parent task is not registered in tasks/index.json`
+          );
+        } else {
+          parentKey = providerParentProof.parentTaskId;
+        }
+      } else if (activeDocsReviewTask && !providerParentProof.error) {
+        failures.push(
+          `Provider docs-review task id '${taskId}' requires registered parent task key and sanctioned provider parent proof`
+        );
       }
     }
 
-    if (!parentKey) {
+    if (!parentKey && !activeDocsReviewTask) {
       const providerProof = await findProviderContractProof(runsDir, taskId, process.env);
       if (providerProof.matched) {
         if (failures.length === 0) {
@@ -971,7 +1169,7 @@ async function main() {
           `Task id '${taskId}' is not registered in tasks/index.json (add it or use a parent task prefix)`
         );
       }
-    } else if (parentKey !== taskId) {
+    } else if (parentKey && parentKey !== taskId) {
       if (failures.length === 0) {
         if (providerParentProof?.matched) {
           console.log(
@@ -983,7 +1181,7 @@ async function main() {
         console.log('Delegation guard: OK (subagent runs are exempt).');
         return;
       }
-    } else {
+    } else if (failures.length === 0) {
       const searchRoots = await resolveDelegatedManifestSearchRoots(taskId, repoRoot, runsDir, process.env);
       const expectedPatterns = buildExpectedSubagentManifestPatterns(searchRoots, taskId);
       const { found, errors } = await findSubagentManifestsAcrossRunsDirs(searchRoots, taskId);

@@ -19,6 +19,7 @@ import {
   type ProviderLinearWorkerExecResult
 } from './providerLinearWorkerRunner.js';
 import { logger } from '../logger.js';
+import { sanitizeTaskId } from '../persistence/sanitizeTaskId.js';
 import { slugify } from './utils/strings.js';
 import {
   applyResolvedProgramInvocationEnvOverrides,
@@ -198,7 +199,26 @@ export async function runProviderLinearChildStreamShell(
       status: 422
     });
   }
-  const childTaskId = `${context.taskId}-${stream}`;
+  const childTaskResolution = resolveProviderChildStreamTaskId({
+    pipelineId,
+    stream,
+    parentTaskId: context.taskId,
+    issueId: context.issueId
+  });
+  if (!childTaskResolution.ok) {
+    return failureResult({
+      issueId: context.issueId,
+      issueIdentifier: context.issueIdentifier,
+      sourceSetup,
+      stream,
+      pipelineId,
+      childRun: null,
+      code: childTaskResolution.code,
+      message: childTaskResolution.message,
+      status: childTaskResolution.status
+    });
+  }
+  const childTaskId = childTaskResolution.childTaskId;
   const invocation = resolveCodexOrchestratorInvocation(env);
   const args = [
     ...invocation.argsPrefix,
@@ -348,6 +368,31 @@ export async function runProviderLinearChildStreamShell(
 function normalizeProviderChildPipelineId(value: string): ProviderLinearChildStreamPipelineId | null { return ALLOWED_PROVIDER_CHILD_PIPELINES.find((candidate) => candidate === value.trim()) ?? null; }
 function normalizeChildStreamName(value: string): string | null { const normalized = slugify(value, '').toLowerCase(); return normalized.length > 0 ? normalized : null; }
 function normalizeRuntimeMode(value: string | undefined): 'cli' | 'appserver' | null { if (typeof value !== 'string') return null; const normalized = value.trim().toLowerCase(); return normalized === 'cli' || normalized === 'appserver' ? normalized : null; }
+type ProviderChildStreamTaskResolution =
+  | { ok: true; childTaskId: string }
+  | { ok: false; code: string; message: string; status: number };
+function resolveProviderChildStreamTaskId(input: {
+  pipelineId: ProviderLinearChildStreamPipelineId;
+  stream: string;
+  parentTaskId: string;
+  issueId: string;
+}): ProviderChildStreamTaskResolution {
+  if (input.pipelineId !== 'docs-review') {
+    return { ok: true, childTaskId: `${input.parentTaskId}-${input.stream}` };
+  }
+  const expected = resolveRegisteredProviderIssueTaskId(input.issueId);
+  if (!expected) return { ok: false, code: 'provider_worker_child_stream_issue_task_invalid', message: `docs-review child streams require a registered provider issue task key for issue ${input.issueId}.`, status: 412 };
+  if (input.parentTaskId !== expected) return { ok: false, code: 'provider_worker_child_stream_parent_task_mismatch', message: `docs-review child streams must run from the registered provider issue task key; expected ${expected}, got ${input.parentTaskId}.`, status: 412 };
+  return { ok: true, childTaskId: `${expected}-docs-review` };
+}
+function resolveRegisteredProviderIssueTaskId(issueId: string): string | null {
+  try {
+    const normalizedIssueId = normalizeOptionalString(issueId);
+    return normalizedIssueId ? sanitizeTaskId(`linear-${normalizedIssueId}`) : null;
+  } catch {
+    return null;
+  }
+}
 function buildProviderLinearChildStartEnv(env: NodeJS.ProcessEnv, repoRoot: string, pipelineId: ProviderLinearChildStreamPipelineId, taskId: string, sourceSetup: DispatchPilotSourceSetup | null): NodeJS.ProcessEnv {
   const sanitized = sanitizeProviderOverrideEnv({ ...process.env, ...env });
   for (const key of PROVIDER_LINEAR_CHILD_STREAM_ENV_KEYS_TO_REMOVE) {

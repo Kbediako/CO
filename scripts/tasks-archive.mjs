@@ -332,7 +332,7 @@ function loadTaskIndex(raw) {
     const runTimestamp = parseRunIdTimestamp(item?.gate?.run_id);
     const runDate = runTimestamp ? runTimestamp.toISOString().slice(0, 10) : null;
     const completedAtFromIndex = parseDateString(item.completed_at);
-    const completedByIndex = status === 'succeeded' || status === 'completed';
+    const completedByIndex = status === 'succeeded' || status === 'completed' || status === 'done';
     const completedAt =
       completedAtFromIndex ??
       (gateStatus === 'succeeded' ? parseDateString(runDate) : null);
