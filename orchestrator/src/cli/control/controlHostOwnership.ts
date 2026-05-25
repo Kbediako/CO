@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { spawn } from 'node:child_process';
 import { mkdir, readFile, rm } from 'node:fs/promises';
 import { hostname } from 'node:os';
 import { join } from 'node:path';
@@ -19,6 +20,9 @@ import {
   CONTROL_HOST_OWNER_LOCK_DIR,
   CONTROL_HOST_STALE_OWNER_FILE
 } from './controlPersistenceFiles.js';
+
+export const CONTROL_HOST_SOURCE_FRESHNESS_AUTHORITY_TTL_MS = 5 * 60 * 1000;
+export const SOURCE_ROOT_FRESHNESS_CHILD_TIMEOUT_MS = 30_000;
 
 export type ControlHostOwnershipDiagnosticReason =
   | 'duplicate_control_host_owner'
@@ -102,7 +106,8 @@ export type ControlHostSourceFreshnessAction = 'restart' | 'fail_closed';
 export type ControlHostSourceFreshnessPolicyReason =
   | 'stale_supervised_source_root'
   | 'unsafe_stale_supervised_source_root'
-  | 'stale_generated_runtime';
+  | 'stale_generated_runtime'
+  | 'source_root_freshness_snapshot_unverified';
 
 export interface ControlHostSourceFreshnessPolicy {
   action: ControlHostSourceFreshnessAction;
@@ -113,6 +118,15 @@ export interface ControlHostSourceFreshnessPolicy {
   intended_checkout_status: string | null;
   drift_classes: SourceRootFreshnessInspection['drift_classes'];
   detail: string;
+}
+
+export interface ControlHostSourceFreshnessAuthority {
+  verified_at: string | null;
+  source_root_freshness_observed_at: string | null;
+  expires_at: string | null;
+  owner_token: string | null;
+  run_id: string | null;
+  source_root_realpath: string | null;
 }
 
 export interface ControlHostOwnershipHandle {
@@ -295,12 +309,41 @@ export function refreshControlHostOwnershipPollingPayload(
   };
 }
 
+export async function refreshControlHostOwnershipPollingPayloadInChild(
+  payload: ControlHostOwnershipPollingPayload | null,
+  options: { timeoutMs?: number } = {}
+): Promise<ControlHostOwnershipPollingPayload | null> {
+  if (!payload) {
+    return null;
+  }
+  const attemptedOwnerPromise =
+    payload.attempted_owner === undefined
+      ? Promise.resolve(undefined)
+      : refreshControlHostOwnerSummaryInChild(payload.attempted_owner, options);
+  const [owner, attemptedOwner] = await Promise.all([
+    refreshControlHostOwnerSummaryInChild(payload.owner, options),
+    attemptedOwnerPromise
+  ]);
+  const refreshedPayload: ControlHostOwnershipPollingPayload = {
+    ...payload,
+    owner,
+    ...(attemptedOwner !== undefined ? { attempted_owner: attemptedOwner } : {})
+  };
+  const updatedAt =
+    resolveControlHostAuthoritativeSourceFreshnessOwner(refreshedPayload)
+      ?.source_root_freshness?.observed_at ?? payload.updated_at;
+  return {
+    ...refreshedPayload,
+    updated_at: updatedAt
+  };
+}
+
 export function resolveControlHostSourceFreshnessPolicyFromPolling(
   value: unknown,
   options: { refresh?: boolean } = {}
 ): ControlHostSourceFreshnessPolicy | null {
   const normalized = normalizeControlHostOwnershipPollingPayload(value);
-  if (options.refresh === false) {
+  if (options.refresh !== true) {
     return resolveControlHostSourceFreshnessPolicy(normalized);
   }
   const refreshed = refreshControlHostOwnershipPollingPayload(normalized);
@@ -365,20 +408,176 @@ export function resolveControlHostSourceFreshnessPolicy(
   };
 }
 
+export function resolveControlHostSourceFreshnessAdmissionPolicy(
+  payload: ControlHostOwnershipPollingPayload | null,
+  authority: ControlHostSourceFreshnessAuthority | null | undefined
+): ControlHostSourceFreshnessPolicy | null {
+  const existingPolicy = resolveControlHostSourceFreshnessPolicy(payload);
+  if (existingPolicy) {
+    return existingPolicy;
+  }
+  if (!payload) {
+    return null;
+  }
+  const owner = resolveControlHostAuthoritativeSourceFreshnessOwner(payload);
+  const freshness = resolveControlHostAuthoritativeSourceFreshness(payload);
+  if (!owner || !freshness || freshness.status !== 'current') {
+    return buildUnverifiedSourceRootFreshnessPolicy(payload, freshness, authority);
+  }
+  if (!authority?.verified_at) {
+    return buildUnverifiedSourceRootFreshnessPolicy(payload, freshness, authority);
+  }
+  const expiresAt = Date.parse(authority.expires_at ?? '');
+  if (!authority.expires_at || !Number.isFinite(expiresAt)) {
+    return buildUnverifiedSourceRootFreshnessPolicy(payload, freshness, authority);
+  }
+  if (expiresAt <= Date.now()) {
+    return buildUnverifiedSourceRootFreshnessPolicy(payload, freshness, authority, {
+      expired: true
+    });
+  }
+  if (authority.owner_token !== owner.owner_token || authority.run_id !== owner.run_id) {
+    return buildUnverifiedSourceRootFreshnessPolicy(payload, freshness, authority);
+  }
+  const sourceRootRealpath = freshness.source_root_realpath ?? null;
+  if (!sourceRootRealpath || authority.source_root_realpath !== sourceRootRealpath) {
+    return buildUnverifiedSourceRootFreshnessPolicy(payload, freshness, authority);
+  }
+  if (authority.source_root_freshness_observed_at !== freshness.observed_at) {
+    return buildUnverifiedSourceRootFreshnessPolicy(payload, freshness, authority);
+  }
+  const observedAt = Date.parse(freshness.observed_at);
+  const verifiedAt = Date.parse(authority.verified_at);
+  if (!Number.isFinite(observedAt) || !Number.isFinite(verifiedAt)) {
+    return buildUnverifiedSourceRootFreshnessPolicy(payload, freshness, authority);
+  }
+  if (verifiedAt < observedAt) {
+    return buildUnverifiedSourceRootFreshnessPolicy(payload, freshness, authority);
+  }
+  return null;
+}
+
+export function isControlHostSourceFreshnessAuthorityAdmissionValid(
+  payload: ControlHostOwnershipPollingPayload | null,
+  authority: ControlHostSourceFreshnessAuthority | null | undefined
+): boolean {
+  return Boolean(payload && authority && resolveControlHostSourceFreshnessAdmissionPolicy(payload, authority) === null);
+}
+
+export function selectControlHostSourceFreshnessAuthorityForOwner(
+  controlHostOwner: ControlHostOwnershipPollingPayload | null,
+  primaryAuthority: ControlHostSourceFreshnessAuthority | null,
+  fallbackAuthority: ControlHostSourceFreshnessAuthority | null
+): ControlHostSourceFreshnessAuthority | null {
+  if (isControlHostSourceFreshnessAuthorityAdmissionValid(controlHostOwner, primaryAuthority)) {
+    return primaryAuthority;
+  }
+  if (isControlHostSourceFreshnessAuthorityAdmissionValid(controlHostOwner, fallbackAuthority)) {
+    return fallbackAuthority;
+  }
+  return primaryAuthority ?? fallbackAuthority;
+}
+
+export function resolvePollingSourceRootFreshnessAuthority(
+  polling: unknown
+): ControlHostSourceFreshnessAuthority | null {
+  if (!polling || typeof polling !== 'object') {
+    return null;
+  }
+  const record = polling as Record<string, unknown>;
+  return {
+    verified_at: readOptionalStringField(record, 'source_root_freshness_verified_at'),
+    source_root_freshness_observed_at: readOptionalStringField(record, 'source_root_freshness_observed_at'),
+    expires_at: readOptionalStringField(record, 'source_root_freshness_expires_at'),
+    owner_token: readOptionalStringField(record, 'source_root_freshness_owner_token'),
+    run_id: readOptionalStringField(record, 'source_root_freshness_run_id'),
+    source_root_realpath: readOptionalStringField(record, 'source_root_freshness_source_root_realpath')
+  };
+}
+
+function readOptionalStringField(record: Record<string, unknown>, key: string): string | null {
+  const value = record[key];
+  return typeof value === 'string' ? value : null;
+}
+
+function buildUnverifiedSourceRootFreshnessPolicy(
+  payload: ControlHostOwnershipPollingPayload,
+  freshness: SourceRootFreshnessInspection | null,
+  authority: ControlHostSourceFreshnessAuthority | null | undefined,
+  options: { expired?: boolean } = {}
+): ControlHostSourceFreshnessPolicy {
+  return {
+    action: 'fail_closed',
+    reason: 'source_root_freshness_snapshot_unverified',
+    updated_at: options.expired
+      ? authority?.expires_at ??
+        authority?.verified_at ??
+        freshness?.observed_at ??
+        payload.updated_at ??
+        null
+      : authority?.verified_at ?? freshness?.observed_at ?? payload.updated_at ?? null,
+    status: freshness?.status ?? 'unavailable',
+    source_checkout_status: freshness?.source_checkout?.status ?? null,
+    intended_checkout_status: freshness?.intended_checkout?.status ?? null,
+    drift_classes: freshness?.drift_classes ?? [],
+    detail: options.expired
+      ? 'Control-host source-root freshness has an expired source-root authority snapshot; provider-intake must fail closed until the freshness collector records a bound current snapshot.'
+      : 'Control-host source-root freshness is not backed by a verified source-root authority snapshot; provider-intake must fail closed until the freshness collector records a bound current snapshot.'
+  };
+}
+
+export function isControlHostOwnershipFreshnessAtLeastAsRecent(
+  candidate: ControlHostOwnershipPollingPayload | null,
+  baseline: ControlHostOwnershipPollingPayload | null,
+  options: {
+    candidateSnapshotUpdatedAt?: string | null;
+    baselineSnapshotUpdatedAt?: string | null;
+  } = {}
+): boolean {
+  const baselineTimestamp = resolveControlHostOwnershipFreshnessTimestamp(
+    baseline,
+    options.baselineSnapshotUpdatedAt
+  );
+  if (baselineTimestamp === null) {
+    return true;
+  }
+  const candidateTimestamp = resolveControlHostOwnershipFreshnessTimestamp(
+    candidate,
+    options.candidateSnapshotUpdatedAt
+  );
+  return candidateTimestamp !== null && candidateTimestamp >= baselineTimestamp;
+}
+
+function resolveControlHostOwnershipFreshnessTimestamp(
+  payload: ControlHostOwnershipPollingPayload | null,
+  snapshotUpdatedAt?: string | null
+): number | null {
+  return maxTimestamp(
+    snapshotUpdatedAt,
+    payload?.updated_at,
+    payload?.owner?.updated_at,
+    payload?.attempted_owner?.updated_at,
+    payload?.owner?.source_root_freshness?.observed_at,
+    payload?.attempted_owner?.source_root_freshness?.observed_at
+  );
+}
+
 export function resolveControlHostAuthoritativeSourceFreshness(
   payload: ControlHostOwnershipPollingPayload | null
 ): SourceRootFreshnessInspection | null {
+  return resolveControlHostAuthoritativeSourceFreshnessOwner(payload)?.source_root_freshness ?? null;
+}
+
+export function resolveControlHostAuthoritativeSourceFreshnessOwner(
+  payload: ControlHostOwnershipPollingPayload | null
+): ControlHostOwnerSummary | null {
   if (!payload) {
     return null;
   }
   if (payload.status === 'stale_reclaimed') {
-    return (
-      payload.attempted_owner?.source_root_freshness ??
-      payload.owner?.source_root_freshness ??
-      null
-    );
+    return payload.attempted_owner ?? payload.owner ?? null;
   }
-  return payload.owner?.source_root_freshness ?? null;
+  return payload.owner ?? null;
 }
 
 function isAuthoritativeControlHostSourceFreshness(
@@ -386,6 +585,18 @@ function isAuthoritativeControlHostSourceFreshness(
 ): boolean {
   const freshness = resolveControlHostAuthoritativeSourceFreshness(payload);
   return freshness?.status === 'current' || freshness?.status === 'warning';
+}
+
+function maxTimestamp(...values: Array<string | null | undefined>): number | null {
+  let latest: number | null = null;
+  for (const value of values) {
+    const parsed = typeof value === 'string' ? Date.parse(value) : Number.NaN;
+    if (!Number.isFinite(parsed)) {
+      continue;
+    }
+    latest = latest === null ? parsed : Math.max(latest, parsed);
+  }
+  return latest;
 }
 
 function isRestartSafeStaleSupervisedSourceRoot(
@@ -805,6 +1016,137 @@ function refreshControlHostOwnerSummary(
     ...summary,
     source_root_freshness: refreshSourceRootFreshnessInspection(prior, summary.repo_root)
   };
+}
+
+async function refreshControlHostOwnerSummaryInChild(
+  summary: ControlHostOwnerSummary | null,
+  options: { timeoutMs?: number }
+): Promise<ControlHostOwnerSummary | null> {
+  const prior = summary?.source_root_freshness;
+  if (!summary || !prior) {
+    return summary;
+  }
+  const sourceRootFreshnessModuleUrl = new URL(
+    '../utils/sourceRootFreshness.js',
+    import.meta.url
+  ).href;
+  const script = `
+const { refreshSourceRootFreshnessInspection } = await import(${JSON.stringify(sourceRootFreshnessModuleUrl)});
+let input = '';
+for await (const chunk of process.stdin) input += chunk;
+const parsed = JSON.parse(input);
+const refreshed = refreshSourceRootFreshnessInspection(parsed.prior, parsed.repoRoot);
+process.stdout.write(JSON.stringify(refreshed));
+`;
+  const refreshed = await runSourceRootFreshnessChild(script, {
+    prior,
+    repoRoot: summary.repo_root
+  }, options.timeoutMs ?? SOURCE_ROOT_FRESHNESS_CHILD_TIMEOUT_MS);
+  return {
+    ...summary,
+    updated_at: refreshed.observed_at || summary.updated_at,
+    source_root_freshness: refreshed
+  };
+}
+
+async function runSourceRootFreshnessChild(
+  script: string,
+  input: unknown,
+  timeoutMs: number
+): Promise<SourceRootFreshnessInspection> {
+  return await new Promise((resolve, reject) => {
+    const child = spawn(
+      process.execPath,
+      [
+        ...filterSourceRootFreshnessChildExecArgv(process.execArgv),
+        '--input-type=module',
+        '-e',
+        script
+      ],
+      { stdio: ['pipe', 'pipe', 'pipe'] }
+    );
+    let stdout = '';
+    let stderr = '';
+    let settled = false;
+    const timeout = setTimeout(() => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      child.kill('SIGKILL');
+      reject(new Error('source_root_freshness_child_timeout'));
+    }, timeoutMs);
+    child.stdout.setEncoding('utf8');
+    child.stderr.setEncoding('utf8');
+    child.stdout.on('data', (chunk) => {
+      stdout += chunk;
+    });
+    child.stderr.on('data', (chunk) => {
+      stderr += chunk;
+    });
+    child.on('error', (error) => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      clearTimeout(timeout);
+      reject(error);
+    });
+    child.on('close', (code) => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      clearTimeout(timeout);
+      if (code !== 0) {
+        reject(new Error(`source_root_freshness_child_failed: ${stderr || code}`));
+        return;
+      }
+      try {
+        const parsed = JSON.parse(stdout) as unknown;
+        const normalized = normalizeSourceRootFreshnessInspection(parsed);
+        if (!normalized) {
+          reject(new Error('source_root_freshness_child_invalid_payload'));
+          return;
+        }
+        resolve(normalized);
+      } catch (error) {
+        reject(error);
+      }
+    });
+    child.stdin.end(JSON.stringify(input));
+  });
+}
+
+export function filterSourceRootFreshnessChildExecArgv(execArgv: readonly string[]): string[] {
+  const filtered: string[] = [];
+  for (let index = 0; index < execArgv.length; index += 1) {
+    const arg = execArgv[index] ?? '';
+    if (isNodeInspectorExecArg(arg)) {
+      if (arg === '--inspect-port') {
+        const next = execArgv[index + 1] ?? '';
+        if (next && !next.startsWith('-')) {
+          index += 1;
+        }
+      }
+      continue;
+    }
+    filtered.push(arg);
+  }
+  return filtered;
+}
+
+function isNodeInspectorExecArg(arg: string): boolean {
+  return (
+    arg === '--inspect' ||
+    arg.startsWith('--inspect=') ||
+    arg === '--inspect-brk' ||
+    arg.startsWith('--inspect-brk=') ||
+    arg === '--inspect-port' ||
+    arg.startsWith('--inspect-port=') ||
+    arg === '--debug' ||
+    arg.startsWith('--debug=')
+  );
 }
 
 function normalizeControlHostOwnerSummary(value: unknown): ControlHostOwnerSummary | null {

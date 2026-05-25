@@ -21,9 +21,12 @@ import {
 } from './providerPollingHealth.js';
 import {
   normalizeControlHostOwnershipPollingPayload,
-  refreshControlHostOwnershipPollingPayload,
+  isControlHostOwnershipFreshnessAtLeastAsRecent,
   resolveControlHostAuthoritativeSourceFreshness,
-  resolveControlHostSourceFreshnessPolicyFromPolling
+  resolvePollingSourceRootFreshnessAuthority,
+  resolveControlHostSourceFreshnessAdmissionPolicy,
+  resolveControlHostSourceFreshnessPolicyFromPolling,
+  selectControlHostSourceFreshnessAuthorityForOwner
 } from './controlHostOwnership.js';
 import {
   buildProviderIntakeSummary,
@@ -424,7 +427,7 @@ function createControlRuntimeSnapshot(
       ),
       providerIntakeUnavailable: providerIntakeAuthority.unavailable,
       providerWorkflow,
-      polling: readProviderPollingSnapshot(authorityContext, { refreshOwnership: false }),
+      polling: readProviderPollingSnapshot(authorityContext),
       maxConcurrentAgents: resolveProviderPollDispatchLimits(
         context.controlStore.snapshot().feature_toggles,
         {
@@ -689,26 +692,51 @@ function resolveProviderIntakeSourceFreshnessPolicy(
   state: ProviderIntakeState | null,
   context: Pick<ControlRuntimeContext, 'readProviderIssueHandoff'>
 ) {
-  const liveControlHostOwner =
-    readProviderPollingHealth(context.readProviderIssueHandoff?.() ?? null)?.control_host_owner ??
-    null;
+  const persistedPolling = normalizePersistedProviderPollingSnapshot(state?.polling);
+  const persistedControlHostOwner = persistedPolling?.control_host_owner ?? null;
+  const persistedAuthority = resolvePollingSourceRootFreshnessAuthority(persistedPolling);
+  const persistedPolicy = resolveControlHostSourceFreshnessPolicyFromPolling(
+    persistedControlHostOwner,
+    { refresh: false }
+  ) ?? resolveControlHostSourceFreshnessAdmissionPolicy(
+    persistedControlHostOwner,
+    persistedAuthority
+  );
+  const livePolling = readProviderPollingHealth(context.readProviderIssueHandoff?.() ?? null);
+  const liveControlHostOwner = livePolling?.control_host_owner ?? null;
   if (liveControlHostOwner) {
-    const refreshedLiveOwner = refreshControlHostOwnershipPollingPayload(
-      normalizeControlHostOwnershipPollingPayload(liveControlHostOwner)
-    );
+    const refreshedLiveOwner = normalizeControlHostOwnershipPollingPayload(liveControlHostOwner);
     const livePolicy = resolveControlHostSourceFreshnessPolicyFromPolling(
       refreshedLiveOwner,
       { refresh: false }
     );
     const liveFreshness = resolveControlHostAuthoritativeSourceFreshness(refreshedLiveOwner);
-    if (livePolicy || isAuthoritativeLiveControlHostFreshness(liveFreshness)) {
+    if (livePolicy) {
       return livePolicy;
     }
+    if (
+      isAuthoritativeLiveControlHostFreshness(liveFreshness) &&
+      isControlHostOwnershipFreshnessAtLeastAsRecent(
+        refreshedLiveOwner,
+        persistedControlHostOwner,
+        {
+          candidateSnapshotUpdatedAt: livePolling?.updated_at ?? null,
+          baselineSnapshotUpdatedAt: persistedPolling?.updated_at ?? null
+        }
+      )
+    ) {
+      const liveAuthority = selectControlHostSourceFreshnessAuthorityForOwner(
+        refreshedLiveOwner,
+        resolvePollingSourceRootFreshnessAuthority(livePolling),
+        persistedAuthority
+      );
+      return resolveControlHostSourceFreshnessAdmissionPolicy(
+        refreshedLiveOwner,
+        liveAuthority
+      );
+    }
   }
-  if (!state?.polling || !isRecordLike(state.polling)) {
-    return null;
-  }
-  return resolveControlHostSourceFreshnessPolicyFromPolling(state.polling.control_host_owner);
+  return persistedPolicy;
 }
 
 function isAuthoritativeLiveControlHostFreshness(
@@ -780,42 +808,52 @@ async function refreshProviderWorkflowStatusPayload(
 }
 
 function readProviderPollingSnapshot(
-  context: Pick<ControlRuntimeContext, 'providerIntakeState' | 'readProviderIssueHandoff'>,
-  options: { refreshOwnership?: boolean } = {}
+  context: Pick<ControlRuntimeContext, 'providerIntakeState' | 'readProviderIssueHandoff'>
 ): ControlPollingHealthPayload | null {
   const livePolling = readProviderPollingHealth(context.readProviderIssueHandoff?.() ?? null);
-  const persistedPolling = normalizePersistedProviderPollingSnapshot(
-    context.providerIntakeState?.polling,
-    { refreshOwnership: options.refreshOwnership }
-  );
-  const finalize = (polling: ControlPollingHealthPayload | null) =>
-    options.refreshOwnership === false
-      ? polling
-      : refreshProviderPollingSnapshotOwnership(polling);
+  const persistedPolling = normalizePersistedProviderPollingSnapshot(context.providerIntakeState?.polling);
   if (persistedPolling && livePolling?.updated_at === null) {
-    return finalize({
-      ...persistedPolling,
-      control_host_owner: livePolling.control_host_owner ?? persistedPolling.control_host_owner
-    });
+    return mergeStartupLiveControlHostOwnerIntoPersistedPolling(persistedPolling, livePolling);
   }
-  return finalize(livePolling ?? persistedPolling);
+  return livePolling ?? persistedPolling;
 }
 
-function refreshProviderPollingSnapshotOwnership(
-  polling: ControlPollingHealthPayload | null
-): ControlPollingHealthPayload | null {
-  if (!polling) {
-    return null;
+function mergeStartupLiveControlHostOwnerIntoPersistedPolling(
+  persistedPolling: ControlPollingHealthPayload,
+  livePolling: ControlPollingHealthPayload
+): ControlPollingHealthPayload {
+  if (!livePolling.control_host_owner) {
+    return persistedPolling;
   }
+  const mergedPolling = {
+    ...persistedPolling,
+    control_host_owner: livePolling.control_host_owner
+  };
+  const authorityPolicy = resolveControlHostSourceFreshnessAdmissionPolicy(
+    mergedPolling.control_host_owner,
+    resolvePollingSourceRootFreshnessAuthority(mergedPolling)
+  );
+  return authorityPolicy
+    ? clearProviderPollingSourceRootFreshnessAuthority(mergedPolling)
+    : mergedPolling;
+}
+
+function clearProviderPollingSourceRootFreshnessAuthority(
+  polling: ControlPollingHealthPayload
+): ControlPollingHealthPayload {
   return {
     ...polling,
-    control_host_owner: refreshControlHostOwnershipPollingPayload(polling.control_host_owner ?? null)
+    source_root_freshness_verified_at: null,
+    source_root_freshness_observed_at: null,
+    source_root_freshness_expires_at: null,
+    source_root_freshness_owner_token: null,
+    source_root_freshness_run_id: null,
+    source_root_freshness_source_root_realpath: null
   };
 }
 
 function normalizePersistedProviderPollingSnapshot(
-  polling: ProviderIntakeState['polling'] | null | undefined,
-  options: { refreshOwnership?: boolean } = {}
+  polling: ProviderIntakeState['polling'] | null | undefined
 ): ControlPollingHealthPayload | null {
   if (!isRecordLike(polling)) {
     return null;
@@ -884,12 +922,31 @@ function normalizePersistedProviderPollingSnapshot(
     restart_required: polling.restart_required === true,
     reason: typeof polling.reason === 'string' ? polling.reason : null,
     linear_budget: linearBudget,
-    control_host_owner:
-      options.refreshOwnership === false
-        ? normalizeControlHostOwnershipPollingPayload(polling.control_host_owner)
-        : refreshControlHostOwnershipPollingPayload(
-            normalizeControlHostOwnershipPollingPayload(polling.control_host_owner)
-          )
+    control_host_owner: normalizeControlHostOwnershipPollingPayload(polling.control_host_owner),
+    source_root_freshness_verified_at:
+      typeof polling.source_root_freshness_verified_at === 'string'
+        ? polling.source_root_freshness_verified_at
+        : null,
+    source_root_freshness_observed_at:
+      typeof polling.source_root_freshness_observed_at === 'string'
+        ? polling.source_root_freshness_observed_at
+        : null,
+    source_root_freshness_expires_at:
+      typeof polling.source_root_freshness_expires_at === 'string'
+        ? polling.source_root_freshness_expires_at
+        : null,
+    source_root_freshness_owner_token:
+      typeof polling.source_root_freshness_owner_token === 'string'
+        ? polling.source_root_freshness_owner_token
+        : null,
+    source_root_freshness_run_id:
+      typeof polling.source_root_freshness_run_id === 'string'
+        ? polling.source_root_freshness_run_id
+        : null,
+    source_root_freshness_source_root_realpath:
+      typeof polling.source_root_freshness_source_root_realpath === 'string'
+        ? polling.source_root_freshness_source_root_realpath
+        : null
   };
 }
 

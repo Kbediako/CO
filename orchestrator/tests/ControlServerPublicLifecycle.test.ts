@@ -44,6 +44,7 @@ import {
 } from '../src/cli/control/controlServerStartupInputPreparation.js';
 import {
   acquireControlHostOwnership,
+  refreshControlHostOwnershipPollingPayloadInChild,
   type ControlHostOwnershipHandle,
   type ControlHostOwnershipPollingPayload
 } from '../src/cli/control/controlHostOwnership.js';
@@ -52,10 +53,14 @@ vi.mock('../src/cli/control/controlServerStartupInputPreparation.js', () => ({
   prepareControlServerStartupInputs: vi.fn()
 }));
 
-vi.mock('../src/cli/control/controlHostOwnership.js', () => ({
-  acquireControlHostOwnership: vi.fn(),
-  refreshControlHostOwnershipPollingPayload: vi.fn((payload) => payload)
-}));
+vi.mock('../src/cli/control/controlHostOwnership.js', async (importActual) => {
+  const actual = await importActual<typeof import('../src/cli/control/controlHostOwnership.js')>();
+  return {
+    ...actual,
+    acquireControlHostOwnership: vi.fn(),
+    refreshControlHostOwnershipPollingPayloadInChild: vi.fn(async (payload) => payload)
+  };
+});
 
 vi.mock('../src/cli/control/controlServerReadyInstanceLifecycle.js', () => ({
   startControlServerReadyInstanceLifecycle: vi.fn(),
@@ -147,6 +152,99 @@ function buildMockControlHostOwnershipHandle(
     },
     polling,
     release: input.release ?? vi.fn(async () => undefined)
+  };
+}
+
+function buildControlHostOwnershipPollingWithSourceRootFreshness(input: {
+  ownerToken: string;
+  runId: string;
+  observedAt: string;
+  updatedAt?: string;
+  freshnessStatus?: 'current' | 'warning';
+  driftClasses?: (
+    | 'shared_checkout_drift'
+    | 'supervised_source_root_drift'
+    | 'source_vs_dist_drift'
+    | 'global_binary_package_provenance_drift'
+  )[];
+}): ControlHostOwnershipPollingPayload {
+  const updatedAt = input.updatedAt ?? input.observedAt;
+  return {
+    status: 'owned',
+    reason: null,
+    updated_at: updatedAt,
+    diagnostic_path: null,
+    lock_dir: '/tmp/repo/.runs/control-host-owner.lock',
+    owner_path: '/tmp/repo/.runs/control-host-owner.json',
+    owner: {
+      owner_token: input.ownerToken,
+      status: 'owned',
+      pid: 1,
+      ppid: null,
+      hostname: 'host',
+      acquired_at: updatedAt,
+      updated_at: updatedAt,
+      released_at: null,
+      repo_root: '/tmp/repo',
+      task_id: 'local-mcp',
+      run_id: input.runId,
+      run_dir: `/tmp/repo/.runs/local-mcp/cli/${input.runId}`,
+      pipeline_id: 'provider-linear-worker',
+      source_root_freshness: {
+        schema_version: 1,
+        status: input.freshnessStatus ?? 'current',
+        observed_at: input.observedAt,
+        intended_repo_root: '/tmp/repo',
+        intended_repo_root_realpath: '/tmp/repo',
+        command_path: '/tmp/repo/bin/codex-orchestrator.ts',
+        command_path_realpath: '/tmp/repo/bin/codex-orchestrator.ts',
+        package_root: '/tmp/repo',
+        package_root_realpath: '/tmp/repo',
+        source_root: '/tmp/repo',
+        source_root_realpath: '/tmp/repo',
+        entrypoint_kind: 'source',
+        base_ref: 'origin/main',
+        drift_classes: input.driftClasses ?? [],
+        source_checkout: {
+          status: input.freshnessStatus === 'warning' ? 'stale' : 'current',
+          repo_root: '/tmp/repo',
+          inside_git_worktree: true,
+          base_ref: 'origin/main',
+          ahead: 0,
+          behind: input.freshnessStatus === 'warning' ? 1 : 0,
+          dirty: { status: 'clean' },
+          head: null,
+          upstream: null,
+          detail: input.freshnessStatus === 'warning' ? 'stale source checkout' : 'current source checkout'
+        },
+        intended_checkout: {
+          status: 'current',
+          repo_root: '/tmp/repo',
+          inside_git_worktree: true,
+          base_ref: 'origin/main',
+          ahead: 0,
+          behind: 0,
+          dirty: { status: 'clean' },
+          head: null,
+          upstream: null,
+          detail: 'current intended checkout'
+        },
+        provenance: {
+          command_path_source: 'explicit',
+          package_root_source: 'explicit',
+          source_root_source: 'package_root',
+          command_path_inside_package: true,
+          package_root_matches_intended: true,
+          source_root_matches_intended: true,
+          source_entry_exists: true,
+          dist_entry_exists: true
+        },
+        guidance: [],
+        detail: input.freshnessStatus === 'warning' ? 'stale source root' : 'current source root'
+      },
+      lock_dir: '/tmp/repo/.runs/control-host-owner.lock',
+      owner_path: '/tmp/repo/.runs/control-host-owner.json'
+    }
   };
 }
 
@@ -550,6 +648,322 @@ describe('startControlServerPublicLifecycle', () => {
 
     await vi.advanceTimersByTimeAsync(15_000);
     expect(refresh).toHaveBeenCalledTimes(2);
+
+    await closeControlServerPublicLifecycle(started);
+  });
+
+  it('records verified control-host owner freshness from the startup freshness collector', async () => {
+    vi.useFakeTimers();
+
+    const initialControlHostOwner = buildMockControlHostOwnershipHandle();
+    const refreshedControlHostOwner: ControlHostOwnershipPollingPayload = {
+      ...initialControlHostOwner.polling,
+      updated_at: '2026-04-11T00:01:00.000Z'
+    };
+    let resolveFreshnessVerification:
+      | ((value: ControlHostOwnershipPollingPayload) => void)
+      | null = null;
+    const freshnessVerification = new Promise<ControlHostOwnershipPollingPayload>((resolve) => {
+      resolveFreshnessVerification = resolve;
+    });
+    vi.mocked(acquireControlHostOwnership).mockResolvedValue(initialControlHostOwner);
+    vi.mocked(refreshControlHostOwnershipPollingPayloadInChild).mockReturnValue(
+      freshnessVerification
+    );
+
+    const providerIssueHandoff = {
+      handleAcceptedTrackedIssue: vi.fn(),
+      rehydrate: vi.fn(async () => undefined),
+      refresh: vi.fn(async () => undefined)
+    };
+    const requestContextShared = {
+      clients: new Set(),
+      eventTransport: { broadcast: vi.fn() },
+      providerIssueHandoff
+    } as unknown as ControlRequestSharedContext;
+    const lifecycleState = {
+      expiryLifecycle: { close: vi.fn() },
+      bootstrapLifecycle: { close: vi.fn(async () => undefined) }
+    } as unknown as ControlServerOwnedLifecycleState;
+    const server = { kind: 'server' } as unknown as http.Server;
+
+    vi.mocked(prepareControlServerStartupInputs).mockResolvedValue({
+      requestContextShared,
+      host: '127.0.0.1',
+      controlToken: 'token-123'
+    } satisfies PreparedControlServerStartupInputs);
+    vi.mocked(startControlServerReadyInstanceLifecycle).mockResolvedValue({
+      server,
+      baseUrl: 'http://127.0.0.1:4545',
+      lifecycleState
+    });
+
+    const started = await startControlServerPublicLifecycle({
+      paths: { repoRoot: '/tmp/repo' } as RunPaths,
+      config: { ui: { bindHost: '127.0.0.1' } } as unknown as EffectiveDelegationConfig,
+      runId: 'run-1',
+      controlHostOwnership: {}
+    });
+
+    await flushStartupProviderRefresh();
+
+    expect(providerIssueHandoff.refresh).not.toHaveBeenCalled();
+    expect(refreshControlHostOwnershipPollingPayloadInChild).toHaveBeenCalledWith(
+      initialControlHostOwner.polling
+    );
+    resolveFreshnessVerification?.(refreshedControlHostOwner);
+    await vi.advanceTimersByTimeAsync(0);
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(providerIssueHandoff.refresh).toHaveBeenCalledOnce();
+    expect(readProviderPollingHealth(providerIssueHandoff)).toMatchObject({
+      control_host_owner: refreshedControlHostOwner
+    });
+
+    await closeControlServerPublicLifecycle(started);
+  });
+
+  it('waits for source-root freshness verification before startup provider refresh', async () => {
+    vi.useFakeTimers();
+
+    const initialControlHostOwner = buildMockControlHostOwnershipHandle({
+      polling: buildControlHostOwnershipPollingWithSourceRootFreshness({
+        ownerToken: 'owner-token',
+        runId: 'run-1',
+        observedAt: '2026-04-11T00:00:00.000Z'
+      })
+    });
+    const refreshedControlHostOwner = buildControlHostOwnershipPollingWithSourceRootFreshness({
+      ownerToken: 'owner-token',
+      runId: 'run-1',
+      observedAt: '2026-04-11T00:01:00.000Z',
+      updatedAt: '2026-04-11T00:01:00.000Z'
+    });
+    let resolveFreshnessVerification:
+      | ((value: ControlHostOwnershipPollingPayload) => void)
+      | null = null;
+    const freshnessVerification = new Promise<ControlHostOwnershipPollingPayload>((resolve) => {
+      resolveFreshnessVerification = resolve;
+    });
+    vi.mocked(acquireControlHostOwnership).mockResolvedValue(initialControlHostOwner);
+    vi.mocked(refreshControlHostOwnershipPollingPayloadInChild).mockReturnValue(
+      freshnessVerification
+    );
+
+    const providerIssueHandoff = {
+      handleAcceptedTrackedIssue: vi.fn(),
+      rehydrate: vi.fn(async () => undefined),
+      refresh: vi.fn(async () => undefined)
+    };
+    const requestContextShared = {
+      clients: new Set(),
+      eventTransport: { broadcast: vi.fn() },
+      providerIssueHandoff
+    } as unknown as ControlRequestSharedContext;
+    const lifecycleState = {
+      expiryLifecycle: { close: vi.fn() },
+      bootstrapLifecycle: { close: vi.fn(async () => undefined) }
+    } as unknown as ControlServerOwnedLifecycleState;
+    const server = { kind: 'server' } as unknown as http.Server;
+
+    vi.mocked(prepareControlServerStartupInputs).mockResolvedValue({
+      requestContextShared,
+      host: '127.0.0.1',
+      controlToken: 'token-123'
+    } satisfies PreparedControlServerStartupInputs);
+    vi.mocked(startControlServerReadyInstanceLifecycle).mockResolvedValue({
+      server,
+      baseUrl: 'http://127.0.0.1:4545',
+      lifecycleState
+    });
+
+    const started = await startControlServerPublicLifecycle({
+      paths: { repoRoot: '/tmp/repo' } as RunPaths,
+      config: { ui: { bindHost: '127.0.0.1' } } as unknown as EffectiveDelegationConfig,
+      runId: 'run-1',
+      controlHostOwnership: {}
+    });
+
+    await vi.advanceTimersByTimeAsync(0);
+    await Promise.resolve();
+
+    expect(providerIssueHandoff.refresh).not.toHaveBeenCalled();
+    expect(readProviderPollingHealth(providerIssueHandoff)?.restart_required).toBe(false);
+
+    resolveFreshnessVerification?.(refreshedControlHostOwner);
+    await vi.advanceTimersByTimeAsync(0);
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(providerIssueHandoff.refresh).toHaveBeenCalledTimes(1);
+    expect(readProviderPollingHealth(providerIssueHandoff)).toMatchObject({
+      control_host_owner: refreshedControlHostOwner,
+      source_root_freshness_observed_at: '2026-04-11T00:01:00.000Z'
+    });
+
+    await closeControlServerPublicLifecycle(started);
+  });
+
+  it('rechecks control-host owner freshness on later provider refresh triggers', async () => {
+    vi.useFakeTimers();
+
+    const initialControlHostOwner = buildMockControlHostOwnershipHandle();
+    const firstRefreshedControlHostOwner: ControlHostOwnershipPollingPayload = {
+      ...initialControlHostOwner.polling,
+      updated_at: '2026-04-11T00:01:00.000Z'
+    };
+    const secondRefreshedControlHostOwner: ControlHostOwnershipPollingPayload = {
+      ...initialControlHostOwner.polling,
+      updated_at: '2026-04-11T00:02:00.000Z'
+    };
+    let resolveFirstVerification:
+      | ((value: ControlHostOwnershipPollingPayload) => void)
+      | null = null;
+    let resolveSecondVerification:
+      | ((value: ControlHostOwnershipPollingPayload) => void)
+      | null = null;
+    const firstVerification = new Promise<ControlHostOwnershipPollingPayload>((resolve) => {
+      resolveFirstVerification = resolve;
+    });
+    const secondVerification = new Promise<ControlHostOwnershipPollingPayload>((resolve) => {
+      resolveSecondVerification = resolve;
+    });
+    vi.mocked(acquireControlHostOwnership).mockResolvedValue(initialControlHostOwner);
+    vi.mocked(refreshControlHostOwnershipPollingPayloadInChild)
+      .mockReturnValueOnce(firstVerification)
+      .mockReturnValueOnce(secondVerification);
+
+    const providerIssueHandoff = {
+      handleAcceptedTrackedIssue: vi.fn(),
+      rehydrate: vi.fn(async () => undefined),
+      refresh: vi.fn(async () => undefined)
+    };
+    const requestContextShared = {
+      clients: new Set(),
+      eventTransport: { broadcast: vi.fn() },
+      providerIssueHandoff
+    } as unknown as ControlRequestSharedContext;
+    const lifecycleState = {
+      expiryLifecycle: { close: vi.fn() },
+      bootstrapLifecycle: { close: vi.fn(async () => undefined) }
+    } as unknown as ControlServerOwnedLifecycleState;
+    const server = { kind: 'server' } as unknown as http.Server;
+
+    vi.mocked(prepareControlServerStartupInputs).mockResolvedValue({
+      requestContextShared,
+      host: '127.0.0.1',
+      controlToken: 'token-123'
+    } satisfies PreparedControlServerStartupInputs);
+    vi.mocked(startControlServerReadyInstanceLifecycle).mockResolvedValue({
+      server,
+      baseUrl: 'http://127.0.0.1:4545',
+      lifecycleState
+    });
+
+    const started = await startControlServerPublicLifecycle({
+      paths: { repoRoot: '/tmp/repo' } as RunPaths,
+      config: { ui: { bindHost: '127.0.0.1' } } as unknown as EffectiveDelegationConfig,
+      runId: 'run-1',
+      controlHostOwnership: {}
+    });
+
+    await vi.advanceTimersByTimeAsync(0);
+    expect(refreshControlHostOwnershipPollingPayloadInChild).toHaveBeenCalledTimes(1);
+    resolveFirstVerification?.(firstRefreshedControlHostOwner);
+    await vi.advanceTimersByTimeAsync(0);
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(providerIssueHandoff.refresh).toHaveBeenCalledTimes(1);
+
+    const refreshPromise = started.triggerProviderRefresh?.() ?? Promise.resolve();
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(refreshControlHostOwnershipPollingPayloadInChild).toHaveBeenCalledTimes(2);
+    expect(providerIssueHandoff.refresh).toHaveBeenCalledTimes(1);
+    resolveSecondVerification?.(secondRefreshedControlHostOwner);
+    await vi.advanceTimersByTimeAsync(0);
+    await refreshPromise;
+    expect(readProviderPollingHealth(providerIssueHandoff)).toMatchObject({
+      control_host_owner: secondRefreshedControlHostOwner
+    });
+    expect(providerIssueHandoff.refresh).toHaveBeenCalledTimes(2);
+
+    await closeControlServerPublicLifecycle(started);
+  });
+
+  it('preserves verified source-root authority when a later refresh starts from the acquisition snapshot', async () => {
+    vi.useFakeTimers();
+
+    const acquisitionOwner = buildControlHostOwnershipPollingWithSourceRootFreshness({
+      ownerToken: 'owner-token',
+      runId: 'run-1',
+      observedAt: '2026-04-11T00:00:00.000Z'
+    });
+    const verifiedOwner = buildControlHostOwnershipPollingWithSourceRootFreshness({
+      ownerToken: 'owner-token',
+      runId: 'run-1',
+      observedAt: '2026-04-11T00:01:00.000Z',
+      updatedAt: '2026-04-11T00:01:00.000Z'
+    });
+    vi.mocked(acquireControlHostOwnership).mockResolvedValue(
+      buildMockControlHostOwnershipHandle({ polling: acquisitionOwner })
+    );
+    vi.mocked(refreshControlHostOwnershipPollingPayloadInChild).mockReturnValue(
+      Promise.resolve(verifiedOwner)
+    );
+
+    const providerIssueHandoff = {
+      handleAcceptedTrackedIssue: vi.fn(),
+      rehydrate: vi.fn(async () => undefined),
+      refresh: vi.fn(async () => undefined)
+    };
+    const requestContextShared = {
+      clients: new Set(),
+      eventTransport: { broadcast: vi.fn() },
+      providerIssueHandoff
+    } as unknown as ControlRequestSharedContext;
+    const lifecycleState = {
+      expiryLifecycle: { close: vi.fn() },
+      bootstrapLifecycle: { close: vi.fn(async () => undefined) }
+    } as unknown as ControlServerOwnedLifecycleState;
+    const server = { kind: 'server' } as unknown as http.Server;
+
+    vi.mocked(prepareControlServerStartupInputs).mockResolvedValue({
+      requestContextShared,
+      host: '127.0.0.1',
+      controlToken: 'token-123'
+    } satisfies PreparedControlServerStartupInputs);
+    vi.mocked(startControlServerReadyInstanceLifecycle).mockResolvedValue({
+      server,
+      baseUrl: 'http://127.0.0.1:4545',
+      lifecycleState
+    });
+
+    const started = await startControlServerPublicLifecycle({
+      paths: { repoRoot: '/tmp/repo' } as RunPaths,
+      config: { ui: { bindHost: '127.0.0.1' } } as unknown as EffectiveDelegationConfig,
+      runId: 'run-1',
+      controlHostOwnership: {}
+    });
+
+    await vi.advanceTimersByTimeAsync(0);
+    await Promise.resolve();
+    expect(readProviderPollingHealth(providerIssueHandoff)).toMatchObject({
+      control_host_owner: verifiedOwner,
+      source_root_freshness_observed_at: '2026-04-11T00:01:00.000Z',
+      source_root_freshness_owner_token: 'owner-token',
+      source_root_freshness_run_id: 'run-1'
+    });
+
+    await started.triggerProviderRefresh?.();
+    await Promise.resolve();
+
+    expect(readProviderPollingHealth(providerIssueHandoff)).toMatchObject({
+      control_host_owner: verifiedOwner,
+      source_root_freshness_observed_at: '2026-04-11T00:01:00.000Z',
+      source_root_freshness_owner_token: 'owner-token',
+      source_root_freshness_run_id: 'run-1'
+    });
 
     await closeControlServerPublicLifecycle(started);
   });
