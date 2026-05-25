@@ -53,6 +53,7 @@ afterEach(async () => {
   vi.restoreAllMocks();
   vi.unstubAllEnvs();
   vi.unstubAllGlobals();
+  vi.useRealTimers();
   await Promise.all(cleanupRoots.splice(0).map((root) => rm(root, { recursive: true, force: true })));
 });
 
@@ -7572,7 +7573,7 @@ describe('ControlRuntime', () => {
     }
   });
 
-  it('does not fill partial explicit proof identities from advisory when raw intake is unavailable', async () => {
+  it('does not fill partial explicit proof issue ids from advisory when raw intake is unavailable', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-05-01T02:41:32.000Z'));
     try {
@@ -7624,7 +7625,15 @@ describe('ControlRuntime', () => {
       expect(issueIdOnlyUiDataset.running.map((entry) => entry.issue_identifier)).not.toContain(
         'CO-424'
       );
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 
+  it('does not fill partial explicit proof identifiers from advisory when raw intake is unavailable', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-05-01T02:41:32.000Z'));
+    try {
       const issueIdentifierOnly = await createFixture({
         taskId: 'local-mcp',
         linearAdvisoryState: {
@@ -7673,7 +7682,7 @@ describe('ControlRuntime', () => {
     } finally {
       vi.useRealTimers();
     }
-  }, 15_000);
+  });
 
   it('keeps proof-bearing explicit null-provider rows visible when raw intake is unavailable', async () => {
     vi.useFakeTimers();
