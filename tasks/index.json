@@ -1,6 +1,67 @@
 {
   "items": [
     {
+      "id": "20260525-linear-725576d6-e236-40f7-a4bc-25428121ee77",
+      "title": "CO-586 drain completed-lane docs freshness residue cohorts",
+      "relates_to": "tasks/specs/linear-725576d6-e236-40f7-a4bc-25428121ee77.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-05-25",
+      "approvals": {
+        "issue_quality_review_20260525": {
+          "reviewer": "CO-586 provider-worker lane",
+          "date": "2026-05-25",
+          "status": "approved-for-implementation",
+          "summary": "The packet preserves the Apr 24 completed-lane residue route, exact owner key, non-goals, Not Done If, and parity matrix before retained-terminal registry lifecycle edits."
+        },
+        "baseline_reproduction": {
+          "reviewer": "CO-586 provider-worker lane",
+          "date": "2026-05-25",
+          "status": "reproduced",
+          "evidence": "out/linear-725576d6-e236-40f7-a4bc-25428121ee77/docs-freshness-maintenance.json",
+          "summary": "Maintainer output reproduced policy_capacity_status.over_cohort_budget=true with current_cohorts=5, max_cohorts=2, and cohort_excess=3."
+        },
+        "live_source_issue_review": {
+          "reviewer": "CO-586 provider-worker lane",
+          "date": "2026-05-25",
+          "status": "done-terminal-evidence",
+          "summary": "Live Linear issue-context verified CO-351 and CO-352 are Done with merged PRs #640 and #641; Apr 24 residue rows are historical completed-lane metadata."
+        },
+        "registry_classification_20260525": {
+          "reviewer": "CO-586 provider-worker lane",
+          "date": "2026-05-25",
+          "status": "retained_terminal_packet",
+          "evidence": "docs/docs-freshness-registry.json",
+          "summary": "Four Apr 24 completed-lane residue rows are marked retained_terminal_packet with live CO-351/CO-352 Done evidence; full docs stay on disk and are not converted into archive stubs."
+        },
+        "blocked_handoff_20260525": {
+          "reviewer": "CO-586 provider-worker lane",
+          "date": "2026-05-25",
+          "status": "superseded_by_current_main_recheck",
+          "evidence": "out/linear-725576d6-e236-40f7-a4bc-25428121ee77/docs-freshness-maintenance.json",
+          "summary": "Earlier block_terminal_lifecycle handoff blocker is superseded by the current-main maintainer recheck; keep this row as historical blocker evidence only."
+        },
+        "current_main_recheck_20260525": {
+          "reviewer": "CO orchestration current-main recheck",
+          "date": "2026-05-25",
+          "status": "unblocked_for_review_prep",
+          "evidence": "out/linear-725576d6-e236-40f7-a4bc-25428121ee77/docs-freshness-maintenance.json",
+          "summary": "Current-main docs:freshness:maintain recheck returned pass_with_owned_rolling_debt with blocks_handoff=false and active owners CO-581/CO-569; prior block_terminal_lifecycle handoff blocker is superseded."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-725576d6-e236-40f7-a4bc-25428121ee77.md",
+        "task": "tasks/tasks-linear-725576d6-e236-40f7-a4bc-25428121ee77.md",
+        "agent_task": ".agent/task/linear-725576d6-e236-40f7-a4bc-25428121ee77.md",
+        "prd": "docs/PRD-linear-725576d6-e236-40f7-a4bc-25428121ee77.md",
+        "docs": "docs/TECH_SPEC-linear-725576d6-e236-40f7-a4bc-25428121ee77.md",
+        "action_plan": "docs/ACTION_PLAN-linear-725576d6-e236-40f7-a4bc-25428121ee77.md"
+      },
+      "status": "in_progress"
+    },
+    {
       "id": "20260525-linear-d2e17480-ee95-4eab-b83d-21be17e58993",
       "title": "CO-585 review docs freshness public and spec pre-expiry batch",
       "relates_to": "tasks/tasks-linear-d2e17480-ee95-4eab-b83d-21be17e58993.md",

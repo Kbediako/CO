@@ -7870,15 +7870,17 @@
     {
       "path": "docs/ACTION_PLAN-codex-0125-model-catalog-posture.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "retained_terminal_packet",
       "last_review": "2026-05-25",
-      "cadence_days": 30,
+      "cadence_days": 365,
+      "notes": "CO-586 retained completed-lane residue: live Linear verified CO-352 Done with merged PR #641; full doc stays on disk as terminal packet history, not an archive stub; CO-569/CO-581 exact rolling owners unchanged.",
+      "retained_reason": "CO-586 retained completed-lane residue: live Linear verified CO-352 Done with merged PR #641; full doc stays on disk as terminal packet history, not an archive stub; CO-569/CO-581 exact rolling owners unchanged.",
+      "task_status": "done",
       "source_issue": {
-        "id": "f4469614-cfdf-49a6-a7ff-366f58229816",
         "identifier": "CO-352",
-        "url": "https://linear.app/asabeko/issue/CO-352/co-adopt-gpt-55xhigh-as-current-co-model-posture"
-      },
-      "notes": "CO-579 residual stale-doc review: live Linear issue-context verifies CO-352 is Done/completed, and the checked-in document remains a readable historical/evidence reference rather than an archive stub; reviewed in place without weakening docs:freshness policy."
+        "id": "f4469614-cfdf-49a6-a7ff-366f58229816",
+        "url": "https://linear.app/asabeko/issue/CO-352/codex-0125-model-catalog-posture"
+      }
     },
     {
       "path": "docs/ACTION_PLAN-codex-cli-alignment-refresh-e2e.md",
@@ -17541,15 +17543,17 @@
     {
       "path": "docs/findings/linear-267f73e1-6347-496d-ad78-2f4177bfe450-codex-0125-appserver-control-seam.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "retained_terminal_packet",
       "last_review": "2026-05-25",
-      "cadence_days": 30,
+      "cadence_days": 365,
+      "notes": "CO-586 retained completed-lane residue: live Linear verified CO-351 Done with merged PR #640; full doc stays on disk as terminal packet history, not an archive stub; CO-569/CO-581 exact rolling owners unchanged.",
+      "retained_reason": "CO-586 retained completed-lane residue: live Linear verified CO-351 Done with merged PR #640; full doc stays on disk as terminal packet history, not an archive stub; CO-569/CO-581 exact rolling owners unchanged.",
+      "task_status": "done",
       "source_issue": {
-        "id": "267f73e1-6347-496d-ad78-2f4177bfe450",
         "identifier": "CO-351",
-        "url": "https://linear.app/asabeko/issue/CO-351/co-adopt-codex-0125-app-server-seam-for-guarded-localcontrol-host-use"
-      },
-      "notes": "CO-579 residual stale-doc review: live Linear issue-context verifies CO-351 is Done/completed, and the checked-in document remains a readable historical/evidence reference rather than an archive stub; reviewed in place without weakening docs:freshness policy."
+        "id": "267f73e1-6347-496d-ad78-2f4177bfe450",
+        "url": "https://linear.app/asabeko/issue/CO-351/codex-cli-01250-app-server-control-seam-validation"
+      }
     },
     {
       "path": "docs/findings/linear-3c52bf66-f805-4537-8671-ad1dec2f4623-docs-freshness-classification.md",
@@ -17627,15 +17631,17 @@
     {
       "path": "docs/findings/linear-f4469614-cfdf-49a6-a7ff-366f58229816-codex-0125-model-catalog-posture.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "retained_terminal_packet",
       "last_review": "2026-05-25",
-      "cadence_days": 30,
+      "cadence_days": 365,
+      "notes": "CO-586 retained completed-lane residue: live Linear verified CO-352 Done with merged PR #641; full doc stays on disk as terminal packet history, not an archive stub; CO-569/CO-581 exact rolling owners unchanged.",
+      "retained_reason": "CO-586 retained completed-lane residue: live Linear verified CO-352 Done with merged PR #641; full doc stays on disk as terminal packet history, not an archive stub; CO-569/CO-581 exact rolling owners unchanged.",
+      "task_status": "done",
       "source_issue": {
-        "id": "f4469614-cfdf-49a6-a7ff-366f58229816",
         "identifier": "CO-352",
-        "url": "https://linear.app/asabeko/issue/CO-352/co-adopt-gpt-55xhigh-as-current-co-model-posture"
-      },
-      "notes": "CO-579 residual stale-doc review: live Linear issue-context verifies CO-352 is Done/completed, and the checked-in document remains a readable historical/evidence reference rather than an archive stub; reviewed in place without weakening docs:freshness policy."
+        "id": "f4469614-cfdf-49a6-a7ff-366f58229816",
+        "url": "https://linear.app/asabeko/issue/CO-352/codex-0125-model-catalog-posture"
+      }
     },
     {
       "path": "docs/findings/more-nutrition.md",
@@ -17919,15 +17925,17 @@
     {
       "path": "docs/PRD-codex-0125-model-catalog-posture.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "retained_terminal_packet",
       "last_review": "2026-05-25",
-      "cadence_days": 30,
+      "cadence_days": 365,
+      "notes": "CO-586 retained completed-lane residue: live Linear verified CO-352 Done with merged PR #641; full doc stays on disk as terminal packet history, not an archive stub; CO-569/CO-581 exact rolling owners unchanged.",
+      "retained_reason": "CO-586 retained completed-lane residue: live Linear verified CO-352 Done with merged PR #641; full doc stays on disk as terminal packet history, not an archive stub; CO-569/CO-581 exact rolling owners unchanged.",
+      "task_status": "done",
       "source_issue": {
-        "id": "f4469614-cfdf-49a6-a7ff-366f58229816",
         "identifier": "CO-352",
-        "url": "https://linear.app/asabeko/issue/CO-352/co-adopt-gpt-55xhigh-as-current-co-model-posture"
-      },
-      "notes": "CO-579 residual stale-doc review: live Linear issue-context verifies CO-352 is Done/completed, and the checked-in document remains a readable historical/evidence reference rather than an archive stub; reviewed in place without weakening docs:freshness policy."
+        "id": "f4469614-cfdf-49a6-a7ff-366f58229816",
+        "url": "https://linear.app/asabeko/issue/CO-352/codex-0125-model-catalog-posture"
+      }
     },
     {
       "path": "docs/PRD-codex-cli-alignment-refresh-e2e.md",
@@ -46279,6 +46287,48 @@
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2026-05-05",
+      "cadence_days": 30
+    },
+    {
+      "path": ".agent/task/linear-725576d6-e236-40f7-a4bc-25428121ee77.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-25",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/PRD-linear-725576d6-e236-40f7-a4bc-25428121ee77.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-25",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/TECH_SPEC-linear-725576d6-e236-40f7-a4bc-25428121ee77.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-25",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/ACTION_PLAN-linear-725576d6-e236-40f7-a4bc-25428121ee77.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-25",
+      "cadence_days": 30
+    },
+    {
+      "path": "tasks/specs/linear-725576d6-e236-40f7-a4bc-25428121ee77.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-25",
+      "cadence_days": 30
+    },
+    {
+      "path": "tasks/tasks-linear-725576d6-e236-40f7-a4bc-25428121ee77.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-25",
       "cadence_days": 30
     }
   ]
