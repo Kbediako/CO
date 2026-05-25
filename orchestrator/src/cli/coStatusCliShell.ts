@@ -130,6 +130,13 @@ export type CoStatusMachineStatusJsonDataset = ControlMachineStatusDataset &
 
 export type CoStatusJsonDataset = CoStatusOperatorDashboardDataset | CoStatusMachineStatusJsonDataset;
 
+export interface CoStatusHealthzDataset {
+  status: 'ok';
+  mode: 'control_host_liveness';
+  timestamp?: string;
+  read_only?: true;
+}
+
 export interface RunCoStatusCliShellParams {
   flags: ArgMap;
   printHelp: () => void;
@@ -174,8 +181,14 @@ export async function runCoStatusCliShell(
   assertAttachCompatibleFlags(params.flags);
   const format: OutputFormat = readStringFlag(params.flags, 'format') === 'json' ? 'json' : 'text';
   const explicitMachineStatus = readBooleanFlag(params.flags, 'machine-status');
+  const explicitHealthz = readBooleanFlag(params.flags, 'healthz');
   const requestedDashboardJson =
     readBooleanFlag(params.flags, 'dashboard') || readBooleanFlag(params.flags, 'operator-dashboard');
+  if (explicitHealthz) {
+    const dataset = await readCoStatusHealthzDataset({ flags: params.flags });
+    dependencies.log(JSON.stringify(dataset, null, 2));
+    return;
+  }
   const explicitMachineStatusJsonSnapshot =
     format === 'json' && explicitMachineStatus && !requestedDashboardJson;
   let runtimeFreshnessBlock: CoStatusRuntimeFreshnessBlockPayload | null = null;
@@ -279,6 +292,184 @@ export async function readCoStatusMachineStatusDataset(input: {
     }
     return degradedDataset;
   }
+}
+
+export async function readCoStatusHealthzDataset(input: {
+  flags: ArgMap;
+  requestTimeoutMs?: number;
+}): Promise<CoStatusHealthzDataset> {
+  let target = await resolveAttachTarget(input.flags);
+  const requestTimeoutMs = input.requestTimeoutMs ?? DEFAULT_CO_STATUS_JSON_REQUEST_TIMEOUT_MS;
+  try {
+    return await fetchCoStatusHealthzDataset(target, requestTimeoutMs);
+  } catch (error) {
+    let resolvedTarget: CoStatusAttachTarget;
+    try {
+      resolvedTarget = await resolveAttachTarget(input.flags);
+    } catch (resolveError) {
+      throw new Error(
+        `${formatCoStatusHealthzRequestFailure(error, target)} Re-resolving control_endpoint.json failed: ${
+          (resolveError as Error)?.message ?? String(resolveError)
+        }.`
+      );
+    }
+
+    if (!isCoStatusAttachTargetEndpointEquivalent(target, resolvedTarget)) {
+      const previousTarget = target;
+      target = resolvedTarget;
+      try {
+        return await fetchCoStatusHealthzDataset(target, requestTimeoutMs);
+      } catch (retryError) {
+        throw new Error(
+          `control-host endpoint rotated from ${previousTarget.baseUrl.toString()} to ${target.baseUrl.toString()}, but the refreshed healthz endpoint is not readable. ${formatCoStatusHealthzRequestFailure(retryError, target, { endpointAlreadyRotated: true })}`
+        );
+      }
+    }
+
+    if (isCoStatusHealthzTimeoutError(error)) {
+      try {
+        return await fetchCoStatusHealthzDataset(target, requestTimeoutMs);
+      } catch (retryError) {
+        if (isCoStatusHealthzTimeoutError(retryError)) {
+          throw new Error(formatCoStatusHealthzSameEndpointTimeoutFailure(retryError, target));
+        }
+        throw new Error(formatCoStatusHealthzRequestFailure(retryError, target));
+      }
+    }
+
+    throw new Error(formatCoStatusHealthzRequestFailure(error, target));
+  }
+}
+
+class CoStatusHealthzRequestError extends Error {
+  readonly kind: 'auth' | 'http' | 'network' | 'timeout';
+
+  constructor(kind: CoStatusHealthzRequestError['kind'], message: string, options: { cause?: unknown } = {}) {
+    super(message, options.cause === undefined ? undefined : { cause: options.cause });
+    this.name = 'CoStatusHealthzRequestError';
+    this.kind = kind;
+  }
+}
+
+async function fetchCoStatusHealthzDataset(
+  target: CoStatusAttachTarget,
+  requestTimeoutMs: number
+): Promise<CoStatusHealthzDataset> {
+  const url = new URL('/healthz', target.baseUrl);
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), requestTimeoutMs);
+  let response: Response;
+  try {
+    response = await fetch(url.toString(), {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${target.token}`,
+        'x-csrf-token': target.token
+      },
+      signal: controller.signal
+    });
+  } catch (error) {
+    if ((error as Error)?.name === 'AbortError') {
+      throw new CoStatusHealthzRequestError(
+        'timeout',
+        `control-host healthz request timeout after ${requestTimeoutMs}ms`,
+        { cause: error }
+      );
+    }
+    throw new CoStatusHealthzRequestError(
+      'network',
+      `control-host healthz unavailable at ${url.toString()}: ${formatCoStatusHealthzFetchNetworkError(error)}`,
+      { cause: error }
+    );
+  } finally {
+    clearTimeout(timer);
+  }
+  if (!response.ok) {
+    const statusText = response.statusText.trim() || 'HTTP error';
+    if (response.status === 401 || response.status === 403) {
+      throw new CoStatusHealthzRequestError(
+        'auth',
+        `control-host healthz auth failed: ${response.status} ${statusText}; refresh control_auth.json or restart co-status against the current control-host.`
+      );
+    }
+    throw new CoStatusHealthzRequestError(
+      'http',
+      `control-host healthz request failed: ${response.status} ${statusText}`
+    );
+  }
+  const payload = (await response.json()) as unknown;
+  if (!isCoStatusHealthzDataset(payload)) {
+    throw new Error('control-host healthz payload invalid');
+  }
+  return payload;
+}
+
+function isCoStatusAttachTargetEndpointEquivalent(
+  left: CoStatusAttachTarget,
+  right: CoStatusAttachTarget
+): boolean {
+  return left.baseUrl.toString() === right.baseUrl.toString() && left.token === right.token;
+}
+
+function isCoStatusHealthzTimeoutError(error: unknown): error is CoStatusHealthzRequestError {
+  return error instanceof CoStatusHealthzRequestError && error.kind === 'timeout';
+}
+
+function formatCoStatusHealthzSameEndpointTimeoutFailure(
+  error: CoStatusHealthzRequestError,
+  target: CoStatusAttachTarget
+): string {
+  return [
+    `${error.message}.`,
+    `The current resolved /healthz endpoint at ${target.baseUrl.toString()} timed out again after endpoint re-resolution returned the same endpoint/token; this is a same-endpoint current-endpoint timeout from endpoint starvation or event-loop blocking, not stale/dead endpoint ECONNREFUSED recovery or attach restart/rotation.`
+  ].join(' ');
+}
+
+function formatCoStatusHealthzRequestFailure(
+  error: unknown,
+  target: CoStatusAttachTarget,
+  options: { endpointAlreadyRotated?: boolean } = {}
+): string {
+  if (error instanceof CoStatusHealthzRequestError) {
+    if (error.kind === 'network') {
+      if (options.endpointAlreadyRotated) {
+        return `current-host-unhealthy: ${error.message}. The refreshed control-host healthz endpoint is still unreachable; wait for the new host to come up or rerun co-status.`;
+      }
+      return `current-host-unhealthy: control_endpoint.json; control-host unavailable; stale endpoint after control-host restart. control_endpoint.json has not rotated to a reachable host. ${error.message}. Waiting for ${resolve(target.runDir, 'control_endpoint.json')} to rotate or rerun co-status.`;
+    }
+    if (error.kind === 'timeout') {
+      return `${error.message}. The control-host did not answer before the healthz timeout; if restart is in progress, wait for endpoint rotation or rerun co-status.`;
+    }
+    return error.message;
+  }
+  return `control-host healthz request failed: ${(error as Error)?.message ?? String(error)}`;
+}
+
+function formatCoStatusHealthzFetchNetworkError(error: unknown): string {
+  const message = (error as Error)?.message ?? String(error);
+  const code = extractCoStatusHealthzFetchErrorCode(error);
+  return code ? `${message} (${code})` : message;
+}
+
+function extractCoStatusHealthzFetchErrorCode(error: unknown): string | null {
+  if (!error || typeof error !== 'object') {
+    return null;
+  }
+  const cause = (error as { cause?: unknown }).cause;
+  if (!cause || typeof cause !== 'object') {
+    return null;
+  }
+  const code = (cause as { code?: unknown }).code;
+  return typeof code === 'string' && code.trim().length > 0 ? code : null;
+}
+
+function isCoStatusHealthzDataset(payload: unknown): payload is CoStatusHealthzDataset {
+  return (
+    typeof payload === 'object' &&
+    payload !== null &&
+    (payload as { status?: unknown }).status === 'ok' &&
+    (payload as { mode?: unknown }).mode === 'control_host_liveness'
+  );
 }
 
 export async function readCoStatusJsonDataset(input: {

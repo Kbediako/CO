@@ -3,15 +3,13 @@ import { readdir, readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import {
-  buildMachineStatusDataset,
-  type ControlMachineStatusSnapshot
+  buildMachineStatusDataset
 } from '../src/cli/control/controlMachineStatusPresenter.js';
 import { createControlRuntime } from '../src/cli/control/controlRuntime.js';
 import {
-  __test__ as machineStatusControllerTest,
   handleMachineStatusRequest
 } from '../src/cli/control/machineStatusController.js';
 import type { ControlProviderWorkflowPayload } from '../src/cli/control/observabilityReadModel.js';
@@ -67,6 +65,144 @@ describe('control machine status contract', () => {
     ).map(({ file, text }) => `// ${file}\n${text}`).join('\n');
 
     expect(source).not.toMatch(/\breadCompatibilityProjection\s*\(/u);
+  });
+
+  it('serves committed machine-status snapshots without invoking live readers or controller timeouts', async () => {
+    const { res, state } = createResponseRecorder();
+    const committedDataset = buildMachineStatusDataset({
+      generatedAt: '2026-05-25T00:24:00.000Z',
+      providerIntake: {
+        provider: 'linear',
+        summary_scope: 'single_claim',
+        selection_strategy: null,
+        claim_count: 1,
+        active_claim_count: 1,
+        running_claim_count: 1,
+        active_issue_identifiers: ['CO-557'],
+        running_issue_identifiers: ['CO-557'],
+        selected_claim: {
+          provider: 'linear',
+          issue_id: '632b3471-6b55-4a0b-a778-0ca4001cf2b9',
+          issue_identifier: 'CO-557',
+          issue_title: 'Prevent provider docs-review task key and root drift',
+          issue_state: 'In Progress',
+          issue_state_type: 'started',
+          issue_updated_at: '2026-05-25T00:23:00.000Z',
+          issue_archived_at: null,
+          issue_trashed: null,
+          issue_viewer_id: null,
+          issue_assignee_id: null,
+          issue_assignee_name: null,
+          task_id: 'linear-632b3471-6b55-4a0b-a778-0ca4001cf2b9',
+          mapping_source: 'provider_id_fallback',
+          state: 'running',
+          reason: 'provider worker active',
+          run_id: 'run-557',
+          worker_host: 'host-a',
+          freshness: null,
+          retry: null,
+          updated_at: '2026-05-25T00:24:00.000Z'
+        },
+        rehydrated_at: null,
+        is_rehydrated: false,
+        updated_at: '2026-05-25T00:24:00.000Z'
+      },
+      runningClaims: [
+        {
+          provider: 'linear',
+          provider_key: 'linear:632b3471-6b55-4a0b-a778-0ca4001cf2b9',
+          issue_id: '632b3471-6b55-4a0b-a778-0ca4001cf2b9',
+          issue_identifier: 'CO-557',
+          issue_title: 'Prevent provider docs-review task key and root drift',
+          issue_state: 'In Progress',
+          issue_state_type: 'started',
+          issue_updated_at: '2026-05-25T00:23:00.000Z',
+          task_id: 'linear-632b3471-6b55-4a0b-a778-0ca4001cf2b9',
+          mapping_source: 'provider_id_fallback',
+          state: 'running',
+          reason: 'provider worker active',
+          accepted_at: '2026-05-25T00:20:00.000Z',
+          updated_at: '2026-05-25T00:24:00.000Z',
+          last_delivery_id: 'delivery-557',
+          last_event: 'provider_worker_progress',
+          last_action: 'poll',
+          last_webhook_timestamp: null,
+          run_id: 'run-557',
+          run_manifest_path: null,
+          worker_host: 'host-a',
+          launch_source: 'control-host',
+          launch_token: null,
+          launch_started_at: '2026-05-25T00:20:30.000Z'
+        } satisfies ProviderIntakeClaimRecord
+      ],
+      polling: {
+        enabled: true,
+        interval_ms: 15000,
+        checking: true,
+        queued: true,
+        stuck: true,
+        restart_required: true,
+        reason: 'provider_refresh_lifecycle_stuck',
+        last_mode: 'refresh',
+        last_requested_at: '2026-05-25T00:24:00.000Z',
+        last_completed_at: null,
+        last_success_at: '2026-05-25T00:20:00.000Z',
+        last_error_at: '2026-05-25T00:24:30.000Z',
+        last_error: 'provider_refresh_lifecycle_stuck',
+        next_poll_at: null,
+        next_poll_in_ms: null
+      }
+    });
+
+    const handled = await handleMachineStatusRequest({
+      req: {
+        method: 'GET',
+        url: '/ui/machine-status.json'
+      } as Pick<http.IncomingMessage, 'method' | 'url'>,
+      res,
+      presenterContext: {
+        readCommittedMachineStatusDataset: () => committedDataset,
+        readMachineStatus: async () => {
+          throw new Error('live machine-status reader must not run on the request path');
+        }
+      } as never
+    });
+
+    expect(handled).toBe(true);
+    expect(state.statusCode).toBe(200);
+    expect(state.body).toMatchObject({
+      generated_at: '2026-05-25T00:24:00.000Z',
+      counts: {
+        running: 1,
+        issues: 1
+      },
+      polling: {
+        last_error: 'provider_refresh_lifecycle_stuck'
+      }
+    });
+    expect(state.body).not.toHaveProperty('machine_status_degraded');
+  });
+
+  it('keeps snapshot machine-status serving free of controller Promise.race and sync process APIs', async () => {
+    const controlDir = join(dirname(fileURLToPath(import.meta.url)), '..', 'src', 'cli', 'control');
+    const requestPathFiles = [
+      'machineStatusController.ts',
+      'controlMachineStatusPresenter.ts',
+      'controlRequestContext.ts'
+    ];
+    const source = (
+      await Promise.all(
+        requestPathFiles.map(async (file) => ({
+          file,
+          text: await readFile(join(controlDir, file), 'utf8')
+        }))
+      )
+    ).map(({ file, text }) => `// ${file}\n${text}`).join('\n');
+
+    expect(source).not.toMatch(/\bPromise\.race\s*\(/u);
+    expect(source).not.toMatch(/\b(?:spawnSync|execSync|execFileSync)\b/u);
+    expect(source).not.toMatch(/\brefreshControlHostOwnershipPollingPayload\s*\(/u);
+    expect(source).not.toMatch(/\brefreshSourceRootFreshnessInspection\s*\(/u);
   });
 
   it('preserves lightweight active-worker identity from provider-intake claims', () => {
@@ -226,6 +362,112 @@ describe('control machine status contract', () => {
     });
   });
 
+  it('preserves committed owner freshness without request-path source-root refresh', () => {
+    const committedObservedAt = '2026-05-21T12:00:00.000Z';
+    const runtime = createControlRuntime({
+      controlStore: {
+        snapshot: () => ({ feature_toggles: {} })
+      },
+      questionQueue: {
+        list: () => []
+      },
+      paths: {
+        manifestPath: '/repo/.runs/local-mcp/cli/control-host/manifest.json',
+        runDir: '/repo/.runs/local-mcp/cli/control-host',
+        logPath: '/repo/.runs/local-mcp/cli/control-host/run.log'
+      },
+      linearAdvisoryState: {
+        tracked_issue: null
+      },
+      providerIntakeState: {
+        schema_version: 1,
+        updated_at: '2026-05-21T12:30:00.000Z',
+        rehydrated_at: null,
+        latest_provider_key: null,
+        latest_reason: null,
+        claims: [],
+        polling: {
+          enabled: true,
+          interval_ms: 15000,
+          checking: false,
+          queued: false,
+          last_mode: 'poll',
+          last_requested_at: '2026-05-21T12:20:00.000Z',
+          last_completed_at: '2026-05-21T12:20:01.000Z',
+          last_success_at: '2026-05-21T12:20:01.000Z',
+          last_error_at: null,
+          last_error: null,
+          next_poll_at: '2026-05-21T12:20:15.000Z',
+          next_poll_in_ms: 15000,
+          stuck: false,
+          restart_required: false,
+          control_host_owner: {
+            status: 'owned',
+            reason: null,
+            updated_at: '2026-05-21T12:00:00.000Z',
+            owner: {
+              owner_token: 'owner-token',
+              status: 'owned',
+              pid: 12345,
+              ppid: null,
+              hostname: 'host-a',
+              acquired_at: '2026-05-21T11:59:00.000Z',
+              updated_at: '2026-05-21T12:00:00.000Z',
+              released_at: null,
+              repo_root: '/definitely/not/a/current/repo',
+              task_id: 'local-mcp',
+              run_id: 'control-host',
+              run_dir: '/repo/.runs/local-mcp/cli/control-host',
+              pipeline_id: 'provider-linear-worker',
+              source_root_freshness: {
+                schema_version: 1,
+                status: 'warning',
+                observed_at: committedObservedAt,
+                intended_repo_root: '/definitely/not/a/current/repo',
+                intended_repo_root_realpath: null,
+                command_path: '/definitely/not/a/current/repo/bin/codex-orchestrator.ts',
+                command_path_realpath: null,
+                package_root: '/definitely/not/a/current/repo',
+                package_root_realpath: null,
+                source_root: '/definitely/not/a/current/repo',
+                source_root_realpath: null,
+                entrypoint_kind: 'source',
+                base_ref: 'origin/main',
+                source_checkout: null,
+                intended_checkout: null,
+                drift_classes: ['supervised_source_root_drift'],
+                provenance: {
+                  command_path_source: 'explicit',
+                  package_root_source: 'explicit',
+                  source_root_source: 'package_root',
+                  command_path_inside_package: true,
+                  package_root_matches_intended: true,
+                  source_root_matches_intended: true,
+                  source_entry_exists: null,
+                  dist_entry_exists: null
+                },
+                guidance: ['committed owner freshness only'],
+                detail: 'committed stale owner evidence'
+              },
+              lock_dir: '/repo/.runs/local-mcp/cli/control-host/control-host-owner.lock',
+              owner_path: '/repo/.runs/local-mcp/cli/control-host/control-host-owner.json'
+            },
+            diagnostic_path: null,
+            lock_dir: '/repo/.runs/local-mcp/cli/control-host/control-host-owner.lock',
+            owner_path: '/repo/.runs/local-mcp/cli/control-host/control-host-owner.json'
+          }
+        }
+      }
+    } as Parameters<typeof createControlRuntime>[0]);
+
+    const dataset = runtime.snapshot().readCommittedMachineStatusDataset();
+
+    expect(dataset.polling?.control_host_owner?.owner?.source_root_freshness).toMatchObject({
+      observed_at: committedObservedAt,
+      detail: 'committed stale owner evidence'
+    });
+  });
+
   it('uses cached provider-workflow status for machine-status reads', async () => {
     let refreshCalled = false;
     const providerWorkflow = buildProviderWorkflowPayload();
@@ -281,101 +523,6 @@ describe('control machine status contract', () => {
     expect(machineStatus.providerWorkflow).toEqual(providerWorkflow);
   });
 
-  it('returns degraded fail-closed machine-status json when the read path times out before reader abort handling', async () => {
-    vi.useFakeTimers();
-    try {
-      const { res, state } = createResponseRecorder();
-      let observedSignal: AbortSignal | undefined;
-      let abortReason: unknown;
-      const readerAbortError = Object.assign(new Error('reader observed abort'), {
-        name: 'AbortError'
-      });
-      const handledPromise = handleMachineStatusRequest({
-        req: {
-          method: 'GET',
-          url: '/ui/machine-status.json'
-        } as Pick<http.IncomingMessage, 'method' | 'url'>,
-        res,
-        presenterContext: {
-          readMachineStatus: async (signal?: AbortSignal) => {
-            observedSignal = signal;
-            return await new Promise<ControlMachineStatusSnapshot>((_resolve, reject) => {
-              signal?.addEventListener(
-                'abort',
-                () => {
-                  abortReason = signal.reason;
-                  reject(readerAbortError);
-                },
-                { once: true }
-              );
-            });
-          }
-        }
-      });
-
-      await vi.advanceTimersByTimeAsync(machineStatusControllerTest.DEFAULT_MACHINE_STATUS_READ_TIMEOUT_MS);
-
-      await expect(handledPromise).resolves.toBe(true);
-      expect(state.statusCode).toBe(200);
-      expect(state.headers).toMatchObject({
-        'Content-Type': 'application/json',
-        'Cache-Control': 'no-store'
-      });
-      expect(state.body).toMatchObject({
-        mode: 'control_machine_status',
-        read_only: true,
-        counts: {
-          running: 0,
-          retrying: 0,
-          issues: 0,
-          max_allowed: null
-        },
-        polling: null,
-        running: [],
-        retrying: [],
-        issues: [],
-        machine_status_degraded: {
-          reason: 'read_timeout',
-          source: 'machine_status_controller',
-          message: `control-host machine-status read timed out after ${machineStatusControllerTest.DEFAULT_MACHINE_STATUS_READ_TIMEOUT_MS}ms`,
-          timeout_ms: machineStatusControllerTest.DEFAULT_MACHINE_STATUS_READ_TIMEOUT_MS
-        }
-      });
-      expect(observedSignal?.aborted).toBe(true);
-      expect(abortReason).toBeInstanceOf(Error);
-    } finally {
-      vi.useRealTimers();
-    }
-  });
-
-  it('returns degraded fail-closed machine-status json for non-string read error messages', async () => {
-    const { res, state } = createResponseRecorder();
-
-    await expect(handleMachineStatusRequest({
-      req: {
-        method: 'GET',
-        url: '/ui/machine-status.json'
-      } as Pick<http.IncomingMessage, 'method' | 'url'>,
-      res,
-      presenterContext: {
-        readMachineStatus: async () => {
-          throw { message: 123 };
-        }
-      }
-    })).resolves.toBe(true);
-
-    expect(state.statusCode).toBe(200);
-    expect(state.body).toMatchObject({
-      mode: 'control_machine_status',
-      read_only: true,
-      machine_status_degraded: {
-        reason: 'read_failed',
-        source: 'machine_status_controller',
-        message: '123',
-        timeout_ms: null
-      }
-    });
-  });
 });
 
 function buildProviderWorkflowPayload(): ControlProviderWorkflowPayload {

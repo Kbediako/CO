@@ -1557,6 +1557,58 @@ describe('createControlServerSeededRuntimeAssembly', () => {
     }
   });
 
+  it('invalidates committed machine-status snapshots after polling-only persistence', async () => {
+    const { root, env, paths } = await createRunRoot('task-1084');
+    const config = computeEffectiveDelegationConfig({ repoRoot: env.repoRoot, layers: [] });
+
+    try {
+      const assembly = createControlServerSeededRuntimeAssembly({
+        runId: 'run-1',
+        token: 'control-token',
+        config,
+        paths,
+        sessionTtlMs: 60_000,
+        controlSeed: null,
+        confirmationsSeed: null,
+        questionsSeed: null,
+        delegationSeed: null,
+        linearAdvisorySeed: null,
+        providerIntakeSeed: null
+      });
+
+      const initialDataset =
+        assembly.requestContextShared.runtime.snapshot().readCommittedMachineStatusDataset();
+      expect(initialDataset.polling).toBeNull();
+
+      await assembly.requestContextShared.persist.providerIntakePolling?.(
+        {
+          enabled: true,
+          checking: true,
+          updated_at: '2026-03-09T00:02:00.000Z',
+          stuck: true,
+          restart_required: true,
+          reason: 'provider_refresh_lifecycle_stuck'
+        },
+        '2026-03-09T00:02:00.000Z'
+      );
+
+      const refreshedDataset =
+        assembly.requestContextShared.runtime.snapshot().readCommittedMachineStatusDataset();
+      expect(refreshedDataset).not.toBe(initialDataset);
+      expect(initialDataset.polling).toBeNull();
+      expect(refreshedDataset.polling).toMatchObject({
+        enabled: true,
+        checking: true,
+        updated_at: '2026-03-09T00:02:00.000Z',
+        stuck: true,
+        restart_required: true,
+        reason: 'provider_refresh_lifecycle_stuck'
+      });
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
   it('keeps the newest top-level provider intake timestamp when polling persistence arrives late', async () => {
     const { root, env, paths } = await createRunRoot('task-1084');
     const config = computeEffectiveDelegationConfig({ repoRoot: env.repoRoot, layers: [] });

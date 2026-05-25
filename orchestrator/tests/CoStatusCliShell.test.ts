@@ -8,6 +8,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { DEFAULT_ATTACH_REQUEST_TIMEOUT_MS } from '../src/cli/coStatusAttachCliShell.js';
 import {
   __test__ as coStatusCliShellTest,
+  readCoStatusHealthzDataset,
   readCoStatusJsonDataset,
   readCoStatusMachineStatusDataset,
   runCoStatusCliShell
@@ -746,6 +747,77 @@ describe('runCoStatusCliShell', () => {
     });
   });
 
+  it('emits the authenticated healthz liveness payload', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'co-status-shell-'));
+    tempDirs.push(root);
+    process.env.CODEX_ORCHESTRATOR_ROOT = root;
+
+    const runDir = await writeCoStatusRunDir(root);
+    const server = await startHealthzServer();
+    servers.add(server.instance);
+    await writeControlEndpointArtifacts(runDir, server.baseUrl);
+
+    const payload = await readCoStatusHealthzDataset({
+      flags: {
+        format: 'json',
+        healthz: true,
+        'run-dir': runDir
+      }
+    });
+
+    expect(server.requests).toEqual([
+      {
+        authorization: 'Bearer snapshot-token',
+        csrfToken: 'snapshot-token'
+      }
+    ]);
+    expect(payload).toMatchObject({
+      status: 'ok',
+      mode: 'control_host_liveness'
+    });
+  });
+
+  it('re-resolves endpoint artifacts for healthz mode when the current endpoint is stale', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'co-status-shell-'));
+    tempDirs.push(root);
+    process.env.CODEX_ORCHESTRATOR_ROOT = root;
+
+    const runDir = await writeCoStatusRunDir(root);
+
+    const currentServer = await startHealthzServer();
+    servers.add(currentServer.instance);
+    const staleServer = await startFailingHealthzServer(async () => {
+      await writeControlEndpointArtifacts(runDir, currentServer.baseUrl);
+    });
+    servers.add(staleServer.instance);
+    await writeControlEndpointArtifacts(runDir, staleServer.baseUrl);
+
+    const payload = await readCoStatusHealthzDataset({
+      flags: {
+        format: 'json',
+        healthz: true,
+        'run-dir': runDir
+      }
+    });
+
+    expect(staleServer.requests).toEqual([
+      {
+        authorization: 'Bearer snapshot-token',
+        csrfToken: 'snapshot-token'
+      }
+    ]);
+    expect(currentServer.requests).toEqual([
+      {
+        authorization: 'Bearer snapshot-token',
+        csrfToken: 'snapshot-token'
+      }
+    ]);
+    expect(payload).toMatchObject({
+      status: 'ok',
+      mode: 'control_host_liveness'
+    });
+  });
+
   it('does not use degraded local fallback for rotated endpoint auth failures', async () => {
     const root = await mkdtemp(join(tmpdir(), 'co-status-shell-'));
     tempDirs.push(root);
@@ -974,8 +1046,9 @@ describe('runCoStatusCliShell', () => {
     }
 
     expect((thrown as Error)?.message ?? String(thrown)).toMatch(
-      /current resolved \/ui\/data\.json endpoint .* timed out again after endpoint re-resolution returned the same endpoint\/token/u
+      /same-endpoint current-endpoint timeout from endpoint starvation or snapshot-read blocking/u
     );
+    expect((thrown as Error)?.message ?? String(thrown)).not.toMatch(/stale endpoint discovery/u);
     expect((thrown as Error)?.message ?? String(thrown)).not.toMatch(/control_endpoint\.json has not rotated/u);
     expect(fetchSpy).toHaveBeenCalledTimes(2);
   });
@@ -3295,6 +3368,58 @@ async function startMachineStatusServer(options: {
   };
 }
 
+async function startHealthzServer(): Promise<{
+  instance: http.Server;
+  baseUrl: string;
+  requests: Array<{ authorization: string | null; csrfToken: string | null }>;
+}> {
+  const requests: Array<{ authorization: string | null; csrfToken: string | null }> = [];
+  const server = http.createServer((req, res) => {
+    if (req.url === '/healthz') {
+      requests.push({
+        authorization: typeof req.headers.authorization === 'string' ? req.headers.authorization : null,
+        csrfToken: typeof req.headers['x-csrf-token'] === 'string' ? req.headers['x-csrf-token'] : null
+      });
+      if (req.headers.authorization !== 'Bearer snapshot-token') {
+        res.writeHead(401, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'unauthorised' }));
+        return;
+      }
+      if (req.headers['x-csrf-token'] !== 'snapshot-token') {
+        res.writeHead(403, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'csrf required' }));
+        return;
+      }
+      res.writeHead(200, {
+        'Content-Type': 'application/json',
+        'Cache-Control': 'no-store'
+      });
+      res.end(
+        JSON.stringify({
+          status: 'ok',
+          mode: 'control_host_liveness',
+          timestamp: '2026-05-25T00:00:00.000Z'
+        })
+      );
+      return;
+    }
+    res.writeHead(404).end();
+  });
+
+  await new Promise<void>((resolve) => {
+    server.listen(0, '127.0.0.1', () => resolve());
+  });
+  const address = server.address();
+  if (!address || typeof address === 'string') {
+    throw new Error('expected loopback http server address');
+  }
+  return {
+    instance: server,
+    baseUrl: `http://127.0.0.1:${address.port}`,
+    requests
+  };
+}
+
 async function startFailingUiServer(
   beforeNetworkFailure?: () => Promise<void> | void
 ): Promise<{
@@ -3305,6 +3430,40 @@ async function startFailingUiServer(
   const requests: Array<{ authorization: string | null; csrfToken: string | null }> = [];
   const server = http.createServer(async (req) => {
     if (req.url === '/ui/data.json') {
+      requests.push({
+        authorization: typeof req.headers.authorization === 'string' ? req.headers.authorization : null,
+        csrfToken: typeof req.headers['x-csrf-token'] === 'string' ? req.headers['x-csrf-token'] : null
+      });
+      await beforeNetworkFailure?.();
+      req.socket.destroy();
+      return;
+    }
+  });
+
+  await new Promise<void>((resolve) => {
+    server.listen(0, '127.0.0.1', () => resolve());
+  });
+  const address = server.address();
+  if (!address || typeof address === 'string') {
+    throw new Error('expected loopback http server address');
+  }
+  return {
+    instance: server,
+    baseUrl: `http://127.0.0.1:${address.port}`,
+    requests
+  };
+}
+
+async function startFailingHealthzServer(
+  beforeNetworkFailure?: () => Promise<void> | void
+): Promise<{
+  instance: http.Server;
+  baseUrl: string;
+  requests: Array<{ authorization: string | null; csrfToken: string | null }>;
+}> {
+  const requests: Array<{ authorization: string | null; csrfToken: string | null }> = [];
+  const server = http.createServer(async (req) => {
+    if (req.url === '/healthz') {
       requests.push({
         authorization: typeof req.headers.authorization === 'string' ? req.headers.authorization : null,
         csrfToken: typeof req.headers['x-csrf-token'] === 'string' ? req.headers['x-csrf-token'] : null

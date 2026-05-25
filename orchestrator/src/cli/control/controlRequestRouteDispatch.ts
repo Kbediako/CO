@@ -26,7 +26,10 @@ export async function handleControlRequestRouteDispatch(
     await handlePublicControlRoute({
       pathname: input.pathname,
       search: input.search,
-      res: input.res
+      req: input.req,
+      res: input.res,
+      controlToken: input.context.token,
+      readCommittedMachineStatusDataset: () => input.runtimeSnapshot.readCommittedMachineStatusDataset()
     })
   ) {
     return;

@@ -1667,6 +1667,55 @@ describe('controlHostSupervision shell helpers', () => {
     });
   });
 
+  it('does not let freshness artifacts override legacy machine-status timeout stderr', async () => {
+    const config = buildControlHostSupervisionConfig({
+      homeDir: '/Users/tester',
+      cwd: '/repo/workspace',
+      label: 'com.example.control-host',
+      repoRoot: '/repo/CO',
+      nodePath: '/custom/node',
+      cliEntrypoint: '/opt/codex-orchestrator.js'
+    });
+    const freshnessReport = {
+      verdict: 'degraded',
+      metrics: {
+        last_successful_refresh_age_ms: { verdict: 'healthy' },
+        active_heartbeat_age_ms: { verdict: 'healthy' },
+        polling_health: { verdict: 'healthy', value: 'ok' }
+      }
+    } as unknown as ProviderControlHostFreshnessGaugeReport;
+
+    const liveHealth = await inspectControlHostSupervisionLiveHealth(config, null, {
+      loadBootstrapEnvironment: async () => ({ HOME: '/Users/tester' }),
+      probeControlHostHealth: (probeConfig, env) =>
+        probeControlHostHealth(
+          probeConfig,
+          env,
+          {},
+          async () => ({
+            exitCode: 1,
+            stdout: '',
+            stderr:
+              'control-host machine-status request timeout after 5000ms. The current resolved /ui/machine-status.json endpoint timed out again after endpoint re-resolution returned the same endpoint/token.',
+            timedOut: false
+          })
+        ),
+      evaluateFreshnessGauge: async () => freshnessReport
+    });
+
+    expect(liveHealth).toMatchObject({
+      healthy: false,
+      source: 'co_status',
+      reason: 'probe_timeout',
+      co_status: {
+        healthy: false,
+        reason: 'probe_timeout',
+        diagnostic: null
+      }
+    });
+    expect(liveHealth?.message).toContain('legacy machine-status probe timed out');
+  });
+
   it('detects the legacy shim LaunchAgent and marks migration as required', () => {
     const launchAgent = inspectControlHostSupervisionLaunchAgent(
       `<?xml version="1.0" encoding="UTF-8"?>
@@ -2220,7 +2269,7 @@ describe('controlHostSupervision shell helpers', () => {
     }
   });
 
-  it('bounds co-status probe timeouts and surfaces timeout health state', async () => {
+  it('bounds cheap liveness probe timeouts without probing machine-status diagnostics', async () => {
     const config = buildControlHostSupervisionConfig({
       homeDir: '/Users/tester',
       cwd: '/repo/workspace',
@@ -2253,17 +2302,13 @@ describe('controlHostSupervision shell helpers', () => {
     );
 
     expect(observedTimeoutMs).toBe(resolveControlHostSupervisionProbeTimeoutMs(5));
-    expect(observedArgs).toEqual(
-      expect.arrayContaining([
-        '--machine-status',
-        '--machine-status-max-age-ms',
-        '15000'
-      ])
-    );
+    expect(observedArgs).toEqual(expect.arrayContaining(['--healthz']));
+    expect(observedArgs).not.toContain('--machine-status');
+    expect(observedArgs).not.toContain('--machine-status-max-age-ms');
     expect(result).toMatchObject({
       healthy: false,
       reason: 'probe_timeout',
-      message: 'co-status probe timed out after 35s.',
+      message: 'co-status healthz probe timed out after 35s.',
       diagnostic: null
     });
     expect(result.probeDurationMs).toBeGreaterThanOrEqual(0);
@@ -2296,11 +2341,11 @@ describe('controlHostSupervision shell helpers', () => {
         })
       );
 
-      expect(result).toMatchObject({
-        healthy: false,
-        reason: 'probe_timeout',
-        message: 'co-status probe timed out after 35s.',
-        diagnostic: {
+    expect(result).toMatchObject({
+      healthy: false,
+      reason: 'probe_timeout',
+      message: 'co-status healthz probe timed out after 35s.',
+      diagnostic: {
           counts: {
             running: 1,
             retrying: null,
@@ -2337,8 +2382,8 @@ describe('controlHostSupervision shell helpers', () => {
     }
   });
 
-  it('does not fail closed solely from dashboard probe timeout when local polling is fresh zero-WIP', async () => {
-    const tempRoot = await mkdtemp(join(tmpdir(), 'co-supervision-zero-wip-dashboard-timeout-'));
+  it('fails closed on healthz probe timeout even when local polling is fresh zero-WIP', async () => {
+    const tempRoot = await mkdtemp(join(tmpdir(), 'co-supervision-zero-wip-healthz-timeout-'));
     try {
       const config = buildControlHostSupervisionConfig({
         homeDir: '/Users/tester',
@@ -2366,14 +2411,14 @@ describe('controlHostSupervision shell helpers', () => {
         async () => ({
           exitCode: 1,
           stdout: '',
-          stderr: 'dashboard /ui/data.json timed out after 5000ms',
+          stderr: 'control-host healthz request timeout after 5000ms',
           timedOut: true
         })
       );
 
-      expect(result.healthy).toBe(true);
-      expect(result.reason).not.toBe('probe_timeout');
-      expect(result.reason).not.toBe('probe_failed');
+      expect(result.healthy).toBe(false);
+      expect(result.reason).toBe('probe_timeout');
+      expect(result.message).toBe('co-status healthz probe timed out after 35s.');
       expect(result.diagnostic?.running_workers).toEqual([]);
       expect(result.diagnostic?.counts).toMatchObject({
         running: 0,
@@ -2496,7 +2541,7 @@ describe('controlHostSupervision shell helpers', () => {
     }
   });
 
-  it('classifies machine-status same-endpoint timeout exits as probe timeouts', async () => {
+  it('treats legacy machine-status same-endpoint timeout exits as non-overridable probe timeouts on the healthz path', async () => {
     const tempRoot = await mkdtemp(join(tmpdir(), 'co-supervision-machine-status-exit-timeout-'));
     try {
       const config = buildControlHostSupervisionConfig({
@@ -2538,6 +2583,56 @@ describe('controlHostSupervision shell helpers', () => {
       expect(result).toMatchObject({
         healthy: false,
         reason: 'probe_timeout',
+        diagnostic: null
+      });
+      expect(result.message).toContain('co-status legacy machine-status probe timed out:');
+      expect(result.message).toContain('machine-status request timeout');
+    } finally {
+      await rm(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('classifies healthz request timeout exits as probe timeouts', async () => {
+    const tempRoot = await mkdtemp(join(tmpdir(), 'co-supervision-healthz-exit-timeout-'));
+    try {
+      const config = buildControlHostSupervisionConfig({
+        homeDir: '/Users/tester',
+        cwd: tempRoot,
+        repoRoot: tempRoot,
+        nodePath: '/custom/node',
+        cliEntrypoint: '/opt/codex-orchestrator.js',
+        taskId: 'local-mcp',
+        runId: 'control-host',
+        healthIntervalSeconds: 5
+      });
+      await writeProviderIntakeStateFixture(config, {
+        polling: buildFreshZeroWipPollingFixture({
+          checking: true,
+          refresh_phase: 'refresh:claim_issue_by_id_reconcile',
+          refresh_request_class: 'claim_issue_by_id:accepted',
+          progress_updated_at: '2026-04-21T07:00:59.000Z',
+          progress_elapsed_ms: 20 * 60 * 1_000,
+          operation_elapsed_ms: 20 * 60 * 1_000,
+          stalled_after_ms: 45_000
+        }),
+        claims: []
+      });
+
+      const result = await probeControlHostHealth(
+        config,
+        {},
+        {},
+        async () => ({
+          exitCode: 1,
+          stdout: '',
+          stderr: 'control-host healthz request timeout after 5000ms',
+          timedOut: false
+        })
+      );
+
+      expect(result).toMatchObject({
+        healthy: false,
+        reason: 'probe_timeout',
         diagnostic: {
           counts: {
             running: 0,
@@ -2555,7 +2650,7 @@ describe('controlHostSupervision shell helpers', () => {
     }
   });
 
-  it('treats rotated-endpoint machine-status timeout exits as probe failures', async () => {
+  it('treats rotated-endpoint machine-status timeout exits as non-overridable probe timeouts', async () => {
     const tempRoot = await mkdtemp(join(tmpdir(), 'co-supervision-rotated-machine-status-timeout-'));
     try {
       const config = buildControlHostSupervisionConfig({
@@ -2584,10 +2679,10 @@ describe('controlHostSupervision shell helpers', () => {
 
       expect(result).toMatchObject({
         healthy: false,
-        reason: 'probe_failed',
+        reason: 'probe_timeout',
         diagnostic: null
       });
-      expect(result.message).toContain('co-status probe failed:');
+      expect(result.message).toContain('co-status legacy machine-status probe timed out:');
       expect(result.message).toContain('refreshed endpoint is not readable');
     } finally {
       await rm(tempRoot, { recursive: true, force: true });
@@ -2891,8 +2986,8 @@ describe('controlHostSupervision shell helpers', () => {
     }
   });
 
-  it('quarantines repeated same-worker probe timeout churn after one fail-closed timeout restart', async () => {
-    const tempRoot = await mkdtemp(join(tmpdir(), 'co-supervision-timeout-quarantine-'));
+  it('does not quarantine healthz liveness timeout churn after one fail-closed timeout restart', async () => {
+    const tempRoot = await mkdtemp(join(tmpdir(), 'co-supervision-healthz-timeout-no-quarantine-'));
     try {
       const config = buildControlHostSupervisionConfig({
         homeDir: '/Users/tester',
@@ -2915,7 +3010,7 @@ describe('controlHostSupervision shell helpers', () => {
             {
               requested_at: restartedAt,
               reason: 'probe_timeout',
-              message: 'co-status probe timed out after 5s.',
+              message: 'co-status healthz probe timed out after 5s.',
               consecutive_unhealthy_samples: 3,
               child_pid: 4321,
               diagnostic: buildProbeTimeoutDiagnosticFixture()
@@ -2926,14 +3021,15 @@ describe('controlHostSupervision shell helpers', () => {
         async () => ({
           exitCode: 1,
           stdout: '',
-          stderr: 'command timed out after 5000ms',
-          timedOut: true
+          stderr: 'control-host healthz request timeout after 5000ms',
+          timedOut: false
         })
       );
 
-      expect(result.healthy).toBe(true);
-      expect(result.reason).toBe('active_worker_probe_timeout_quarantine');
-      expect(result.message).toContain(
+      expect(result.healthy).toBe(false);
+      expect(result.reason).toBe('probe_timeout');
+      expect(result.message).toContain('co-status healthz probe timed out');
+      expect(result.message).not.toContain(
         `same active provider worker series already restarted at ${restartedAt}`
       );
       expect(result.diagnostic?.running_workers.map((worker) => worker.issue_identifier)).toEqual([
@@ -2944,7 +3040,7 @@ describe('controlHostSupervision shell helpers', () => {
     }
   });
 
-  it('quarantines repeated same-endpoint machine-status timeout churn after one fail-closed timeout restart', async () => {
+  it('does not quarantine legacy machine-status timeout stderr on the healthz probe path', async () => {
     const tempRoot = await mkdtemp(join(tmpdir(), 'co-supervision-same-endpoint-timeout-quarantine-'));
     try {
       const config = buildControlHostSupervisionConfig({
@@ -2985,22 +3081,21 @@ describe('controlHostSupervision shell helpers', () => {
         })
       );
 
-      expect(result.healthy).toBe(true);
-      expect(result.reason).toBe('active_worker_probe_timeout_quarantine');
-      expect(result.message).toContain(
+      expect(result.healthy).toBe(false);
+      expect(result.reason).toBe('probe_timeout');
+      expect(result.message).toContain('co-status legacy machine-status probe timed out:');
+      expect(result.message).toContain('machine-status request timeout');
+      expect(result.message).not.toContain(
         `same active provider worker series already restarted at ${restartedAt}`
       );
-      expect(result.diagnostic?.polling?.reason).toBe('provider_refresh_lifecycle_stuck');
-      expect(result.diagnostic?.running_workers.map((worker) => worker.issue_identifier)).toEqual([
-        'CO-225'
-      ]);
+      expect(result.diagnostic).toBeNull();
     } finally {
       await rm(tempRoot, { recursive: true, force: true });
     }
   });
 
-  it('quarantines repeated probe timeout churn while provider refresh is active before restart_required', async () => {
-    const tempRoot = await mkdtemp(join(tmpdir(), 'co-supervision-timeout-active-refresh-'));
+  it('does not quarantine legacy machine-status timeout stderr while provider refresh is active', async () => {
+    const tempRoot = await mkdtemp(join(tmpdir(), 'co-supervision-machine-status-active-refresh-'));
     try {
       const config = buildControlHostSupervisionConfig({
         homeDir: '/Users/tester',
@@ -3064,7 +3159,7 @@ describe('controlHostSupervision shell helpers', () => {
             {
               requested_at: restartedAt,
               reason: 'probe_timeout',
-              message: 'co-status probe timed out after 5s.',
+              message: 'control-host machine-status request timeout after 5000ms.',
               consecutive_unhealthy_samples: 3,
               child_pid: 4321,
               diagnostic: {
@@ -3084,21 +3179,20 @@ describe('controlHostSupervision shell helpers', () => {
         async () => ({
           exitCode: 1,
           stdout: '',
-          stderr: 'command timed out after 5000ms',
-          timedOut: true
+          stderr:
+            'control-host machine-status request timeout after 5000ms. The current resolved /ui/machine-status.json endpoint timed out again after endpoint re-resolution returned the same endpoint/token; this is a same-endpoint current-endpoint timeout.',
+          timedOut: false
         })
       );
 
-      expect(result.healthy).toBe(true);
-      expect(result.reason).toBe('active_worker_probe_timeout_quarantine');
-      expect(result.diagnostic?.polling?.restart_required).toBe(false);
-      expect(result.diagnostic?.polling?.last_error).toBe('refresh request timeout');
-      expect(result.diagnostic?.polling?.refresh_phase).toBe('refresh:rehydrate');
-      expect(result.diagnostic?.running_workers.map((worker) => worker.issue_identifier)).toEqual([
-        'CO-351',
-        'CO-352',
-        'CO-355'
-      ]);
+      expect(result.healthy).toBe(false);
+      expect(result.reason).toBe('probe_timeout');
+      expect(result.message).toContain('co-status legacy machine-status probe timed out:');
+      expect(result.message).toContain('machine-status request timeout');
+      expect(result.message).not.toContain(
+        `same active provider worker series already restarted at ${restartedAt}`
+      );
+      expect(result.diagnostic).toBeNull();
     } finally {
       await rm(tempRoot, { recursive: true, force: true });
     }

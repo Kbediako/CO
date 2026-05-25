@@ -128,6 +128,7 @@ export function buildControlPresenterRuntimeContext(
       controlStore: input.controlStore,
       paths: input.paths,
       readSelectedRunSnapshot: () => runtimeSnapshot.readSelectedRunSnapshot(),
+      readCommittedMachineStatusDataset: () => runtimeSnapshot.readCommittedMachineStatusDataset(),
       readMachineStatus: (signal?: AbortSignal) => runtimeSnapshot.readMachineStatus(signal),
       readCompatibilityProjection: (signal?: AbortSignal) => runtimeSnapshot.readCompatibilityProjection(signal)
     }
