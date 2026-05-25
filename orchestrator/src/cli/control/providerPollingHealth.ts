@@ -304,6 +304,27 @@ export function readProviderPollingHealth(
   return buildProviderPollingHealthPayload(state, nowMs);
 }
 
+export function resolveProviderPollingSourceEvidenceUpdatedAt(
+  payload:
+    | Pick<
+        ControlPollingHealthPayload,
+        'source_updated_at' | 'last_success_at' | 'updated_at'
+      >
+    | Record<string, unknown>
+    | null
+    | undefined,
+  options: { includeSnapshotUpdatedAt?: boolean } = {}
+): string | null {
+  if (!payload || typeof payload !== 'object') {
+    return null;
+  }
+  return latestIsoTimestamp(
+    readStringField(payload, 'source_updated_at'),
+    readStringField(payload, 'last_success_at'),
+    options.includeSnapshotUpdatedAt ? readStringField(payload, 'updated_at') : null
+  );
+}
+
 export async function flushProviderPollingHealthUpdates(
   providerIssueHandoff: ProviderIssueHandoffService | null | undefined
 ): Promise<void> {
@@ -586,6 +607,23 @@ function toIsoTimestamp(value: number | null): string | null {
     return null;
   }
   return new Date(value).toISOString();
+}
+
+function latestIsoTimestamp(...values: Array<string | null | undefined>): string | null {
+  let latest: number | null = null;
+  for (const value of values) {
+    const parsed = parseIsoToMs(value);
+    if (parsed === null) {
+      continue;
+    }
+    latest = latest === null ? parsed : Math.max(latest, parsed);
+  }
+  return latest === null ? null : new Date(latest).toISOString();
+}
+
+function readStringField(payload: object, key: string): string | null {
+  const value = (payload as Record<string, unknown>)[key];
+  return typeof value === 'string' && value.trim().length > 0 ? value : null;
 }
 
 function parseIsoToMs(value: string | null | undefined): number | null {

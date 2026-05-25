@@ -102,7 +102,8 @@ export type ControlHostSourceFreshnessAction = 'restart' | 'fail_closed';
 export type ControlHostSourceFreshnessPolicyReason =
   | 'stale_supervised_source_root'
   | 'unsafe_stale_supervised_source_root'
-  | 'stale_generated_runtime';
+  | 'stale_generated_runtime'
+  | 'stale_source_root_freshness_snapshot';
 
 export interface ControlHostSourceFreshnessPolicy {
   action: ControlHostSourceFreshnessAction;
@@ -367,24 +368,66 @@ export function resolveControlHostSourceFreshnessPolicy(
 
 export function isControlHostOwnershipFreshnessAtLeastAsRecent(
   candidate: ControlHostOwnershipPollingPayload | null,
-  baseline: ControlHostOwnershipPollingPayload | null
+  baseline: ControlHostOwnershipPollingPayload | null,
+  options: {
+    candidateSnapshotUpdatedAt?: string | null;
+    baselineSnapshotUpdatedAt?: string | null;
+  } = {}
 ): boolean {
-  const baselineTimestamp = resolveControlHostOwnershipFreshnessTimestamp(baseline);
+  const baselineTimestamp = resolveControlHostOwnershipFreshnessTimestamp(
+    baseline,
+    options.baselineSnapshotUpdatedAt
+  );
   if (baselineTimestamp === null) {
     return true;
   }
-  const candidateTimestamp = resolveControlHostOwnershipFreshnessTimestamp(candidate);
+  const candidateTimestamp = resolveControlHostOwnershipFreshnessTimestamp(
+    candidate,
+    options.candidateSnapshotUpdatedAt
+  );
   return candidateTimestamp !== null && candidateTimestamp >= baselineTimestamp;
 }
 
 function resolveControlHostOwnershipFreshnessTimestamp(
-  payload: ControlHostOwnershipPollingPayload | null
+  payload: ControlHostOwnershipPollingPayload | null,
+  snapshotUpdatedAt?: string | null
 ): number | null {
   return maxTimestamp(
+    snapshotUpdatedAt,
     payload?.updated_at,
     payload?.owner?.updated_at,
-    payload?.attempted_owner?.updated_at
+    payload?.attempted_owner?.updated_at,
+    payload?.owner?.source_root_freshness?.observed_at,
+    payload?.attempted_owner?.source_root_freshness?.observed_at
   );
+}
+
+export function resolveControlHostSourceFreshnessSnapshotStalenessPolicy(
+  payload: ControlHostOwnershipPollingPayload | null,
+  sourceEvidenceUpdatedAt: string | null | undefined
+): ControlHostSourceFreshnessPolicy | null {
+  const freshness = resolveControlHostAuthoritativeSourceFreshness(payload);
+  if (!freshness || freshness.status !== 'current') {
+    return null;
+  }
+  if (
+    isControlHostOwnershipFreshnessAtLeastAsRecent(payload, null, {
+      baselineSnapshotUpdatedAt: sourceEvidenceUpdatedAt ?? null
+    })
+  ) {
+    return null;
+  }
+  return {
+    action: 'fail_closed',
+    reason: 'stale_source_root_freshness_snapshot',
+    updated_at: sourceEvidenceUpdatedAt ?? null,
+    status: freshness.status,
+    source_checkout_status: freshness.source_checkout?.status ?? null,
+    intended_checkout_status: freshness.intended_checkout?.status ?? null,
+    drift_classes: freshness.drift_classes,
+    detail:
+      `Control-host source-root freshness was observed before the latest provider source evidence (${sourceEvidenceUpdatedAt ?? 'unknown'}); provider-intake must fail closed until the source-root freshness collector records a current snapshot.`
+  };
 }
 
 export function resolveControlHostAuthoritativeSourceFreshness(

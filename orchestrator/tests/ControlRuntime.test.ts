@@ -8809,8 +8809,14 @@ describe('ControlRuntime', () => {
     if (!persistedOwner?.owner) {
       throw new Error('Expected persisted stale owner.');
     }
-    persistedOwner.updated_at = '2026-05-18T23:09:00.000Z';
-    persistedOwner.owner.updated_at = '2026-05-18T23:09:00.000Z';
+    persistedOwner.updated_at = '2026-05-18T23:07:00.000Z';
+    persistedOwner.owner.updated_at = '2026-05-18T23:07:00.000Z';
+    if (persistedOwner.owner.source_root_freshness) {
+      persistedOwner.owner.source_root_freshness = {
+        ...persistedOwner.owner.source_root_freshness,
+        observed_at: '2026-05-18T23:09:00.000Z'
+      };
+    }
 
     initializeProviderPollingHealth(providerIssueHandoff, {
       intervalMs: 15000,
@@ -8870,6 +8876,84 @@ describe('ControlRuntime', () => {
     expect(projection.polling?.control_host_owner?.owner?.source_root_freshness).toMatchObject({
       status: 'current',
       observed_at: '2026-05-18T22:55:00.000Z'
+    });
+  });
+
+  it('marks provider intake unavailable when live current freshness predates provider source evidence', async () => {
+    const fixture = await createFixture({ taskId: 'local-mcp' });
+    const providerIssueHandoff = {
+      handleAcceptedTrackedIssue: vi.fn(),
+      rehydrate: vi.fn(async () => {}),
+      refresh: vi.fn(async () => {})
+    } as unknown as ProviderIssueHandoffService;
+    const repoRoot = await createSourceRootRepo('control-runtime-live-current-source-evidence-newer-');
+    const liveFreshness = inspectSourceRootFreshness({
+      intendedRepoRoot: repoRoot,
+      packageRoot: repoRoot,
+      argv: ['node', join(repoRoot, 'bin', 'codex-orchestrator.ts')],
+      cwd: repoRoot,
+      now: () => '2026-05-18T22:55:00.000Z'
+    });
+    const residentHash = git(repoRoot, ['rev-parse', 'HEAD']).stdout.trim();
+    await writeFile(join(repoRoot, 'co-583-main-advance.txt'), 'main advanced\n', 'utf8');
+    git(repoRoot, ['add', '.']);
+    git(repoRoot, ['commit', '-m', 'CO-583 main advance']);
+    git(repoRoot, ['update-ref', 'refs/remotes/origin/main', 'HEAD']);
+    git(repoRoot, ['reset', '--hard', residentHash]);
+    const liveOwner = createControlHostOwnerPayload(repoRoot, liveFreshness);
+
+    initializeProviderPollingHealth(providerIssueHandoff, {
+      intervalMs: 15000,
+      stuckAfterMs: 45000,
+      skipInitialUpdate: true,
+      controlHostOwner: liveOwner
+    });
+    markProviderPollingCompleted(providerIssueHandoff, {
+      atMs: Date.parse('2026-05-18T23:09:00.000Z')
+    });
+
+    const providerIntakeState = createProviderIntakeState([
+      {
+        provider: 'linear',
+        provider_key: 'linear:lin-issue-512',
+        issue_id: 'lin-issue-512',
+        issue_identifier: 'CO-512',
+        issue_title: 'Active worker under source freshness policy',
+        issue_state: 'In Progress',
+        issue_state_type: 'started',
+        issue_updated_at: '2026-05-01T00:00:30.000Z',
+        task_id: 'linear-co-512',
+        mapping_source: 'provider_id_fallback',
+        state: 'accepted',
+        reason: 'provider_issue_rehydration_pending_revalidation',
+        accepted_at: '2026-05-01T00:00:30.000Z',
+        updated_at: '2026-05-01T00:00:30.000Z',
+        last_delivery_id: 'delivery-512',
+        last_event: 'Issue',
+        last_action: 'update',
+        last_webhook_timestamp: 1_746_057_630_000,
+        run_id: null,
+        run_manifest_path: null,
+        launch_source: null,
+        launch_token: null
+      }
+    ]);
+
+    const runtime = createControlRuntime({
+      controlStore: fixture.controlStore,
+      questionQueue: { list: () => [] },
+      paths: fixture.paths,
+      linearAdvisoryState: { tracked_issue: null },
+      providerIntakeState,
+      readProviderIssueHandoff: () => providerIssueHandoff
+    });
+
+    const projection = await runtime.snapshot().readCompatibilityProjection();
+
+    expect(projection.providerIntake).toBeNull();
+    expect(projection.providerIntakeUnavailable).toMatchObject({
+      reason: 'stale_supervised_control_host_source',
+      action: 'fail_closed'
     });
   });
 
@@ -9093,12 +9177,19 @@ describe('ControlRuntime', () => {
       createTerminalRetryClaim('CO-554', 'lin-issue-554'),
       createTerminalRetryClaim('CO-555', 'lin-issue-555')
     ]);
+    const persistedControlHostOwner = refreshControlHostOwnershipPollingPayload(
+      createControlHostOwnerPayload(repoRoot, startupFreshness)
+    );
+    if (persistedControlHostOwner?.owner?.source_root_freshness) {
+      persistedControlHostOwner.owner.source_root_freshness = {
+        ...persistedControlHostOwner.owner.source_root_freshness,
+        observed_at: '2026-05-18T23:08:00.000Z'
+      };
+    }
     providerIntakeState.polling = {
       updated_at: '2026-05-18T23:08:00.000Z',
       restart_required: false,
-      control_host_owner: refreshControlHostOwnershipPollingPayload(
-        createControlHostOwnerPayload(repoRoot, startupFreshness)
-      )
+      control_host_owner: persistedControlHostOwner
     };
     const runtime = createControlRuntime({
       controlStore: fixture.controlStore,
@@ -9181,6 +9272,12 @@ describe('ControlRuntime', () => {
     persistedOwner.updated_at = '2026-05-18T23:08:00.000Z';
     persistedOwner.owner.owner_token = 'persisted-owner-token';
     persistedOwner.owner.updated_at = '2026-05-18T23:08:00.000Z';
+    if (persistedOwner.owner.source_root_freshness) {
+      persistedOwner.owner.source_root_freshness = {
+        ...persistedOwner.owner.source_root_freshness,
+        observed_at: '2026-05-18T23:08:00.000Z'
+      };
+    }
     const providerIntakeState = createProviderIntakeState([
       createReleasedTerminalClaim('CO-512', 'lin-issue-512'),
       createReleasedTerminalClaim('CO-554', 'lin-issue-554'),

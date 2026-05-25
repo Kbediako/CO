@@ -59,12 +59,14 @@ import {
   markProviderPollingCompleted,
   markProviderPollingStarted,
   readProviderPollingHealth,
-  recordProviderPollingProgress
+  recordProviderPollingProgress,
+  resolveProviderPollingSourceEvidenceUpdatedAt
 } from './providerPollingHealth.js';
 import {
   normalizeControlHostOwnershipPollingPayload,
   isControlHostOwnershipFreshnessAtLeastAsRecent,
   resolveControlHostAuthoritativeSourceFreshness,
+  resolveControlHostSourceFreshnessSnapshotStalenessPolicy,
   resolveControlHostSourceFreshnessPolicyFromPolling
 } from './controlHostOwnership.js';
 import type { ProviderWorkflowConfigStore } from './providerWorkflowConfigStore.js';
@@ -595,22 +597,36 @@ export function createProviderIssueHandoffService(
       persistedControlHostOwner,
       { refresh: false }
     );
-    const liveControlHostOwner =
-      readProviderPollingHealth(providerIssueHandoffService)?.control_host_owner ??
-      null;
+    const livePolling = readProviderPollingHealth(providerIssueHandoffService);
+    const liveControlHostOwner = livePolling?.control_host_owner ?? null;
     if (liveControlHostOwner) {
       const refreshedLiveOwner = normalizeControlHostOwnershipPollingPayload(liveControlHostOwner);
       const livePolicy = resolveControlHostSourceFreshnessPolicyFromPolling(
         refreshedLiveOwner,
         { refresh: false }
       );
+      const liveSnapshotStalenessPolicy =
+        resolveControlHostSourceFreshnessSnapshotStalenessPolicy(
+          refreshedLiveOwner,
+          resolveProviderPollingSourceEvidenceUpdatedAt(livePolling)
+        );
       const liveFreshness = resolveControlHostAuthoritativeSourceFreshness(refreshedLiveOwner);
       if (
         livePolicy ||
+        liveSnapshotStalenessPolicy ||
         (isAuthoritativeProviderHandoffLiveControlHostFreshness(liveFreshness) &&
-          isControlHostOwnershipFreshnessAtLeastAsRecent(refreshedLiveOwner, persistedControlHostOwner))
+          isControlHostOwnershipFreshnessAtLeastAsRecent(
+            refreshedLiveOwner,
+            persistedControlHostOwner,
+            {
+              baselineSnapshotUpdatedAt: resolveProviderPollingSourceEvidenceUpdatedAt(
+                options.state.polling ?? null,
+                { includeSnapshotUpdatedAt: true }
+              )
+            }
+          ))
       ) {
-        return livePolicy;
+        return livePolicy ?? liveSnapshotStalenessPolicy;
       }
     }
     return persistedPolicy;
