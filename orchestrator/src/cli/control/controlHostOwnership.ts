@@ -22,6 +22,7 @@ import {
 } from './controlPersistenceFiles.js';
 
 export const CONTROL_HOST_SOURCE_FRESHNESS_AUTHORITY_TTL_MS = 5 * 60 * 1000;
+export const SOURCE_ROOT_FRESHNESS_CHILD_TIMEOUT_MS = 30_000;
 
 export type ControlHostOwnershipDiagnosticReason =
   | 'duplicate_control_host_owner'
@@ -1002,7 +1003,7 @@ process.stdout.write(JSON.stringify(refreshed));
   const refreshed = await runSourceRootFreshnessChild(script, {
     prior,
     repoRoot: summary.repo_root
-  }, options.timeoutMs ?? 5000);
+  }, options.timeoutMs ?? SOURCE_ROOT_FRESHNESS_CHILD_TIMEOUT_MS);
   return {
     ...summary,
     updated_at: refreshed.observed_at || summary.updated_at,
@@ -1016,9 +1017,16 @@ async function runSourceRootFreshnessChild(
   timeoutMs: number
 ): Promise<SourceRootFreshnessInspection> {
   return await new Promise((resolve, reject) => {
-    const child = spawn(process.execPath, [...process.execArgv, '--input-type=module', '-e', script], {
-      stdio: ['pipe', 'pipe', 'pipe']
-    });
+    const child = spawn(
+      process.execPath,
+      [
+        ...filterSourceRootFreshnessChildExecArgv(process.execArgv),
+        '--input-type=module',
+        '-e',
+        script
+      ],
+      { stdio: ['pipe', 'pipe', 'pipe'] }
+    );
     let stdout = '';
     let stderr = '';
     let settled = false;
@@ -1070,6 +1078,37 @@ async function runSourceRootFreshnessChild(
     });
     child.stdin.end(JSON.stringify(input));
   });
+}
+
+export function filterSourceRootFreshnessChildExecArgv(execArgv: readonly string[]): string[] {
+  const filtered: string[] = [];
+  for (let index = 0; index < execArgv.length; index += 1) {
+    const arg = execArgv[index] ?? '';
+    if (isNodeInspectorExecArg(arg)) {
+      if (arg === '--inspect-port') {
+        const next = execArgv[index + 1] ?? '';
+        if (next && !next.startsWith('-')) {
+          index += 1;
+        }
+      }
+      continue;
+    }
+    filtered.push(arg);
+  }
+  return filtered;
+}
+
+function isNodeInspectorExecArg(arg: string): boolean {
+  return (
+    arg === '--inspect' ||
+    arg.startsWith('--inspect=') ||
+    arg === '--inspect-brk' ||
+    arg.startsWith('--inspect-brk=') ||
+    arg === '--inspect-port' ||
+    arg.startsWith('--inspect-port=') ||
+    arg === '--debug' ||
+    arg.startsWith('--debug=')
+  );
 }
 
 function normalizeControlHostOwnerSummary(value: unknown): ControlHostOwnerSummary | null {

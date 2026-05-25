@@ -7,10 +7,12 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import {
   acquireControlHostOwnership,
+  filterSourceRootFreshnessChildExecArgv,
   readControlHostOwnerMetadata,
   readControlHostOwnershipOperatorHint,
   resolveControlHostSourceFreshnessAdmissionPolicy,
   resolveControlHostSourceFreshnessPolicy,
+  SOURCE_ROOT_FRESHNESS_CHILD_TIMEOUT_MS,
   type ControlHostOwnershipPollingPayload,
   type ControlHostOwnerMetadata
 } from '../src/cli/control/controlHostOwnership.js';
@@ -35,6 +37,32 @@ describe('control host ownership', () => {
     roots.push(root);
     return join(root, 'runs', 'local-mcp', 'cli', 'control-host');
   }
+
+  it('keeps child source-root freshness timeout wider than one git probe budget', () => {
+    expect(SOURCE_ROOT_FRESHNESS_CHILD_TIMEOUT_MS).toBeGreaterThan(5000);
+  });
+
+  it('filters inspector exec arguments before spawning source-root freshness verifier', () => {
+    expect(
+      filterSourceRootFreshnessChildExecArgv([
+        '--loader',
+        '/repo/node_modules/ts-node/esm.mjs',
+        '--inspect-brk=127.0.0.1:9229',
+        '--inspect-port',
+        '9230',
+        '--import',
+        'data:text/javascript,register()',
+        '--experimental-vm-modules',
+        '--debug=5858'
+      ])
+    ).toEqual([
+      '--loader',
+      '/repo/node_modules/ts-node/esm.mjs',
+      '--import',
+      'data:text/javascript,register()',
+      '--experimental-vm-modules'
+    ]);
+  });
 
   it('records source-root freshness on owner metadata and polling summaries', async () => {
     const runDir = await createRunDir();
