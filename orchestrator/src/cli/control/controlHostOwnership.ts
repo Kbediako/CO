@@ -300,7 +300,7 @@ export function resolveControlHostSourceFreshnessPolicyFromPolling(
   options: { refresh?: boolean } = {}
 ): ControlHostSourceFreshnessPolicy | null {
   const normalized = normalizeControlHostOwnershipPollingPayload(value);
-  if (options.refresh === false) {
+  if (options.refresh !== true) {
     return resolveControlHostSourceFreshnessPolicy(normalized);
   }
   const refreshed = refreshControlHostOwnershipPollingPayload(normalized);

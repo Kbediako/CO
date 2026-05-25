@@ -21,7 +21,6 @@ import {
 } from './providerPollingHealth.js';
 import {
   normalizeControlHostOwnershipPollingPayload,
-  refreshControlHostOwnershipPollingPayload,
   resolveControlHostAuthoritativeSourceFreshness,
   resolveControlHostSourceFreshnessPolicyFromPolling
 } from './controlHostOwnership.js';
@@ -424,7 +423,7 @@ function createControlRuntimeSnapshot(
       ),
       providerIntakeUnavailable: providerIntakeAuthority.unavailable,
       providerWorkflow,
-      polling: readProviderPollingSnapshot(authorityContext, { refreshOwnership: false }),
+      polling: readProviderPollingSnapshot(authorityContext),
       maxConcurrentAgents: resolveProviderPollDispatchLimits(
         context.controlStore.snapshot().feature_toggles,
         {
@@ -693,9 +692,7 @@ function resolveProviderIntakeSourceFreshnessPolicy(
     readProviderPollingHealth(context.readProviderIssueHandoff?.() ?? null)?.control_host_owner ??
     null;
   if (liveControlHostOwner) {
-    const refreshedLiveOwner = refreshControlHostOwnershipPollingPayload(
-      normalizeControlHostOwnershipPollingPayload(liveControlHostOwner)
-    );
+    const refreshedLiveOwner = normalizeControlHostOwnershipPollingPayload(liveControlHostOwner);
     const livePolicy = resolveControlHostSourceFreshnessPolicyFromPolling(
       refreshedLiveOwner,
       { refresh: false }
@@ -708,7 +705,10 @@ function resolveProviderIntakeSourceFreshnessPolicy(
   if (!state?.polling || !isRecordLike(state.polling)) {
     return null;
   }
-  return resolveControlHostSourceFreshnessPolicyFromPolling(state.polling.control_host_owner);
+  return resolveControlHostSourceFreshnessPolicyFromPolling(
+    state.polling.control_host_owner,
+    { refresh: false }
+  );
 }
 
 function isAuthoritativeLiveControlHostFreshness(
@@ -780,42 +780,21 @@ async function refreshProviderWorkflowStatusPayload(
 }
 
 function readProviderPollingSnapshot(
-  context: Pick<ControlRuntimeContext, 'providerIntakeState' | 'readProviderIssueHandoff'>,
-  options: { refreshOwnership?: boolean } = {}
+  context: Pick<ControlRuntimeContext, 'providerIntakeState' | 'readProviderIssueHandoff'>
 ): ControlPollingHealthPayload | null {
   const livePolling = readProviderPollingHealth(context.readProviderIssueHandoff?.() ?? null);
-  const persistedPolling = normalizePersistedProviderPollingSnapshot(
-    context.providerIntakeState?.polling,
-    { refreshOwnership: options.refreshOwnership }
-  );
-  const finalize = (polling: ControlPollingHealthPayload | null) =>
-    options.refreshOwnership === false
-      ? polling
-      : refreshProviderPollingSnapshotOwnership(polling);
+  const persistedPolling = normalizePersistedProviderPollingSnapshot(context.providerIntakeState?.polling);
   if (persistedPolling && livePolling?.updated_at === null) {
-    return finalize({
+    return {
       ...persistedPolling,
       control_host_owner: livePolling.control_host_owner ?? persistedPolling.control_host_owner
-    });
+    };
   }
-  return finalize(livePolling ?? persistedPolling);
-}
-
-function refreshProviderPollingSnapshotOwnership(
-  polling: ControlPollingHealthPayload | null
-): ControlPollingHealthPayload | null {
-  if (!polling) {
-    return null;
-  }
-  return {
-    ...polling,
-    control_host_owner: refreshControlHostOwnershipPollingPayload(polling.control_host_owner ?? null)
-  };
+  return livePolling ?? persistedPolling;
 }
 
 function normalizePersistedProviderPollingSnapshot(
-  polling: ProviderIntakeState['polling'] | null | undefined,
-  options: { refreshOwnership?: boolean } = {}
+  polling: ProviderIntakeState['polling'] | null | undefined
 ): ControlPollingHealthPayload | null {
   if (!isRecordLike(polling)) {
     return null;
@@ -884,12 +863,7 @@ function normalizePersistedProviderPollingSnapshot(
     restart_required: polling.restart_required === true,
     reason: typeof polling.reason === 'string' ? polling.reason : null,
     linear_budget: linearBudget,
-    control_host_owner:
-      options.refreshOwnership === false
-        ? normalizeControlHostOwnershipPollingPayload(polling.control_host_owner)
-        : refreshControlHostOwnershipPollingPayload(
-            normalizeControlHostOwnershipPollingPayload(polling.control_host_owner)
-          )
+    control_host_owner: normalizeControlHostOwnershipPollingPayload(polling.control_host_owner)
   };
 }
 

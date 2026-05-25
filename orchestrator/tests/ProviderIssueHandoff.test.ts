@@ -39,6 +39,9 @@ import {
   markProviderPollingStarted,
   markProviderPollingStuck
 } from '../src/cli/control/providerPollingHealth.js';
+import {
+  refreshControlHostOwnershipPollingPayload
+} from '../src/cli/control/controlHostOwnership.js';
 import { inspectSourceRootFreshness } from '../src/cli/utils/sourceRootFreshness.js';
 
 const cleanupRoots: string[] = [];
@@ -1116,7 +1119,7 @@ describe('createProviderIssueHandoffService', () => {
     expect(persist).toHaveBeenCalledTimes(1);
   });
 
-  it('blocks direct provider issue starts when refreshed owner freshness becomes stale', async () => {
+  it('does not hot-refresh current-at-acquisition owner freshness before direct provider issue starts', async () => {
     const { paths } = await createHostPaths();
     const state = createProviderIntakeState();
     state.polling = {
@@ -1149,22 +1152,24 @@ describe('createProviderIssueHandoffService', () => {
       webhookTimestamp: 1_742_360_000_000
     });
 
-    expect(result).toMatchObject({
-      kind: 'ignored',
-      reason: 'stale_supervised_control_host_source'
-    });
-    expect(launcher.start).not.toHaveBeenCalled();
+    expect(result.kind).toBe('start');
+    expect(launcher.start).toHaveBeenCalledWith(expect.objectContaining({
+      pipelineId: 'diagnostics',
+      provider: 'linear',
+      issueId: 'lin-issue-1',
+      issueIdentifier: 'CO-2',
+      launchToken: expect.any(String)
+    }));
     expect(launcher.resume).not.toHaveBeenCalled();
     expect(state.claims[0]).toMatchObject({
       provider_key: 'linear:lin-issue-1',
-      state: 'ignored',
-      reason: 'stale_supervised_control_host_source',
-      retry_queued: null,
-      retry_attempt: null,
-      retry_due_at: null,
-      retry_error: null
+      state: 'starting',
+      task_id: 'linear-lin-issue-1',
+      issue_identifier: 'CO-2',
+      launch_source: 'control-host',
+      launch_token: expect.any(String)
     });
-    expect(persist).toHaveBeenCalledTimes(1);
+    expect(persist).toHaveBeenCalledTimes(2);
   });
 
   it('keeps terminal release precedence while stale supervised source is authoritative', async () => {
@@ -38275,12 +38280,14 @@ describe('createProviderIssueHandoffService', () => {
     });
   });
 
-  it('fails refresh closed before retry resume when refreshed owner freshness becomes stale', async () => {
+  it('fails refresh closed before retry resume while committed owner freshness is stale', async () => {
     const { paths } = await createHostPaths();
     const state = createProviderIntakeState();
     state.polling = {
-      control_host_owner: await createCurrentAtAcquisitionOwnerThatBecomesStale(
-        'provider-refresh-current-at-acquisition-stale-'
+      control_host_owner: refreshControlHostOwnershipPollingPayload(
+        await createCurrentAtAcquisitionOwnerThatBecomesStale(
+          'provider-refresh-current-at-acquisition-stale-'
+        )
       )
     };
     state.claims.push({

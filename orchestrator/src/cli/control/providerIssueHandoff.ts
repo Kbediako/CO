@@ -63,7 +63,6 @@ import {
 } from './providerPollingHealth.js';
 import {
   normalizeControlHostOwnershipPollingPayload,
-  refreshControlHostOwnershipPollingPayload,
   resolveControlHostAuthoritativeSourceFreshness,
   resolveControlHostSourceFreshnessPolicyFromPolling
 } from './controlHostOwnership.js';
@@ -592,9 +591,7 @@ export function createProviderIssueHandoffService(
       readProviderPollingHealth(providerIssueHandoffService)?.control_host_owner ??
       null;
     if (liveControlHostOwner) {
-      const refreshedLiveOwner = refreshControlHostOwnershipPollingPayload(
-        normalizeControlHostOwnershipPollingPayload(liveControlHostOwner)
-      );
+      const refreshedLiveOwner = normalizeControlHostOwnershipPollingPayload(liveControlHostOwner);
       const livePolicy = resolveControlHostSourceFreshnessPolicyFromPolling(
         refreshedLiveOwner,
         { refresh: false }
@@ -605,7 +602,8 @@ export function createProviderIssueHandoffService(
       }
     }
     return resolveControlHostSourceFreshnessPolicyFromPolling(
-      options.state.polling?.control_host_owner
+      options.state.polling?.control_host_owner,
+      { refresh: false }
     );
   };
   const isAuthoritativeProviderHandoffLiveControlHostFreshness = (
