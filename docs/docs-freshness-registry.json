@@ -6346,8 +6346,8 @@
     {
       "path": ".agent/task/linear-b02f8333-202c-49ed-9443-8daf921e297d.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-22",
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-25",
       "cadence_days": 365,
       "source_issue": {
         "id": "b02f8333-202c-49ed-9443-8daf921e297d",
@@ -6355,12 +6355,8 @@
         "url": "https://linear.app/asabeko/issue/CO-573/co-replace-terminal-co-558-docs-freshness-pre-expiry-owner"
       },
       "doc_class": "task_mirror",
-      "lifecycle_state": "active",
-      "created_at": "2026-05-21",
-      "next_review": "2026-06-20",
-      "notes": "CO-573 remains the historical packet source issue; CO-575 is only the live global docs:freshness:maintain owner after terminal CO-573. CO-584 registry integrity repair: status restored to active because local open checklist obligations prevent archive readiness; prior archived status retained only as terminal source lineage in notes.",
-      "terminal_source_lifecycle_state": "terminal_pending_archive",
-      "recommended_action": "resolve_local_checklist_obligations_before_archive"
+      "notes": "CO-579 terminal lifecycle repair: live Linear issue-context verifies CO-573 is Done/completed; local packet files are archive stubs with no open checklist obligations, so this row is retained as terminal lineage instead of active docs freshness debt.",
+      "retained_reason": "CO-579 terminal lifecycle repair: live Linear issue-context verifies CO-573 is Done/completed; local packet files are archive stubs with no open checklist obligations, so this row is retained as terminal lineage instead of active docs freshness debt."
     },
     {
       "path": ".agent/task/linear-b0aac010-12ec-4509-88a4-c2dbc6395e19.md",
@@ -6497,8 +6493,8 @@
     {
       "path": ".agent/task/linear-b9447b5a-224d-4731-bab9-95bb0597dbe0.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-22",
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-25",
       "cadence_days": 365,
       "source_issue": {
         "id": "b9447b5a-224d-4731-bab9-95bb0597dbe0",
@@ -6506,12 +6502,8 @@
         "url": "https://linear.app/asabeko/issue/CO-558/co-replace-terminal-docs-freshness-maintenance-owner-after-may-19"
       },
       "doc_class": "task_mirror",
-      "lifecycle_state": "active",
-      "created_at": "2026-05-19",
-      "next_review": "2026-06-19",
-      "notes": "CO-558 remains the historical packet source issue; CO-573 is only the live global docs:freshness:maintain owner after terminal CO-558. CO-584 registry integrity repair: status restored to active because local open checklist obligations prevent archive readiness; prior archived status retained only as terminal source lineage in notes.",
-      "terminal_source_lifecycle_state": "terminal_pending_archive",
-      "recommended_action": "resolve_local_checklist_obligations_before_archive"
+      "notes": "CO-579 terminal lifecycle repair: live Linear issue-context verifies CO-558 is Done/completed; local packet files are archive stubs with no open checklist obligations, so this row is retained as terminal lineage instead of active docs freshness debt.",
+      "retained_reason": "CO-579 terminal lifecycle repair: live Linear issue-context verifies CO-558 is Done/completed; local packet files are archive stubs with no open checklist obligations, so this row is retained as terminal lineage instead of active docs freshness debt."
     },
     {
       "path": ".agent/task/linear-b9a1044e-03b0-49ef-8435-92840eaf90b9.md",
@@ -7675,8 +7667,14 @@
       "path": "docs/ACTION_PLAN-codex-0125-model-catalog-posture.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-04-24",
-      "cadence_days": 30
+      "last_review": "2026-05-25",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "f4469614-cfdf-49a6-a7ff-366f58229816",
+        "identifier": "CO-352",
+        "url": "https://linear.app/asabeko/issue/CO-352/co-adopt-gpt-55xhigh-as-current-co-model-posture"
+      },
+      "notes": "CO-579 residual stale-doc review: live Linear issue-context verifies CO-352 is Done/completed, and the checked-in document remains a readable historical/evidence reference rather than an archive stub; reviewed in place without weakening docs:freshness policy."
     },
     {
       "path": "docs/ACTION_PLAN-codex-cli-alignment-refresh-e2e.md",
@@ -13100,8 +13098,8 @@
     {
       "path": "docs/ACTION_PLAN-linear-b02f8333-202c-49ed-9443-8daf921e297d.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-22",
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-25",
       "cadence_days": 365,
       "source_issue": {
         "id": "b02f8333-202c-49ed-9443-8daf921e297d",
@@ -13109,12 +13107,8 @@
         "url": "https://linear.app/asabeko/issue/CO-573/co-replace-terminal-co-558-docs-freshness-pre-expiry-owner"
       },
       "doc_class": "task_packet",
-      "lifecycle_state": "active",
-      "created_at": "2026-05-21",
-      "next_review": "2026-06-20",
-      "notes": "CO-573 remains the historical packet source issue; CO-575 is only the live global docs:freshness:maintain owner after terminal CO-573. CO-584 registry integrity repair: status restored to active because local open checklist obligations prevent archive readiness; prior archived status retained only as terminal source lineage in notes.",
-      "terminal_source_lifecycle_state": "terminal_pending_archive",
-      "recommended_action": "resolve_local_checklist_obligations_before_archive"
+      "notes": "CO-579 terminal lifecycle repair: live Linear issue-context verifies CO-573 is Done/completed; local packet files are archive stubs with no open checklist obligations, so this row is retained as terminal lineage instead of active docs freshness debt.",
+      "retained_reason": "CO-579 terminal lifecycle repair: live Linear issue-context verifies CO-573 is Done/completed; local packet files are archive stubs with no open checklist obligations, so this row is retained as terminal lineage instead of active docs freshness debt."
     },
     {
       "path": "docs/ACTION_PLAN-linear-b0aac010-12ec-4509-88a4-c2dbc6395e19.md",
@@ -13251,8 +13245,8 @@
     {
       "path": "docs/ACTION_PLAN-linear-b9447b5a-224d-4731-bab9-95bb0597dbe0.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-22",
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-25",
       "cadence_days": 365,
       "source_issue": {
         "id": "b9447b5a-224d-4731-bab9-95bb0597dbe0",
@@ -13260,12 +13254,8 @@
         "url": "https://linear.app/asabeko/issue/CO-558/co-replace-terminal-docs-freshness-maintenance-owner-after-may-19"
       },
       "doc_class": "task_packet",
-      "lifecycle_state": "active",
-      "created_at": "2026-05-19",
-      "next_review": "2026-06-19",
-      "notes": "CO-558 remains the historical packet source issue; CO-573 is only the live global docs:freshness:maintain owner after terminal CO-558. CO-584 registry integrity repair: status restored to active because local open checklist obligations prevent archive readiness; prior archived status retained only as terminal source lineage in notes.",
-      "terminal_source_lifecycle_state": "terminal_pending_archive",
-      "recommended_action": "resolve_local_checklist_obligations_before_archive"
+      "notes": "CO-579 terminal lifecycle repair: live Linear issue-context verifies CO-558 is Done/completed; local packet files are archive stubs with no open checklist obligations, so this row is retained as terminal lineage instead of active docs freshness debt.",
+      "retained_reason": "CO-579 terminal lifecycle repair: live Linear issue-context verifies CO-558 is Done/completed; local packet files are archive stubs with no open checklist obligations, so this row is retained as terminal lineage instead of active docs freshness debt."
     },
     {
       "path": "docs/ACTION_PLAN-linear-b9a1044e-03b0-49ef-8435-92840eaf90b9.md",
@@ -17348,8 +17338,14 @@
       "path": "docs/findings/linear-267f73e1-6347-496d-ad78-2f4177bfe450-codex-0125-appserver-control-seam.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-04-24",
-      "cadence_days": 30
+      "last_review": "2026-05-25",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "267f73e1-6347-496d-ad78-2f4177bfe450",
+        "identifier": "CO-351",
+        "url": "https://linear.app/asabeko/issue/CO-351/co-adopt-codex-0125-app-server-seam-for-guarded-localcontrol-host-use"
+      },
+      "notes": "CO-579 residual stale-doc review: live Linear issue-context verifies CO-351 is Done/completed, and the checked-in document remains a readable historical/evidence reference rather than an archive stub; reviewed in place without weakening docs:freshness policy."
     },
     {
       "path": "docs/findings/linear-3c52bf66-f805-4537-8671-ad1dec2f4623-docs-freshness-classification.md",
@@ -17428,8 +17424,14 @@
       "path": "docs/findings/linear-f4469614-cfdf-49a6-a7ff-366f58229816-codex-0125-model-catalog-posture.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-04-24",
-      "cadence_days": 30
+      "last_review": "2026-05-25",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "f4469614-cfdf-49a6-a7ff-366f58229816",
+        "identifier": "CO-352",
+        "url": "https://linear.app/asabeko/issue/CO-352/co-adopt-gpt-55xhigh-as-current-co-model-posture"
+      },
+      "notes": "CO-579 residual stale-doc review: live Linear issue-context verifies CO-352 is Done/completed, and the checked-in document remains a readable historical/evidence reference rather than an archive stub; reviewed in place without weakening docs:freshness policy."
     },
     {
       "path": "docs/findings/more-nutrition.md",
@@ -17714,8 +17716,14 @@
       "path": "docs/PRD-codex-0125-model-catalog-posture.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-04-24",
-      "cadence_days": 30
+      "last_review": "2026-05-25",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "f4469614-cfdf-49a6-a7ff-366f58229816",
+        "identifier": "CO-352",
+        "url": "https://linear.app/asabeko/issue/CO-352/co-adopt-gpt-55xhigh-as-current-co-model-posture"
+      },
+      "notes": "CO-579 residual stale-doc review: live Linear issue-context verifies CO-352 is Done/completed, and the checked-in document remains a readable historical/evidence reference rather than an archive stub; reviewed in place without weakening docs:freshness policy."
     },
     {
       "path": "docs/PRD-codex-cli-alignment-refresh-e2e.md",
@@ -23172,8 +23180,8 @@
     {
       "path": "docs/PRD-linear-b02f8333-202c-49ed-9443-8daf921e297d.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-22",
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-25",
       "cadence_days": 365,
       "source_issue": {
         "id": "b02f8333-202c-49ed-9443-8daf921e297d",
@@ -23181,12 +23189,8 @@
         "url": "https://linear.app/asabeko/issue/CO-573/co-replace-terminal-co-558-docs-freshness-pre-expiry-owner"
       },
       "doc_class": "task_packet",
-      "lifecycle_state": "active",
-      "created_at": "2026-05-21",
-      "next_review": "2026-06-20",
-      "notes": "CO-573 remains the historical packet source issue; CO-575 is only the live global docs:freshness:maintain owner after terminal CO-573. CO-584 registry integrity repair: status restored to active because local open checklist obligations prevent archive readiness; prior archived status retained only as terminal source lineage in notes.",
-      "terminal_source_lifecycle_state": "terminal_pending_archive",
-      "recommended_action": "resolve_local_checklist_obligations_before_archive"
+      "notes": "CO-579 terminal lifecycle repair: live Linear issue-context verifies CO-573 is Done/completed; local packet files are archive stubs with no open checklist obligations, so this row is retained as terminal lineage instead of active docs freshness debt.",
+      "retained_reason": "CO-579 terminal lifecycle repair: live Linear issue-context verifies CO-573 is Done/completed; local packet files are archive stubs with no open checklist obligations, so this row is retained as terminal lineage instead of active docs freshness debt."
     },
     {
       "path": "docs/PRD-linear-b0aac010-12ec-4509-88a4-c2dbc6395e19.md",
@@ -23323,8 +23327,8 @@
     {
       "path": "docs/PRD-linear-b9447b5a-224d-4731-bab9-95bb0597dbe0.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-22",
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-25",
       "cadence_days": 365,
       "source_issue": {
         "id": "b9447b5a-224d-4731-bab9-95bb0597dbe0",
@@ -23332,12 +23336,8 @@
         "url": "https://linear.app/asabeko/issue/CO-558/co-replace-terminal-docs-freshness-maintenance-owner-after-may-19"
       },
       "doc_class": "task_packet",
-      "lifecycle_state": "active",
-      "created_at": "2026-05-19",
-      "next_review": "2026-06-19",
-      "notes": "CO-558 remains the historical packet source issue; CO-573 is only the live global docs:freshness:maintain owner after terminal CO-558. CO-584 registry integrity repair: status restored to active because local open checklist obligations prevent archive readiness; prior archived status retained only as terminal source lineage in notes.",
-      "terminal_source_lifecycle_state": "terminal_pending_archive",
-      "recommended_action": "resolve_local_checklist_obligations_before_archive"
+      "notes": "CO-579 terminal lifecycle repair: live Linear issue-context verifies CO-558 is Done/completed; local packet files are archive stubs with no open checklist obligations, so this row is retained as terminal lineage instead of active docs freshness debt.",
+      "retained_reason": "CO-579 terminal lifecycle repair: live Linear issue-context verifies CO-558 is Done/completed; local packet files are archive stubs with no open checklist obligations, so this row is retained as terminal lineage instead of active docs freshness debt."
     },
     {
       "path": "docs/PRD-linear-b9a1044e-03b0-49ef-8435-92840eaf90b9.md",
@@ -30316,8 +30316,8 @@
     {
       "path": "docs/TECH_SPEC-linear-b02f8333-202c-49ed-9443-8daf921e297d.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-22",
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-25",
       "cadence_days": 365,
       "source_issue": {
         "id": "b02f8333-202c-49ed-9443-8daf921e297d",
@@ -30325,12 +30325,8 @@
         "url": "https://linear.app/asabeko/issue/CO-573/co-replace-terminal-co-558-docs-freshness-pre-expiry-owner"
       },
       "doc_class": "task_packet",
-      "lifecycle_state": "active",
-      "created_at": "2026-05-21",
-      "next_review": "2026-06-20",
-      "notes": "CO-573 remains the historical packet source issue; CO-575 is only the live global docs:freshness:maintain owner after terminal CO-573. CO-584 registry integrity repair: status restored to active because local open checklist obligations prevent archive readiness; prior archived status retained only as terminal source lineage in notes.",
-      "terminal_source_lifecycle_state": "terminal_pending_archive",
-      "recommended_action": "resolve_local_checklist_obligations_before_archive"
+      "notes": "CO-579 terminal lifecycle repair: live Linear issue-context verifies CO-573 is Done/completed; local packet files are archive stubs with no open checklist obligations, so this row is retained as terminal lineage instead of active docs freshness debt.",
+      "retained_reason": "CO-579 terminal lifecycle repair: live Linear issue-context verifies CO-573 is Done/completed; local packet files are archive stubs with no open checklist obligations, so this row is retained as terminal lineage instead of active docs freshness debt."
     },
     {
       "path": "docs/TECH_SPEC-linear-b0aac010-12ec-4509-88a4-c2dbc6395e19.md",
@@ -30467,8 +30463,8 @@
     {
       "path": "docs/TECH_SPEC-linear-b9447b5a-224d-4731-bab9-95bb0597dbe0.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-22",
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-25",
       "cadence_days": 365,
       "source_issue": {
         "id": "b9447b5a-224d-4731-bab9-95bb0597dbe0",
@@ -30476,12 +30472,8 @@
         "url": "https://linear.app/asabeko/issue/CO-558/co-replace-terminal-docs-freshness-maintenance-owner-after-may-19"
       },
       "doc_class": "task_packet",
-      "lifecycle_state": "active",
-      "created_at": "2026-05-19",
-      "next_review": "2026-06-19",
-      "notes": "CO-558 remains the historical packet source issue; CO-573 is only the live global docs:freshness:maintain owner after terminal CO-558. CO-584 registry integrity repair: status restored to active because local open checklist obligations prevent archive readiness; prior archived status retained only as terminal source lineage in notes.",
-      "terminal_source_lifecycle_state": "terminal_pending_archive",
-      "recommended_action": "resolve_local_checklist_obligations_before_archive"
+      "notes": "CO-579 terminal lifecycle repair: live Linear issue-context verifies CO-558 is Done/completed; local packet files are archive stubs with no open checklist obligations, so this row is retained as terminal lineage instead of active docs freshness debt.",
+      "retained_reason": "CO-579 terminal lifecycle repair: live Linear issue-context verifies CO-558 is Done/completed; local packet files are archive stubs with no open checklist obligations, so this row is retained as terminal lineage instead of active docs freshness debt."
     },
     {
       "path": "docs/TECH_SPEC-linear-b9a1044e-03b0-49ef-8435-92840eaf90b9.md",
@@ -37802,8 +37794,8 @@
     {
       "path": "tasks/specs/linear-b02f8333-202c-49ed-9443-8daf921e297d.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-22",
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-25",
       "cadence_days": 365,
       "source_issue": {
         "id": "b02f8333-202c-49ed-9443-8daf921e297d",
@@ -37811,12 +37803,8 @@
         "url": "https://linear.app/asabeko/issue/CO-573/co-replace-terminal-co-558-docs-freshness-pre-expiry-owner"
       },
       "doc_class": "task_packet",
-      "lifecycle_state": "active",
-      "created_at": "2026-05-21",
-      "next_review": "2026-06-20",
-      "notes": "CO-573 remains the historical packet source issue; CO-575 is only the live global docs:freshness:maintain owner after terminal CO-573. CO-584 registry integrity repair: status restored to active because local open checklist obligations prevent archive readiness; prior archived status retained only as terminal source lineage in notes.",
-      "terminal_source_lifecycle_state": "terminal_pending_archive",
-      "recommended_action": "resolve_local_checklist_obligations_before_archive"
+      "notes": "CO-579 terminal lifecycle repair: live Linear issue-context verifies CO-573 is Done/completed; local packet files are archive stubs with no open checklist obligations, so this row is retained as terminal lineage instead of active docs freshness debt.",
+      "retained_reason": "CO-579 terminal lifecycle repair: live Linear issue-context verifies CO-573 is Done/completed; local packet files are archive stubs with no open checklist obligations, so this row is retained as terminal lineage instead of active docs freshness debt."
     },
     {
       "path": "tasks/specs/linear-b0aac010-12ec-4509-88a4-c2dbc6395e19.md",
@@ -37954,8 +37942,8 @@
     {
       "path": "tasks/specs/linear-b9447b5a-224d-4731-bab9-95bb0597dbe0.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-22",
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-25",
       "cadence_days": 365,
       "source_issue": {
         "id": "b9447b5a-224d-4731-bab9-95bb0597dbe0",
@@ -37963,12 +37951,8 @@
         "url": "https://linear.app/asabeko/issue/CO-558/co-replace-terminal-docs-freshness-maintenance-owner-after-may-19"
       },
       "doc_class": "task_packet",
-      "lifecycle_state": "active",
-      "created_at": "2026-05-19",
-      "next_review": "2026-06-19",
-      "notes": "CO-558 remains the historical packet source issue; CO-573 is only the live global docs:freshness:maintain owner after terminal CO-558. CO-584 registry integrity repair: status restored to active because local open checklist obligations prevent archive readiness; prior archived status retained only as terminal source lineage in notes.",
-      "terminal_source_lifecycle_state": "terminal_pending_archive",
-      "recommended_action": "resolve_local_checklist_obligations_before_archive"
+      "notes": "CO-579 terminal lifecycle repair: live Linear issue-context verifies CO-558 is Done/completed; local packet files are archive stubs with no open checklist obligations, so this row is retained as terminal lineage instead of active docs freshness debt.",
+      "retained_reason": "CO-579 terminal lifecycle repair: live Linear issue-context verifies CO-558 is Done/completed; local packet files are archive stubs with no open checklist obligations, so this row is retained as terminal lineage instead of active docs freshness debt."
     },
     {
       "path": "tasks/specs/linear-b9a1044e-03b0-49ef-8435-92840eaf90b9.md",
@@ -44948,8 +44932,8 @@
     {
       "path": "tasks/tasks-linear-b02f8333-202c-49ed-9443-8daf921e297d.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-22",
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-25",
       "cadence_days": 365,
       "source_issue": {
         "id": "b02f8333-202c-49ed-9443-8daf921e297d",
@@ -44957,12 +44941,8 @@
         "url": "https://linear.app/asabeko/issue/CO-573/co-replace-terminal-co-558-docs-freshness-pre-expiry-owner"
       },
       "doc_class": "task_packet",
-      "lifecycle_state": "active",
-      "created_at": "2026-05-21",
-      "next_review": "2026-06-20",
-      "notes": "CO-573 remains the historical packet source issue; CO-575 is only the live global docs:freshness:maintain owner after terminal CO-573. CO-584 registry integrity repair: status restored to active because local open checklist obligations prevent archive readiness; prior archived status retained only as terminal source lineage in notes.",
-      "terminal_source_lifecycle_state": "terminal_pending_archive",
-      "recommended_action": "resolve_local_checklist_obligations_before_archive"
+      "notes": "CO-579 terminal lifecycle repair: live Linear issue-context verifies CO-573 is Done/completed; local packet files are archive stubs with no open checklist obligations, so this row is retained as terminal lineage instead of active docs freshness debt.",
+      "retained_reason": "CO-579 terminal lifecycle repair: live Linear issue-context verifies CO-573 is Done/completed; local packet files are archive stubs with no open checklist obligations, so this row is retained as terminal lineage instead of active docs freshness debt."
     },
     {
       "path": "tasks/tasks-linear-b0aac010-12ec-4509-88a4-c2dbc6395e19.md",
@@ -45099,8 +45079,8 @@
     {
       "path": "tasks/tasks-linear-b9447b5a-224d-4731-bab9-95bb0597dbe0.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-22",
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-25",
       "cadence_days": 365,
       "source_issue": {
         "id": "b9447b5a-224d-4731-bab9-95bb0597dbe0",
@@ -45108,12 +45088,8 @@
         "url": "https://linear.app/asabeko/issue/CO-558/co-replace-terminal-docs-freshness-maintenance-owner-after-may-19"
       },
       "doc_class": "task_packet",
-      "lifecycle_state": "active",
-      "created_at": "2026-05-19",
-      "next_review": "2026-06-19",
-      "notes": "CO-558 remains the historical packet source issue; CO-573 is only the live global docs:freshness:maintain owner after terminal CO-558. CO-584 registry integrity repair: status restored to active because local open checklist obligations prevent archive readiness; prior archived status retained only as terminal source lineage in notes.",
-      "terminal_source_lifecycle_state": "terminal_pending_archive",
-      "recommended_action": "resolve_local_checklist_obligations_before_archive"
+      "notes": "CO-579 terminal lifecycle repair: live Linear issue-context verifies CO-558 is Done/completed; local packet files are archive stubs with no open checklist obligations, so this row is retained as terminal lineage instead of active docs freshness debt.",
+      "retained_reason": "CO-579 terminal lifecycle repair: live Linear issue-context verifies CO-558 is Done/completed; local packet files are archive stubs with no open checklist obligations, so this row is retained as terminal lineage instead of active docs freshness debt."
     },
     {
       "path": "tasks/tasks-linear-b9a1044e-03b0-49ef-8435-92840eaf90b9.md",
