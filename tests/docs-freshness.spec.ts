@@ -2259,7 +2259,7 @@ describe('docs freshness reporting', () => {
           path: packetPath,
           owner: 'Codex',
           status: 'archived',
-          lifecycle_state: 'active',
+          lifecycle_state: ' ACTIVE ',
           last_review: reviewDateDaysAgo(31),
           cadence_days: 30
         }

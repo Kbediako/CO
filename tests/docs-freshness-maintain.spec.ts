@@ -5083,7 +5083,7 @@ last_review: ${lastReview}
               path: invalidPath,
               owner: 'Codex',
               status: 'archived',
-              lifecycle_state: 'active',
+              lifecycle_state: ' ACTIVE ',
               last_review: reviewDateDaysAgo(31),
               cadence_days: 30
             }
