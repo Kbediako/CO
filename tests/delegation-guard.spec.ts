@@ -674,6 +674,100 @@ describe('delegation-guard script', () => {
     expect(stdout).not.toContain('Delegation guard: OK (subagent runs are exempt).');
   });
 
+  it('does not derive shared provider-intake proof from manifest workspace_path without a current root', async () => {
+    tempDir = await mkdtemp(join(tmpdir(), 'delegation-guard-provider-child-no-root-'));
+    const parentTaskId = 'linear-lin-issue-1';
+    const childTaskId = `${parentTaskId}-docs-review`;
+    const parentRunId = 'run-parent';
+    const currentRoot = join(tempDir, 'current-clone');
+    const foreignRoot = join(tempDir, 'foreign-clone');
+    const workspacePath = join(currentRoot, '.workspaces', parentTaskId);
+    const foreignWorkspacePath = join(foreignRoot, '.workspaces', parentTaskId);
+    const workspaceRunsDir = join(workspacePath, '.runs');
+    const foreignSharedRunsDir = join(foreignRoot, '.runs');
+    await mkdir(join(workspacePath, 'tasks'), { recursive: true });
+    await writeTaskIndex(workspacePath, [
+      {
+        id: `20260525-${parentTaskId}`,
+        title: 'CO-557 provider issue parent',
+        relates_to: `tasks/tasks-${parentTaskId}.md`
+      }
+    ]);
+
+    const childManifestPath = join(workspaceRunsDir, childTaskId, 'cli', 'run-docs-review', 'manifest.json');
+    await mkdir(dirname(childManifestPath), { recursive: true });
+    await writeJson(childManifestPath, {
+      task_id: childTaskId,
+      run_id: 'run-docs-review',
+      parent_run_id: parentRunId,
+      pipeline_id: 'docs-review',
+      status: 'in_progress',
+      issue_provider: 'linear',
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-515',
+      workspace_path: foreignWorkspacePath
+    });
+
+    const parentManifestPath = join(foreignSharedRunsDir, parentTaskId, 'cli', parentRunId, 'manifest.json');
+    await mkdir(dirname(parentManifestPath), { recursive: true });
+    await mkdir(foreignWorkspacePath, { recursive: true });
+    await writeJson(parentManifestPath, {
+      task_id: parentTaskId,
+      run_id: parentRunId,
+      pipeline_id: 'provider-linear-worker',
+      status: 'in_progress',
+      issue_provider: 'linear',
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-515',
+      workspace_path: foreignWorkspacePath
+    });
+
+    const foreignControlHostDir = join(foreignSharedRunsDir, 'local-mcp', 'cli', 'control-host');
+    await mkdir(foreignControlHostDir, { recursive: true });
+    await writeJson(join(foreignControlHostDir, 'provider-intake-state.json'), {
+      schema_version: 1,
+      updated_at: '2026-05-19T00:00:01.000Z',
+      claims: [
+        {
+          provider: 'linear',
+          provider_key: 'linear:lin-issue-1',
+          issue_id: 'lin-issue-1',
+          issue_identifier: 'CO-515',
+          issue_title: 'CO recheck control-host source freshness',
+          issue_state: 'In Progress',
+          issue_state_type: 'started',
+          issue_updated_at: '2026-05-19T00:00:00.000Z',
+          task_id: parentTaskId,
+          mapping_source: 'provider_id_fallback',
+          state: 'running',
+          reason: 'provider_issue_rehydrated_active_run',
+          accepted_at: '2026-05-19T00:00:00.000Z',
+          updated_at: '2026-05-19T00:00:01.000Z',
+          run_id: parentRunId,
+          run_manifest_path: parentManifestPath,
+          launch_source: 'control-host',
+          launch_token: 'launch-token-1'
+        }
+      ]
+    });
+
+    const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
+      cwd: workspacePath,
+      env: cleanGuardOverrideEnv({
+        MCP_RUNNER_TASK_ID: childTaskId,
+        CODEX_ORCHESTRATOR_RUNS_DIR: workspaceRunsDir,
+        CODEX_ORCHESTRATOR_MANIFEST_PATH: childManifestPath,
+        CODEX_ORCHESTRATOR_PIPELINE_ID: 'docs-review'
+      })
+    });
+
+    expect(stdout).toContain(
+      `Provider docs-review task id '${childTaskId}' requires sanctioned provider parent proof for registered parent task '${parentTaskId}'`
+    );
+    expect(stdout).not.toContain(join(foreignControlHostDir, 'provider-intake-state.json'));
+    expect(stdout).not.toContain('Delegation guard: OK (subagent runs are exempt).');
+  });
+
   it('keeps provider-worker workspace-scoped searches fail-closed when no delegated child manifests exist', async () => {
     tempDir = await mkdtemp(join(tmpdir(), 'delegation-guard-provider-worker-missing-'));
     const taskId = 'linear-fabdf855-dd07-4f8d-8ffa-f02d22cb27be';

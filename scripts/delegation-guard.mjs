@@ -359,7 +359,7 @@ function resolveProviderWorkspacePath(env, manifest = null) {
     : '';
   const envRoot = readNonEmptyString(env, 'CODEX_ORCHESTRATOR_ROOT');
   if (!envRoot) {
-    return manifestWorkspacePath;
+    return '';
   }
   if (!manifestWorkspacePath) {
     return envRoot;
@@ -381,21 +381,28 @@ function resolveProviderWorkspacePath(env, manifest = null) {
   return envRoot;
 }
 
-function resolveSharedRunsDirForProviderWorkspace(workspacePath) {
-  if (!workspacePath) {
+function resolveSharedRunsDirForProviderWorkspace(workspacePath, trustedRoot) {
+  if (!workspacePath || !trustedRoot) {
     return '';
   }
   const resolvedWorkspacePath = resolve(workspacePath);
+  const resolvedTrustedRoot = resolve(trustedRoot);
   if (basename(dirname(resolvedWorkspacePath)) !== '.workspaces') {
     return '';
   }
-  return join(dirname(dirname(resolvedWorkspacePath)), '.runs');
+  const sharedRoot = dirname(dirname(resolvedWorkspacePath));
+  if (resolvedWorkspacePath !== resolvedTrustedRoot && sharedRoot !== resolvedTrustedRoot) {
+    return '';
+  }
+  return join(sharedRoot, '.runs');
 }
 
 function resolveControlHostProviderIntakeRunsDirs(runsDir, env, manifest = null) {
   const candidates = [resolve(runsDir)];
+  const trustedRoot = readNonEmptyString(env, 'CODEX_ORCHESTRATOR_ROOT');
   const sharedRunsDir = resolveSharedRunsDirForProviderWorkspace(
-    resolveProviderWorkspacePath(env, manifest)
+    resolveProviderWorkspacePath(env, manifest),
+    trustedRoot
   );
   if (sharedRunsDir) {
     candidates.push(resolve(sharedRunsDir));

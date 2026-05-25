@@ -159,7 +159,7 @@
           "review_outcome": "clean-success",
           "review_verdict": "clean",
           "contract_overall_verdict": "clean",
-          "summary": "Final model-backed review ran on Codex CLI 0.133.0 with gpt-5.5/xhigh via appserver and returned clean enforce-mode contract validation across spec_conformance, coding_standards, code_changes, and agent_loop."
+          "summary": "After CodeRabbit rework for no-root provider-intake proof and continuation-prompt task-key guidance, final model-backed review ran on Codex CLI 0.133.0 with gpt-5.5/xhigh via appserver and returned clean enforce-mode contract validation across spec_conformance, coding_standards, code_changes, and agent_loop."
         }
       },
       "validation": {
@@ -182,6 +182,11 @@
           "foreign active-manifest workspace_path cannot make delegation-guard accept provider-intake proof from another clone",
           "npx vitest run tests/delegation-guard.spec.ts -t \"foreign workspace root\" passed",
           "npx vitest run tests/delegation-guard.spec.ts orchestrator/tests/ProviderLinearChildLaneShell.test.ts tests/tasks-archive.spec.ts passed 168 tests",
+          "missing CODEX_ORCHESTRATOR_ROOT cannot derive shared provider-intake proof from active-manifest workspace_path",
+          "npx vitest run tests/delegation-guard.spec.ts -t \"foreign workspace root|without a current root\" passed",
+          "continuation prompts assert docs-packet, docs-review, and source-freshness-recheck task-key guidance",
+          "npx vitest run orchestrator/tests/ProviderLinearWorkerRunner.test.ts -t \"builds a full first-turn prompt and a continuation prompt\" passed",
+          "npx vitest run tests/delegation-guard.spec.ts orchestrator/tests/ProviderLinearWorkerRunner.test.ts passed 468 tests",
           "tasks/index.json status done is terminal for task archive eligibility",
           "docs:archive-tasks restored docs/TASKS reserve without policy weakening",
           "npm run build passed after foreign-root rework",
@@ -194,7 +199,7 @@
           "node scripts/diff-budget.mjs passed with explicit CO-557 override",
           "npm run pack:smoke passed after foreign-root rework",
           "npm run test -- --reporter=dot passed after foreign-root rework (367 files / 6353 tests)",
-          "codex-orchestrator review --uncommitted returned clean enforce-mode contract after accept-path and foreign-root rework"
+          "codex-orchestrator review --uncommitted returned clean enforce-mode contract after accept-path, foreign-root, and CodeRabbit no-root/continuation-prompt rework"
         ],
         "pending": [
           "parent PR lifecycle and Linear handoff"

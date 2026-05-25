@@ -37,14 +37,22 @@
   - Applies: `Yes`, because task-key/root authority currently risks fallback-like implicit inference.
   - Decision: expire implicit docs-review task-key inference from sibling child keys and expire implicit artifact-root inference between shared control-host artifact root and workspace-local `.runs`.
   - Durable retention evidence: strict registered-parent-task and sanctioned-provider-child proof remain supported correctness contracts under `delegation-guard`.
-- Large-refactor check:
-  - Start with a scoped authority repair. Relaunch with widened ownership if parent source inspection shows root/task-key authority is split across lifecycle phases.
+- Large refactor: start with a scoped authority repair. Relaunch with widened ownership if parent source inspection shows root/task-key authority is split across lifecycle phases.
+- Large refactor: scoped authority repair stays within existing provider child-stream, child-lane accept, and artifact resolver seams.
+- Minor seam: no new minor seam is retained; the existing implicit task-key/root inference seam is expired by fail-closed authority checks.
 
 | Surface | Fallback / seam | Decision | Owner | Trigger | Introduced date | Review date | Maximum lifetime | Removal condition | Validation |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Provider docs-review task key | Docs-review task identity can be inferred from sibling child keys such as `linear-<uuid>-docs-packet` or `linear-<uuid>-source-freshness-recheck`. | expire fallback | CO-557 parent implementation | Provider docs-review launch or validation. | pre-CO-557 | 2026-05-25 | 2026-06-24 | Docs-review task key derives from registered parent task plus sanctioned child-stream proof. | Focused docs-review task-key and `delegation-guard` regressions. |
-| Control-host artifact root | Artifact lookup can implicitly choose shared control-host artifact root or workspace-local `.runs`. | expire fallback | CO-557 parent implementation | Provider reads accepted child-lane manifest, source-freshness recheck, or provider-intake audit evidence. | pre-CO-557 | 2026-05-25 | 2026-06-24 | Root selection is explicit, diagnostics name the root, and wrong-root lookup fails closed. | Focused root-resolution and manifest-acceptance regressions. |
+| Provider docs-review task key | Docs-review task identity can be inferred from sibling child keys such as `linear-<uuid>-docs-packet` or `linear-<uuid>-source-freshness-recheck`. | expire fallback | CO-557 parent implementation | Provider docs-review launch or validation. | 2026-05-25 | 2026-05-25 | 2026-06-24 | Docs-review task key derives from registered parent task plus sanctioned child-stream proof. | Focused docs-review task-key and `delegation-guard` regressions. |
+| Control-host artifact root | Artifact lookup can implicitly choose shared control-host artifact root or workspace-local `.runs`. | expire fallback | CO-557 parent implementation | Provider reads accepted child-lane manifest, source-freshness recheck, or provider-intake audit evidence. | 2026-05-25 | 2026-05-25 | 2026-06-24 | Root selection is explicit, diagnostics name the root, and wrong-root lookup fails closed. | Focused root-resolution and manifest-acceptance regressions. |
 | Strict provider task registration and provenance | Contract name: registered parent task plus sanctioned provider child proof. | justify retaining fallback | Owning surface: `delegation-guard` and provider child-stream contract | Provider docs-review validation. | 2026-05-25 | 2026-05-25 | Non-expiring durable retention only with rationale | Non-expiring rationale: strict registry/provenance validation is correctness behavior. | Missing registry proof, wrong task key, and wrong-root artifact cases fail closed. |
+
+Durable retention evidence:
+- Contract name: registered parent task plus sanctioned provider child proof.
+- Owning surface: `delegation-guard` and provider child-stream contract.
+- Steady-state proof: missing registry proof, wrong task key, and wrong-root artifact cases fail closed.
+- Tests/docs: `tests/delegation-guard.spec.ts`, `orchestrator/tests/ProviderLinearChildStreamShell.test.ts`, and this CO-557 packet.
+- Non-expiring rationale: strict registry/provenance validation is correctness behavior, not temporary fallback.
 
 ## Milestones & Sequencing
 1. Create the CO-557 docs-first packet and task mirrors within the declared docs child-lane scope.
