@@ -20,6 +20,8 @@ import {
 import {
   buildTaskPacketLifecycleIndex,
   buildTaskPacketLifecycleIndexForRepo,
+  ACTIVE_LIFECYCLE_STATUS,
+  ARCHIVED_LIFECYCLE_STATUS,
   classifyTaskPacketPathFamily,
   collectTaskIndexItems,
   EFFECTIVE_LIFECYCLE_STATUSES,
@@ -821,6 +823,10 @@ export async function runDocsFreshness(
 
     if (!STATUS_VALUES.has(status)) {
       issues.push('invalid status');
+    }
+
+    if (status === ARCHIVED_LIFECYCLE_STATUS && entry?.lifecycle_state === ACTIVE_LIFECYCLE_STATUS) {
+      issues.push('archived registry status cannot declare active lifecycle_state');
     }
 
     if (!Number.isInteger(cadenceDays) || cadenceDays <= 0) {

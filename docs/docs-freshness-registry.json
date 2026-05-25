@@ -3,6 +3,108 @@
   "generated_at": "2026-05-25",
   "entries": [
     {
+      "path": ".agent/task/linear-bb7589e8-b79d-405a-8408-5842a75d8b5d.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-25",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "bb7589e8-b79d-405a-8408-5842a75d8b5d",
+        "identifier": "CO-584",
+        "url": "https://linear.app/asabeko/issue/CO-584/co-repair-docs-freshness-registry-lifecycle-integrity-hard-block"
+      },
+      "doc_class": "task_mirror",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-25",
+      "next_review": "2026-06-24",
+      "notes": "CO-584 docs-first packet for docs freshness registry lifecycle integrity hard block."
+    },
+    {
+      "path": "docs/ACTION_PLAN-linear-bb7589e8-b79d-405a-8408-5842a75d8b5d.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-25",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "bb7589e8-b79d-405a-8408-5842a75d8b5d",
+        "identifier": "CO-584",
+        "url": "https://linear.app/asabeko/issue/CO-584/co-repair-docs-freshness-registry-lifecycle-integrity-hard-block"
+      },
+      "doc_class": "task_packet",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-25",
+      "next_review": "2026-06-24",
+      "notes": "CO-584 docs-first packet for docs freshness registry lifecycle integrity hard block."
+    },
+    {
+      "path": "docs/PRD-linear-bb7589e8-b79d-405a-8408-5842a75d8b5d.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-25",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "bb7589e8-b79d-405a-8408-5842a75d8b5d",
+        "identifier": "CO-584",
+        "url": "https://linear.app/asabeko/issue/CO-584/co-repair-docs-freshness-registry-lifecycle-integrity-hard-block"
+      },
+      "doc_class": "task_packet",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-25",
+      "next_review": "2026-06-24",
+      "notes": "CO-584 docs-first packet for docs freshness registry lifecycle integrity hard block."
+    },
+    {
+      "path": "docs/TECH_SPEC-linear-bb7589e8-b79d-405a-8408-5842a75d8b5d.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-25",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "bb7589e8-b79d-405a-8408-5842a75d8b5d",
+        "identifier": "CO-584",
+        "url": "https://linear.app/asabeko/issue/CO-584/co-repair-docs-freshness-registry-lifecycle-integrity-hard-block"
+      },
+      "doc_class": "task_packet",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-25",
+      "next_review": "2026-06-24",
+      "notes": "CO-584 docs-first packet for docs freshness registry lifecycle integrity hard block."
+    },
+    {
+      "path": "tasks/specs/linear-bb7589e8-b79d-405a-8408-5842a75d8b5d.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-25",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "bb7589e8-b79d-405a-8408-5842a75d8b5d",
+        "identifier": "CO-584",
+        "url": "https://linear.app/asabeko/issue/CO-584/co-repair-docs-freshness-registry-lifecycle-integrity-hard-block"
+      },
+      "doc_class": "active_spec",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-25",
+      "next_review": "2026-06-24",
+      "notes": "CO-584 docs-first packet for docs freshness registry lifecycle integrity hard block."
+    },
+    {
+      "path": "tasks/tasks-linear-bb7589e8-b79d-405a-8408-5842a75d8b5d.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-25",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "bb7589e8-b79d-405a-8408-5842a75d8b5d",
+        "identifier": "CO-584",
+        "url": "https://linear.app/asabeko/issue/CO-584/co-repair-docs-freshness-registry-lifecycle-integrity-hard-block"
+      },
+      "doc_class": "task_mirror",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-25",
+      "next_review": "2026-06-24",
+      "notes": "CO-584 docs-first packet for docs freshness registry lifecycle integrity hard block."
+    },
+    {
       "path": ".agent/AGENTS.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -2355,11 +2457,13 @@
     {
       "path": ".agent/task/1164-coordinator-symphony-aligned-orchestrator-perform-run-lifecycle-execution-and-run-error-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "archived",
+      "status": "active",
       "last_review": "2026-05-25",
       "cadence_days": 365,
-      "notes": "CO-580 lifecycle resolver migration: terminal source evidence remains active because local open checklist obligations prevent archive readiness. Linked open checklist obligation groups=1.",
-      "lifecycle_state": "active"
+      "notes": "CO-580 lifecycle resolver migration: terminal source evidence remains active because local open checklist obligations prevent archive readiness. Linked open checklist obligation groups=1. CO-584 registry integrity repair: status restored to active because local open checklist obligations prevent archive readiness; prior archived status retained only as terminal source lineage in notes.",
+      "lifecycle_state": "active",
+      "terminal_source_lifecycle_state": "terminal_pending_archive",
+      "recommended_action": "resolve_local_checklist_obligations_before_archive"
     },
     {
       "path": ".agent/task/1165-coordinator-symphony-aligned-orchestrator-public-run-entry-bootstrap-and-handoff-reassessment.md",
@@ -2420,20 +2524,24 @@
     {
       "path": ".agent/task/1173-coordinator-symphony-aligned-orchestrator-cloud-target-execution-request-contract-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "archived",
+      "status": "active",
       "last_review": "2026-05-25",
       "cadence_days": 365,
-      "notes": "CO-580 lifecycle resolver migration: terminal source evidence remains active because local open checklist obligations prevent archive readiness. Linked open checklist obligation groups=1.",
-      "lifecycle_state": "active"
+      "notes": "CO-580 lifecycle resolver migration: terminal source evidence remains active because local open checklist obligations prevent archive readiness. Linked open checklist obligation groups=1. CO-584 registry integrity repair: status restored to active because local open checklist obligations prevent archive readiness; prior archived status retained only as terminal source lineage in notes.",
+      "lifecycle_state": "active",
+      "terminal_source_lifecycle_state": "terminal_pending_archive",
+      "recommended_action": "resolve_local_checklist_obligations_before_archive"
     },
     {
       "path": ".agent/task/1174-coordinator-symphony-aligned-orchestrator-cloud-target-missing-env-failure-contract-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "archived",
+      "status": "active",
       "last_review": "2026-05-25",
       "cadence_days": 365,
-      "notes": "CO-580 lifecycle resolver migration: terminal source evidence remains active because local open checklist obligations prevent archive readiness. Linked open checklist obligation groups=1.",
-      "lifecycle_state": "active"
+      "notes": "CO-580 lifecycle resolver migration: terminal source evidence remains active because local open checklist obligations prevent archive readiness. Linked open checklist obligation groups=1. CO-584 registry integrity repair: status restored to active because local open checklist obligations prevent archive readiness; prior archived status retained only as terminal source lineage in notes.",
+      "lifecycle_state": "active",
+      "terminal_source_lifecycle_state": "terminal_pending_archive",
+      "recommended_action": "resolve_local_checklist_obligations_before_archive"
     },
     {
       "path": ".agent/task/1175-coordinator-symphony-aligned-orchestrator-cloud-target-running-state-and-update-shell-extraction.md",
@@ -2564,29 +2672,35 @@
     {
       "path": ".agent/task/1193-coordinator-symphony-aligned-orchestrator-control-plane-lifecycle-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "archived",
+      "status": "active",
       "last_review": "2026-05-25",
       "cadence_days": 365,
-      "notes": "CO-580 lifecycle resolver migration: terminal source evidence remains active because local open checklist obligations prevent archive readiness. Linked open checklist obligation groups=1.",
-      "lifecycle_state": "active"
+      "notes": "CO-580 lifecycle resolver migration: terminal source evidence remains active because local open checklist obligations prevent archive readiness. Linked open checklist obligation groups=1. CO-584 registry integrity repair: status restored to active because local open checklist obligations prevent archive readiness; prior archived status retained only as terminal source lineage in notes.",
+      "lifecycle_state": "active",
+      "terminal_source_lifecycle_state": "terminal_pending_archive",
+      "recommended_action": "resolve_local_checklist_obligations_before_archive"
     },
     {
       "path": ".agent/task/1194-coordinator-symphony-aligned-orchestrator-start-preparation-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "archived",
+      "status": "active",
       "last_review": "2026-05-25",
       "cadence_days": 365,
-      "notes": "CO-580 lifecycle resolver migration: terminal source evidence remains active because local open checklist obligations prevent archive readiness. Linked open checklist obligation groups=1.",
-      "lifecycle_state": "active"
+      "notes": "CO-580 lifecycle resolver migration: terminal source evidence remains active because local open checklist obligations prevent archive readiness. Linked open checklist obligation groups=1. CO-584 registry integrity repair: status restored to active because local open checklist obligations prevent archive readiness; prior archived status retained only as terminal source lineage in notes.",
+      "lifecycle_state": "active",
+      "terminal_source_lifecycle_state": "terminal_pending_archive",
+      "recommended_action": "resolve_local_checklist_obligations_before_archive"
     },
     {
       "path": ".agent/task/1195-coordinator-symphony-aligned-orchestrator-resume-preparation-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "archived",
+      "status": "active",
       "last_review": "2026-05-25",
       "cadence_days": 365,
-      "notes": "CO-580 lifecycle resolver migration: terminal source evidence remains active because local open checklist obligations prevent archive readiness. Linked open checklist obligation groups=1.",
-      "lifecycle_state": "active"
+      "notes": "CO-580 lifecycle resolver migration: terminal source evidence remains active because local open checklist obligations prevent archive readiness. Linked open checklist obligation groups=1. CO-584 registry integrity repair: status restored to active because local open checklist obligations prevent archive readiness; prior archived status retained only as terminal source lineage in notes.",
+      "lifecycle_state": "active",
+      "terminal_source_lifecycle_state": "terminal_pending_archive",
+      "recommended_action": "resolve_local_checklist_obligations_before_archive"
     },
     {
       "path": ".agent/task/1196-coordinator-symphony-aligned-orchestrator-status-shell-extraction.md",
@@ -6087,11 +6201,13 @@
     {
       "path": ".agent/task/linear-ac7cefc8-ed87-4591-86cf-63b07bc20c2c.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "archived",
+      "status": "active",
       "last_review": "2026-05-25",
       "cadence_days": 365,
-      "notes": "CO-580 lifecycle resolver migration: terminal source evidence remains active because local open checklist obligations prevent archive readiness. Linked open checklist obligation groups=1.",
-      "lifecycle_state": "active"
+      "notes": "CO-580 lifecycle resolver migration: terminal source evidence remains active because local open checklist obligations prevent archive readiness. Linked open checklist obligation groups=1. CO-584 registry integrity repair: status restored to active because local open checklist obligations prevent archive readiness; prior archived status retained only as terminal source lineage in notes.",
+      "lifecycle_state": "active",
+      "terminal_source_lifecycle_state": "terminal_pending_archive",
+      "recommended_action": "resolve_local_checklist_obligations_before_archive"
     },
     {
       "path": ".agent/task/linear-acc07ffc-06ac-4649-a235-1bf37c13cc51.md",
@@ -6128,7 +6244,7 @@
     {
       "path": ".agent/task/linear-b02f8333-202c-49ed-9443-8daf921e297d.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "archived",
+      "status": "active",
       "last_review": "2026-05-22",
       "cadence_days": 365,
       "source_issue": {
@@ -6140,7 +6256,9 @@
       "lifecycle_state": "active",
       "created_at": "2026-05-21",
       "next_review": "2026-06-20",
-      "notes": "CO-573 remains the historical packet source issue; CO-575 is only the live global docs:freshness:maintain owner after terminal CO-573."
+      "notes": "CO-573 remains the historical packet source issue; CO-575 is only the live global docs:freshness:maintain owner after terminal CO-573. CO-584 registry integrity repair: status restored to active because local open checklist obligations prevent archive readiness; prior archived status retained only as terminal source lineage in notes.",
+      "terminal_source_lifecycle_state": "terminal_pending_archive",
+      "recommended_action": "resolve_local_checklist_obligations_before_archive"
     },
     {
       "path": ".agent/task/linear-b0aac010-12ec-4509-88a4-c2dbc6395e19.md",
@@ -6277,7 +6395,7 @@
     {
       "path": ".agent/task/linear-b9447b5a-224d-4731-bab9-95bb0597dbe0.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "archived",
+      "status": "active",
       "last_review": "2026-05-22",
       "cadence_days": 365,
       "source_issue": {
@@ -6289,7 +6407,9 @@
       "lifecycle_state": "active",
       "created_at": "2026-05-19",
       "next_review": "2026-06-19",
-      "notes": "CO-558 remains the historical packet source issue; CO-573 is only the live global docs:freshness:maintain owner after terminal CO-558."
+      "notes": "CO-558 remains the historical packet source issue; CO-573 is only the live global docs:freshness:maintain owner after terminal CO-558. CO-584 registry integrity repair: status restored to active because local open checklist obligations prevent archive readiness; prior archived status retained only as terminal source lineage in notes.",
+      "terminal_source_lifecycle_state": "terminal_pending_archive",
+      "recommended_action": "resolve_local_checklist_obligations_before_archive"
     },
     {
       "path": ".agent/task/linear-b9a1044e-03b0-49ef-8435-92840eaf90b9.md",
@@ -12833,11 +12953,13 @@
     {
       "path": "docs/ACTION_PLAN-linear-ac7cefc8-ed87-4591-86cf-63b07bc20c2c.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "archived",
+      "status": "active",
       "last_review": "2026-05-25",
       "cadence_days": 365,
-      "notes": "CO-580 lifecycle resolver migration: terminal source evidence remains active because local open checklist obligations prevent archive readiness. Linked open checklist obligation groups=1.",
-      "lifecycle_state": "active"
+      "notes": "CO-580 lifecycle resolver migration: terminal source evidence remains active because local open checklist obligations prevent archive readiness. Linked open checklist obligation groups=1. CO-584 registry integrity repair: status restored to active because local open checklist obligations prevent archive readiness; prior archived status retained only as terminal source lineage in notes.",
+      "lifecycle_state": "active",
+      "terminal_source_lifecycle_state": "terminal_pending_archive",
+      "recommended_action": "resolve_local_checklist_obligations_before_archive"
     },
     {
       "path": "docs/ACTION_PLAN-linear-acc07ffc-06ac-4649-a235-1bf37c13cc51.md",
@@ -12876,7 +12998,7 @@
     {
       "path": "docs/ACTION_PLAN-linear-b02f8333-202c-49ed-9443-8daf921e297d.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "archived",
+      "status": "active",
       "last_review": "2026-05-22",
       "cadence_days": 365,
       "source_issue": {
@@ -12888,7 +13010,9 @@
       "lifecycle_state": "active",
       "created_at": "2026-05-21",
       "next_review": "2026-06-20",
-      "notes": "CO-573 remains the historical packet source issue; CO-575 is only the live global docs:freshness:maintain owner after terminal CO-573."
+      "notes": "CO-573 remains the historical packet source issue; CO-575 is only the live global docs:freshness:maintain owner after terminal CO-573. CO-584 registry integrity repair: status restored to active because local open checklist obligations prevent archive readiness; prior archived status retained only as terminal source lineage in notes.",
+      "terminal_source_lifecycle_state": "terminal_pending_archive",
+      "recommended_action": "resolve_local_checklist_obligations_before_archive"
     },
     {
       "path": "docs/ACTION_PLAN-linear-b0aac010-12ec-4509-88a4-c2dbc6395e19.md",
@@ -13025,7 +13149,7 @@
     {
       "path": "docs/ACTION_PLAN-linear-b9447b5a-224d-4731-bab9-95bb0597dbe0.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "archived",
+      "status": "active",
       "last_review": "2026-05-22",
       "cadence_days": 365,
       "source_issue": {
@@ -13037,7 +13161,9 @@
       "lifecycle_state": "active",
       "created_at": "2026-05-19",
       "next_review": "2026-06-19",
-      "notes": "CO-558 remains the historical packet source issue; CO-573 is only the live global docs:freshness:maintain owner after terminal CO-558."
+      "notes": "CO-558 remains the historical packet source issue; CO-573 is only the live global docs:freshness:maintain owner after terminal CO-558. CO-584 registry integrity repair: status restored to active because local open checklist obligations prevent archive readiness; prior archived status retained only as terminal source lineage in notes.",
+      "terminal_source_lifecycle_state": "terminal_pending_archive",
+      "recommended_action": "resolve_local_checklist_obligations_before_archive"
     },
     {
       "path": "docs/ACTION_PLAN-linear-b9a1044e-03b0-49ef-8435-92840eaf90b9.md",
@@ -18730,11 +18856,13 @@
     {
       "path": "docs/PRD-coordinator-symphony-aligned-orchestrator-cloud-target-execution-request-contract-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "archived",
+      "status": "active",
       "last_review": "2026-05-25",
       "cadence_days": 365,
-      "notes": "CO-580 lifecycle resolver migration: terminal source evidence remains active because local open checklist obligations prevent archive readiness. Linked open checklist obligation groups=1.",
-      "lifecycle_state": "active"
+      "notes": "CO-580 lifecycle resolver migration: terminal source evidence remains active because local open checklist obligations prevent archive readiness. Linked open checklist obligation groups=1. CO-584 registry integrity repair: status restored to active because local open checklist obligations prevent archive readiness; prior archived status retained only as terminal source lineage in notes.",
+      "lifecycle_state": "active",
+      "terminal_source_lifecycle_state": "terminal_pending_archive",
+      "recommended_action": "resolve_local_checklist_obligations_before_archive"
     },
     {
       "path": "docs/PRD-coordinator-symphony-aligned-orchestrator-cloud-target-executor-extraction.md",
@@ -18749,11 +18877,13 @@
     {
       "path": "docs/PRD-coordinator-symphony-aligned-orchestrator-cloud-target-missing-env-failure-contract-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "archived",
+      "status": "active",
       "last_review": "2026-05-25",
       "cadence_days": 365,
-      "notes": "CO-580 lifecycle resolver migration: terminal source evidence remains active because local open checklist obligations prevent archive readiness. Linked open checklist obligation groups=1.",
-      "lifecycle_state": "active"
+      "notes": "CO-580 lifecycle resolver migration: terminal source evidence remains active because local open checklist obligations prevent archive readiness. Linked open checklist obligation groups=1. CO-584 registry integrity repair: status restored to active because local open checklist obligations prevent archive readiness; prior archived status retained only as terminal source lineage in notes.",
+      "lifecycle_state": "active",
+      "terminal_source_lifecycle_state": "terminal_pending_archive",
+      "recommended_action": "resolve_local_checklist_obligations_before_archive"
     },
     {
       "path": "docs/PRD-coordinator-symphony-aligned-orchestrator-cloud-target-preflight-resolution-and-sibling-skip-shell-extraction.md",
@@ -18878,11 +19008,13 @@
     {
       "path": "docs/PRD-coordinator-symphony-aligned-orchestrator-perform-run-lifecycle-execution-and-run-error-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "archived",
+      "status": "active",
       "last_review": "2026-05-25",
       "cadence_days": 365,
-      "notes": "CO-580 lifecycle resolver migration: terminal source evidence remains active because local open checklist obligations prevent archive readiness. Linked open checklist obligation groups=1.",
-      "lifecycle_state": "active"
+      "notes": "CO-580 lifecycle resolver migration: terminal source evidence remains active because local open checklist obligations prevent archive readiness. Linked open checklist obligation groups=1. CO-584 registry integrity repair: status restored to active because local open checklist obligations prevent archive readiness; prior archived status retained only as terminal source lineage in notes.",
+      "lifecycle_state": "active",
+      "terminal_source_lifecycle_state": "terminal_pending_archive",
+      "recommended_action": "resolve_local_checklist_obligations_before_archive"
     },
     {
       "path": "docs/PRD-coordinator-symphony-aligned-orchestrator-perform-run-lifecycle-execution-registration-shell-extraction.md",
@@ -18985,11 +19117,13 @@
     {
       "path": "docs/PRD-coordinator-symphony-aligned-orchestrator-resume-preparation-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "archived",
+      "status": "active",
       "last_review": "2026-05-25",
       "cadence_days": 365,
-      "notes": "CO-580 lifecycle resolver migration: terminal source evidence remains active because local open checklist obligations prevent archive readiness. Linked open checklist obligation groups=1.",
-      "lifecycle_state": "active"
+      "notes": "CO-580 lifecycle resolver migration: terminal source evidence remains active because local open checklist obligations prevent archive readiness. Linked open checklist obligation groups=1. CO-584 registry integrity repair: status restored to active because local open checklist obligations prevent archive readiness; prior archived status retained only as terminal source lineage in notes.",
+      "lifecycle_state": "active",
+      "terminal_source_lifecycle_state": "terminal_pending_archive",
+      "recommended_action": "resolve_local_checklist_obligations_before_archive"
     },
     {
       "path": "docs/PRD-coordinator-symphony-aligned-orchestrator-resume-token-validation-extraction.md",
@@ -19042,11 +19176,13 @@
     {
       "path": "docs/PRD-coordinator-symphony-aligned-orchestrator-start-preparation-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "archived",
+      "status": "active",
       "last_review": "2026-05-25",
       "cadence_days": 365,
-      "notes": "CO-580 lifecycle resolver migration: terminal source evidence remains active because local open checklist obligations prevent archive readiness. Linked open checklist obligation groups=1.",
-      "lifecycle_state": "active"
+      "notes": "CO-580 lifecycle resolver migration: terminal source evidence remains active because local open checklist obligations prevent archive readiness. Linked open checklist obligation groups=1. CO-584 registry integrity repair: status restored to active because local open checklist obligations prevent archive readiness; prior archived status retained only as terminal source lineage in notes.",
+      "lifecycle_state": "active",
+      "terminal_source_lifecycle_state": "terminal_pending_archive",
+      "recommended_action": "resolve_local_checklist_obligations_before_archive"
     },
     {
       "path": "docs/PRD-coordinator-symphony-aligned-orchestrator-start-resume-control-plane-launch-shell-extraction.md",
@@ -19068,11 +19204,13 @@
     {
       "path": "docs/PRD-coordinator-symphony-aligned-orchestrator-with-control-plane-lifecycle-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "archived",
+      "status": "active",
       "last_review": "2026-05-25",
       "cadence_days": 365,
-      "notes": "CO-580 lifecycle resolver migration: terminal source evidence remains active because local open checklist obligations prevent archive readiness. Linked open checklist obligation groups=1.",
-      "lifecycle_state": "active"
+      "notes": "CO-580 lifecycle resolver migration: terminal source evidence remains active because local open checklist obligations prevent archive readiness. Linked open checklist obligation groups=1. CO-584 registry integrity repair: status restored to active because local open checklist obligations prevent archive readiness; prior archived status retained only as terminal source lineage in notes.",
+      "lifecycle_state": "active",
+      "terminal_source_lifecycle_state": "terminal_pending_archive",
+      "recommended_action": "resolve_local_checklist_obligations_before_archive"
     },
     {
       "path": "docs/PRD-coordinator-symphony-aligned-plan-cli-shell-extraction.md",
@@ -22932,7 +23070,7 @@
     {
       "path": "docs/PRD-linear-b02f8333-202c-49ed-9443-8daf921e297d.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "archived",
+      "status": "active",
       "last_review": "2026-05-22",
       "cadence_days": 365,
       "source_issue": {
@@ -22944,7 +23082,9 @@
       "lifecycle_state": "active",
       "created_at": "2026-05-21",
       "next_review": "2026-06-20",
-      "notes": "CO-573 remains the historical packet source issue; CO-575 is only the live global docs:freshness:maintain owner after terminal CO-573."
+      "notes": "CO-573 remains the historical packet source issue; CO-575 is only the live global docs:freshness:maintain owner after terminal CO-573. CO-584 registry integrity repair: status restored to active because local open checklist obligations prevent archive readiness; prior archived status retained only as terminal source lineage in notes.",
+      "terminal_source_lifecycle_state": "terminal_pending_archive",
+      "recommended_action": "resolve_local_checklist_obligations_before_archive"
     },
     {
       "path": "docs/PRD-linear-b0aac010-12ec-4509-88a4-c2dbc6395e19.md",
@@ -23081,7 +23221,7 @@
     {
       "path": "docs/PRD-linear-b9447b5a-224d-4731-bab9-95bb0597dbe0.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "archived",
+      "status": "active",
       "last_review": "2026-05-22",
       "cadence_days": 365,
       "source_issue": {
@@ -23093,7 +23233,9 @@
       "lifecycle_state": "active",
       "created_at": "2026-05-19",
       "next_review": "2026-06-19",
-      "notes": "CO-558 remains the historical packet source issue; CO-573 is only the live global docs:freshness:maintain owner after terminal CO-558."
+      "notes": "CO-558 remains the historical packet source issue; CO-573 is only the live global docs:freshness:maintain owner after terminal CO-558. CO-584 registry integrity repair: status restored to active because local open checklist obligations prevent archive readiness; prior archived status retained only as terminal source lineage in notes.",
+      "terminal_source_lifecycle_state": "terminal_pending_archive",
+      "recommended_action": "resolve_local_checklist_obligations_before_archive"
     },
     {
       "path": "docs/PRD-linear-b9a1044e-03b0-49ef-8435-92840eaf90b9.md",
@@ -25899,11 +26041,13 @@
     {
       "path": "docs/TECH_SPEC-coordinator-symphony-aligned-orchestrator-cloud-target-execution-request-contract-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "archived",
+      "status": "active",
       "last_review": "2026-05-25",
       "cadence_days": 365,
-      "notes": "CO-580 lifecycle resolver migration: terminal source evidence remains active because local open checklist obligations prevent archive readiness. Linked open checklist obligation groups=1.",
-      "lifecycle_state": "active"
+      "notes": "CO-580 lifecycle resolver migration: terminal source evidence remains active because local open checklist obligations prevent archive readiness. Linked open checklist obligation groups=1. CO-584 registry integrity repair: status restored to active because local open checklist obligations prevent archive readiness; prior archived status retained only as terminal source lineage in notes.",
+      "lifecycle_state": "active",
+      "terminal_source_lifecycle_state": "terminal_pending_archive",
+      "recommended_action": "resolve_local_checklist_obligations_before_archive"
     },
     {
       "path": "docs/TECH_SPEC-coordinator-symphony-aligned-orchestrator-cloud-target-executor-extraction.md",
@@ -25918,11 +26062,13 @@
     {
       "path": "docs/TECH_SPEC-coordinator-symphony-aligned-orchestrator-cloud-target-missing-env-failure-contract-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "archived",
+      "status": "active",
       "last_review": "2026-05-25",
       "cadence_days": 365,
-      "notes": "CO-580 lifecycle resolver migration: terminal source evidence remains active because local open checklist obligations prevent archive readiness. Linked open checklist obligation groups=1.",
-      "lifecycle_state": "active"
+      "notes": "CO-580 lifecycle resolver migration: terminal source evidence remains active because local open checklist obligations prevent archive readiness. Linked open checklist obligation groups=1. CO-584 registry integrity repair: status restored to active because local open checklist obligations prevent archive readiness; prior archived status retained only as terminal source lineage in notes.",
+      "lifecycle_state": "active",
+      "terminal_source_lifecycle_state": "terminal_pending_archive",
+      "recommended_action": "resolve_local_checklist_obligations_before_archive"
     },
     {
       "path": "docs/TECH_SPEC-coordinator-symphony-aligned-orchestrator-cloud-target-preflight-resolution-and-sibling-skip-shell-extraction.md",
@@ -26047,11 +26193,13 @@
     {
       "path": "docs/TECH_SPEC-coordinator-symphony-aligned-orchestrator-perform-run-lifecycle-execution-and-run-error-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "archived",
+      "status": "active",
       "last_review": "2026-05-25",
       "cadence_days": 365,
-      "notes": "CO-580 lifecycle resolver migration: terminal source evidence remains active because local open checklist obligations prevent archive readiness. Linked open checklist obligation groups=1.",
-      "lifecycle_state": "active"
+      "notes": "CO-580 lifecycle resolver migration: terminal source evidence remains active because local open checklist obligations prevent archive readiness. Linked open checklist obligation groups=1. CO-584 registry integrity repair: status restored to active because local open checklist obligations prevent archive readiness; prior archived status retained only as terminal source lineage in notes.",
+      "lifecycle_state": "active",
+      "terminal_source_lifecycle_state": "terminal_pending_archive",
+      "recommended_action": "resolve_local_checklist_obligations_before_archive"
     },
     {
       "path": "docs/TECH_SPEC-coordinator-symphony-aligned-orchestrator-perform-run-lifecycle-execution-registration-shell-extraction.md",
@@ -26154,11 +26302,13 @@
     {
       "path": "docs/TECH_SPEC-coordinator-symphony-aligned-orchestrator-resume-preparation-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "archived",
+      "status": "active",
       "last_review": "2026-05-25",
       "cadence_days": 365,
-      "notes": "CO-580 lifecycle resolver migration: terminal source evidence remains active because local open checklist obligations prevent archive readiness. Linked open checklist obligation groups=1.",
-      "lifecycle_state": "active"
+      "notes": "CO-580 lifecycle resolver migration: terminal source evidence remains active because local open checklist obligations prevent archive readiness. Linked open checklist obligation groups=1. CO-584 registry integrity repair: status restored to active because local open checklist obligations prevent archive readiness; prior archived status retained only as terminal source lineage in notes.",
+      "lifecycle_state": "active",
+      "terminal_source_lifecycle_state": "terminal_pending_archive",
+      "recommended_action": "resolve_local_checklist_obligations_before_archive"
     },
     {
       "path": "docs/TECH_SPEC-coordinator-symphony-aligned-orchestrator-resume-token-validation-extraction.md",
@@ -26211,11 +26361,13 @@
     {
       "path": "docs/TECH_SPEC-coordinator-symphony-aligned-orchestrator-start-preparation-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "archived",
+      "status": "active",
       "last_review": "2026-05-25",
       "cadence_days": 365,
-      "notes": "CO-580 lifecycle resolver migration: terminal source evidence remains active because local open checklist obligations prevent archive readiness. Linked open checklist obligation groups=1.",
-      "lifecycle_state": "active"
+      "notes": "CO-580 lifecycle resolver migration: terminal source evidence remains active because local open checklist obligations prevent archive readiness. Linked open checklist obligation groups=1. CO-584 registry integrity repair: status restored to active because local open checklist obligations prevent archive readiness; prior archived status retained only as terminal source lineage in notes.",
+      "lifecycle_state": "active",
+      "terminal_source_lifecycle_state": "terminal_pending_archive",
+      "recommended_action": "resolve_local_checklist_obligations_before_archive"
     },
     {
       "path": "docs/TECH_SPEC-coordinator-symphony-aligned-orchestrator-start-resume-control-plane-launch-shell-extraction.md",
@@ -26237,11 +26389,13 @@
     {
       "path": "docs/TECH_SPEC-coordinator-symphony-aligned-orchestrator-with-control-plane-lifecycle-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "archived",
+      "status": "active",
       "last_review": "2026-05-25",
       "cadence_days": 365,
-      "notes": "CO-580 lifecycle resolver migration: terminal source evidence remains active because local open checklist obligations prevent archive readiness. Linked open checklist obligation groups=1.",
-      "lifecycle_state": "active"
+      "notes": "CO-580 lifecycle resolver migration: terminal source evidence remains active because local open checklist obligations prevent archive readiness. Linked open checklist obligation groups=1. CO-584 registry integrity repair: status restored to active because local open checklist obligations prevent archive readiness; prior archived status retained only as terminal source lineage in notes.",
+      "lifecycle_state": "active",
+      "terminal_source_lifecycle_state": "terminal_pending_archive",
+      "recommended_action": "resolve_local_checklist_obligations_before_archive"
     },
     {
       "path": "docs/TECH_SPEC-coordinator-symphony-aligned-plan-cli-shell-extraction.md",
@@ -30015,11 +30169,13 @@
     {
       "path": "docs/TECH_SPEC-linear-ac7cefc8-ed87-4591-86cf-63b07bc20c2c.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "archived",
+      "status": "active",
       "last_review": "2026-05-25",
       "cadence_days": 365,
-      "notes": "CO-580 lifecycle resolver migration: terminal source evidence remains active because local open checklist obligations prevent archive readiness. Linked open checklist obligation groups=1.",
-      "lifecycle_state": "active"
+      "notes": "CO-580 lifecycle resolver migration: terminal source evidence remains active because local open checklist obligations prevent archive readiness. Linked open checklist obligation groups=1. CO-584 registry integrity repair: status restored to active because local open checklist obligations prevent archive readiness; prior archived status retained only as terminal source lineage in notes.",
+      "lifecycle_state": "active",
+      "terminal_source_lifecycle_state": "terminal_pending_archive",
+      "recommended_action": "resolve_local_checklist_obligations_before_archive"
     },
     {
       "path": "docs/TECH_SPEC-linear-acc07ffc-06ac-4649-a235-1bf37c13cc51.md",
@@ -30058,7 +30214,7 @@
     {
       "path": "docs/TECH_SPEC-linear-b02f8333-202c-49ed-9443-8daf921e297d.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "archived",
+      "status": "active",
       "last_review": "2026-05-22",
       "cadence_days": 365,
       "source_issue": {
@@ -30070,7 +30226,9 @@
       "lifecycle_state": "active",
       "created_at": "2026-05-21",
       "next_review": "2026-06-20",
-      "notes": "CO-573 remains the historical packet source issue; CO-575 is only the live global docs:freshness:maintain owner after terminal CO-573."
+      "notes": "CO-573 remains the historical packet source issue; CO-575 is only the live global docs:freshness:maintain owner after terminal CO-573. CO-584 registry integrity repair: status restored to active because local open checklist obligations prevent archive readiness; prior archived status retained only as terminal source lineage in notes.",
+      "terminal_source_lifecycle_state": "terminal_pending_archive",
+      "recommended_action": "resolve_local_checklist_obligations_before_archive"
     },
     {
       "path": "docs/TECH_SPEC-linear-b0aac010-12ec-4509-88a4-c2dbc6395e19.md",
@@ -30207,7 +30365,7 @@
     {
       "path": "docs/TECH_SPEC-linear-b9447b5a-224d-4731-bab9-95bb0597dbe0.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "archived",
+      "status": "active",
       "last_review": "2026-05-22",
       "cadence_days": 365,
       "source_issue": {
@@ -30219,7 +30377,9 @@
       "lifecycle_state": "active",
       "created_at": "2026-05-19",
       "next_review": "2026-06-19",
-      "notes": "CO-558 remains the historical packet source issue; CO-573 is only the live global docs:freshness:maintain owner after terminal CO-558."
+      "notes": "CO-558 remains the historical packet source issue; CO-573 is only the live global docs:freshness:maintain owner after terminal CO-558. CO-584 registry integrity repair: status restored to active because local open checklist obligations prevent archive readiness; prior archived status retained only as terminal source lineage in notes.",
+      "terminal_source_lifecycle_state": "terminal_pending_archive",
+      "recommended_action": "resolve_local_checklist_obligations_before_archive"
     },
     {
       "path": "docs/TECH_SPEC-linear-b9a1044e-03b0-49ef-8435-92840eaf90b9.md",
@@ -33738,11 +33898,13 @@
     {
       "path": "tasks/specs/1164-coordinator-symphony-aligned-orchestrator-perform-run-lifecycle-execution-and-run-error-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "archived",
+      "status": "active",
       "last_review": "2026-05-25",
       "cadence_days": 365,
-      "notes": "CO-580 lifecycle resolver migration: terminal source evidence remains active because local open checklist obligations prevent archive readiness. Linked open checklist obligation groups=1.",
-      "lifecycle_state": "active"
+      "notes": "CO-580 lifecycle resolver migration: terminal source evidence remains active because local open checklist obligations prevent archive readiness. Linked open checklist obligation groups=1. CO-584 registry integrity repair: status restored to active because local open checklist obligations prevent archive readiness; prior archived status retained only as terminal source lineage in notes.",
+      "lifecycle_state": "active",
+      "terminal_source_lifecycle_state": "terminal_pending_archive",
+      "recommended_action": "resolve_local_checklist_obligations_before_archive"
     },
     {
       "path": "tasks/specs/1165-coordinator-symphony-aligned-orchestrator-public-run-entry-bootstrap-and-handoff-reassessment.md",
@@ -33803,20 +33965,24 @@
     {
       "path": "tasks/specs/1173-coordinator-symphony-aligned-orchestrator-cloud-target-execution-request-contract-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "archived",
+      "status": "active",
       "last_review": "2026-05-25",
       "cadence_days": 365,
-      "notes": "CO-580 lifecycle resolver migration: terminal source evidence remains active because local open checklist obligations prevent archive readiness. Linked open checklist obligation groups=1.",
-      "lifecycle_state": "active"
+      "notes": "CO-580 lifecycle resolver migration: terminal source evidence remains active because local open checklist obligations prevent archive readiness. Linked open checklist obligation groups=1. CO-584 registry integrity repair: status restored to active because local open checklist obligations prevent archive readiness; prior archived status retained only as terminal source lineage in notes.",
+      "lifecycle_state": "active",
+      "terminal_source_lifecycle_state": "terminal_pending_archive",
+      "recommended_action": "resolve_local_checklist_obligations_before_archive"
     },
     {
       "path": "tasks/specs/1174-coordinator-symphony-aligned-orchestrator-cloud-target-missing-env-failure-contract-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "archived",
+      "status": "active",
       "last_review": "2026-05-25",
       "cadence_days": 365,
-      "notes": "CO-580 lifecycle resolver migration: terminal source evidence remains active because local open checklist obligations prevent archive readiness. Linked open checklist obligation groups=1.",
-      "lifecycle_state": "active"
+      "notes": "CO-580 lifecycle resolver migration: terminal source evidence remains active because local open checklist obligations prevent archive readiness. Linked open checklist obligation groups=1. CO-584 registry integrity repair: status restored to active because local open checklist obligations prevent archive readiness; prior archived status retained only as terminal source lineage in notes.",
+      "lifecycle_state": "active",
+      "terminal_source_lifecycle_state": "terminal_pending_archive",
+      "recommended_action": "resolve_local_checklist_obligations_before_archive"
     },
     {
       "path": "tasks/specs/1175-coordinator-symphony-aligned-orchestrator-cloud-target-running-state-and-update-shell-extraction.md",
@@ -33958,29 +34124,35 @@
     {
       "path": "tasks/specs/1193-coordinator-symphony-aligned-orchestrator-control-plane-lifecycle-shell-extraction.md",
       "owner": "Codex",
-      "status": "archived",
+      "status": "active",
       "last_review": "2026-05-25",
       "cadence_days": 365,
-      "notes": "CO-580 lifecycle resolver migration: terminal source evidence remains active because local open checklist obligations prevent archive readiness. Linked open checklist obligation groups=1.",
-      "lifecycle_state": "active"
+      "notes": "CO-580 lifecycle resolver migration: terminal source evidence remains active because local open checklist obligations prevent archive readiness. Linked open checklist obligation groups=1. CO-584 registry integrity repair: status restored to active because local open checklist obligations prevent archive readiness; prior archived status retained only as terminal source lineage in notes.",
+      "lifecycle_state": "active",
+      "terminal_source_lifecycle_state": "terminal_pending_archive",
+      "recommended_action": "resolve_local_checklist_obligations_before_archive"
     },
     {
       "path": "tasks/specs/1194-coordinator-symphony-aligned-orchestrator-start-preparation-shell-extraction.md",
       "owner": "Codex",
-      "status": "archived",
+      "status": "active",
       "last_review": "2026-05-25",
       "cadence_days": 365,
-      "notes": "CO-580 lifecycle resolver migration: terminal source evidence remains active because local open checklist obligations prevent archive readiness. Linked open checklist obligation groups=1.",
-      "lifecycle_state": "active"
+      "notes": "CO-580 lifecycle resolver migration: terminal source evidence remains active because local open checklist obligations prevent archive readiness. Linked open checklist obligation groups=1. CO-584 registry integrity repair: status restored to active because local open checklist obligations prevent archive readiness; prior archived status retained only as terminal source lineage in notes.",
+      "lifecycle_state": "active",
+      "terminal_source_lifecycle_state": "terminal_pending_archive",
+      "recommended_action": "resolve_local_checklist_obligations_before_archive"
     },
     {
       "path": "tasks/specs/1195-coordinator-symphony-aligned-orchestrator-resume-preparation-shell-extraction.md",
       "owner": "Codex",
-      "status": "archived",
+      "status": "active",
       "last_review": "2026-05-25",
       "cadence_days": 365,
-      "notes": "CO-580 lifecycle resolver migration: terminal source evidence remains active because local open checklist obligations prevent archive readiness. Linked open checklist obligation groups=1.",
-      "lifecycle_state": "active"
+      "notes": "CO-580 lifecycle resolver migration: terminal source evidence remains active because local open checklist obligations prevent archive readiness. Linked open checklist obligation groups=1. CO-584 registry integrity repair: status restored to active because local open checklist obligations prevent archive readiness; prior archived status retained only as terminal source lineage in notes.",
+      "lifecycle_state": "active",
+      "terminal_source_lifecycle_state": "terminal_pending_archive",
+      "recommended_action": "resolve_local_checklist_obligations_before_archive"
     },
     {
       "path": "tasks/specs/1196-coordinator-symphony-aligned-orchestrator-status-shell-extraction.md",
@@ -37487,11 +37659,13 @@
     {
       "path": "tasks/specs/linear-ac7cefc8-ed87-4591-86cf-63b07bc20c2c.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "archived",
+      "status": "active",
       "last_review": "2026-05-25",
       "cadence_days": 365,
-      "notes": "CO-580 lifecycle resolver migration: terminal source evidence remains active because local open checklist obligations prevent archive readiness. Linked open checklist obligation groups=1.",
-      "lifecycle_state": "active"
+      "notes": "CO-580 lifecycle resolver migration: terminal source evidence remains active because local open checklist obligations prevent archive readiness. Linked open checklist obligation groups=1. CO-584 registry integrity repair: status restored to active because local open checklist obligations prevent archive readiness; prior archived status retained only as terminal source lineage in notes.",
+      "lifecycle_state": "active",
+      "terminal_source_lifecycle_state": "terminal_pending_archive",
+      "recommended_action": "resolve_local_checklist_obligations_before_archive"
     },
     {
       "path": "tasks/specs/linear-acc07ffc-06ac-4649-a235-1bf37c13cc51.md",
@@ -37526,7 +37700,7 @@
     {
       "path": "tasks/specs/linear-b02f8333-202c-49ed-9443-8daf921e297d.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "archived",
+      "status": "active",
       "last_review": "2026-05-22",
       "cadence_days": 365,
       "source_issue": {
@@ -37538,7 +37712,9 @@
       "lifecycle_state": "active",
       "created_at": "2026-05-21",
       "next_review": "2026-06-20",
-      "notes": "CO-573 remains the historical packet source issue; CO-575 is only the live global docs:freshness:maintain owner after terminal CO-573."
+      "notes": "CO-573 remains the historical packet source issue; CO-575 is only the live global docs:freshness:maintain owner after terminal CO-573. CO-584 registry integrity repair: status restored to active because local open checklist obligations prevent archive readiness; prior archived status retained only as terminal source lineage in notes.",
+      "terminal_source_lifecycle_state": "terminal_pending_archive",
+      "recommended_action": "resolve_local_checklist_obligations_before_archive"
     },
     {
       "path": "tasks/specs/linear-b0aac010-12ec-4509-88a4-c2dbc6395e19.md",
@@ -37676,7 +37852,7 @@
     {
       "path": "tasks/specs/linear-b9447b5a-224d-4731-bab9-95bb0597dbe0.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "archived",
+      "status": "active",
       "last_review": "2026-05-22",
       "cadence_days": 365,
       "source_issue": {
@@ -37688,7 +37864,9 @@
       "lifecycle_state": "active",
       "created_at": "2026-05-19",
       "next_review": "2026-06-19",
-      "notes": "CO-558 remains the historical packet source issue; CO-573 is only the live global docs:freshness:maintain owner after terminal CO-558."
+      "notes": "CO-558 remains the historical packet source issue; CO-573 is only the live global docs:freshness:maintain owner after terminal CO-558. CO-584 registry integrity repair: status restored to active because local open checklist obligations prevent archive readiness; prior archived status retained only as terminal source lineage in notes.",
+      "terminal_source_lifecycle_state": "terminal_pending_archive",
+      "recommended_action": "resolve_local_checklist_obligations_before_archive"
     },
     {
       "path": "tasks/specs/linear-b9a1044e-03b0-49ef-8435-92840eaf90b9.md",
@@ -40838,11 +41016,13 @@
     {
       "path": "tasks/tasks-1164-coordinator-symphony-aligned-orchestrator-perform-run-lifecycle-execution-and-run-error-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "archived",
+      "status": "active",
       "last_review": "2026-05-25",
       "cadence_days": 365,
-      "notes": "CO-580 lifecycle resolver migration: terminal source evidence remains active because local open checklist obligations prevent archive readiness. Linked open checklist obligation groups=1.",
-      "lifecycle_state": "active"
+      "notes": "CO-580 lifecycle resolver migration: terminal source evidence remains active because local open checklist obligations prevent archive readiness. Linked open checklist obligation groups=1. CO-584 registry integrity repair: status restored to active because local open checklist obligations prevent archive readiness; prior archived status retained only as terminal source lineage in notes.",
+      "lifecycle_state": "active",
+      "terminal_source_lifecycle_state": "terminal_pending_archive",
+      "recommended_action": "resolve_local_checklist_obligations_before_archive"
     },
     {
       "path": "tasks/tasks-1165-coordinator-symphony-aligned-orchestrator-public-run-entry-bootstrap-and-handoff-reassessment.md",
@@ -40903,20 +41083,24 @@
     {
       "path": "tasks/tasks-1173-coordinator-symphony-aligned-orchestrator-cloud-target-execution-request-contract-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "archived",
+      "status": "active",
       "last_review": "2026-05-25",
       "cadence_days": 365,
-      "notes": "CO-580 lifecycle resolver migration: terminal source evidence remains active because local open checklist obligations prevent archive readiness. Linked open checklist obligation groups=1.",
-      "lifecycle_state": "active"
+      "notes": "CO-580 lifecycle resolver migration: terminal source evidence remains active because local open checklist obligations prevent archive readiness. Linked open checklist obligation groups=1. CO-584 registry integrity repair: status restored to active because local open checklist obligations prevent archive readiness; prior archived status retained only as terminal source lineage in notes.",
+      "lifecycle_state": "active",
+      "terminal_source_lifecycle_state": "terminal_pending_archive",
+      "recommended_action": "resolve_local_checklist_obligations_before_archive"
     },
     {
       "path": "tasks/tasks-1174-coordinator-symphony-aligned-orchestrator-cloud-target-missing-env-failure-contract-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "archived",
+      "status": "active",
       "last_review": "2026-05-25",
       "cadence_days": 365,
-      "notes": "CO-580 lifecycle resolver migration: terminal source evidence remains active because local open checklist obligations prevent archive readiness. Linked open checklist obligation groups=1.",
-      "lifecycle_state": "active"
+      "notes": "CO-580 lifecycle resolver migration: terminal source evidence remains active because local open checklist obligations prevent archive readiness. Linked open checklist obligation groups=1. CO-584 registry integrity repair: status restored to active because local open checklist obligations prevent archive readiness; prior archived status retained only as terminal source lineage in notes.",
+      "lifecycle_state": "active",
+      "terminal_source_lifecycle_state": "terminal_pending_archive",
+      "recommended_action": "resolve_local_checklist_obligations_before_archive"
     },
     {
       "path": "tasks/tasks-1175-coordinator-symphony-aligned-orchestrator-cloud-target-running-state-and-update-shell-extraction.md",
@@ -41047,29 +41231,35 @@
     {
       "path": "tasks/tasks-1193-coordinator-symphony-aligned-orchestrator-control-plane-lifecycle-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "archived",
+      "status": "active",
       "last_review": "2026-05-25",
       "cadence_days": 365,
-      "notes": "CO-580 lifecycle resolver migration: terminal source evidence remains active because local open checklist obligations prevent archive readiness. Linked open checklist obligation groups=1.",
-      "lifecycle_state": "active"
+      "notes": "CO-580 lifecycle resolver migration: terminal source evidence remains active because local open checklist obligations prevent archive readiness. Linked open checklist obligation groups=1. CO-584 registry integrity repair: status restored to active because local open checklist obligations prevent archive readiness; prior archived status retained only as terminal source lineage in notes.",
+      "lifecycle_state": "active",
+      "terminal_source_lifecycle_state": "terminal_pending_archive",
+      "recommended_action": "resolve_local_checklist_obligations_before_archive"
     },
     {
       "path": "tasks/tasks-1194-coordinator-symphony-aligned-orchestrator-start-preparation-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "archived",
+      "status": "active",
       "last_review": "2026-05-25",
       "cadence_days": 365,
-      "notes": "CO-580 lifecycle resolver migration: terminal source evidence remains active because local open checklist obligations prevent archive readiness. Linked open checklist obligation groups=1.",
-      "lifecycle_state": "active"
+      "notes": "CO-580 lifecycle resolver migration: terminal source evidence remains active because local open checklist obligations prevent archive readiness. Linked open checklist obligation groups=1. CO-584 registry integrity repair: status restored to active because local open checklist obligations prevent archive readiness; prior archived status retained only as terminal source lineage in notes.",
+      "lifecycle_state": "active",
+      "terminal_source_lifecycle_state": "terminal_pending_archive",
+      "recommended_action": "resolve_local_checklist_obligations_before_archive"
     },
     {
       "path": "tasks/tasks-1195-coordinator-symphony-aligned-orchestrator-resume-preparation-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "archived",
+      "status": "active",
       "last_review": "2026-05-25",
       "cadence_days": 365,
-      "notes": "CO-580 lifecycle resolver migration: terminal source evidence remains active because local open checklist obligations prevent archive readiness. Linked open checklist obligation groups=1.",
-      "lifecycle_state": "active"
+      "notes": "CO-580 lifecycle resolver migration: terminal source evidence remains active because local open checklist obligations prevent archive readiness. Linked open checklist obligation groups=1. CO-584 registry integrity repair: status restored to active because local open checklist obligations prevent archive readiness; prior archived status retained only as terminal source lineage in notes.",
+      "lifecycle_state": "active",
+      "terminal_source_lifecycle_state": "terminal_pending_archive",
+      "recommended_action": "resolve_local_checklist_obligations_before_archive"
     },
     {
       "path": "tasks/tasks-1196-coordinator-symphony-aligned-orchestrator-status-shell-extraction.md",
@@ -44613,11 +44803,13 @@
     {
       "path": "tasks/tasks-linear-ac7cefc8-ed87-4591-86cf-63b07bc20c2c.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "archived",
+      "status": "active",
       "last_review": "2026-05-25",
       "cadence_days": 365,
-      "notes": "CO-580 lifecycle resolver migration: terminal source evidence remains active because local open checklist obligations prevent archive readiness. Linked open checklist obligation groups=1.",
-      "lifecycle_state": "active"
+      "notes": "CO-580 lifecycle resolver migration: terminal source evidence remains active because local open checklist obligations prevent archive readiness. Linked open checklist obligation groups=1. CO-584 registry integrity repair: status restored to active because local open checklist obligations prevent archive readiness; prior archived status retained only as terminal source lineage in notes.",
+      "lifecycle_state": "active",
+      "terminal_source_lifecycle_state": "terminal_pending_archive",
+      "recommended_action": "resolve_local_checklist_obligations_before_archive"
     },
     {
       "path": "tasks/tasks-linear-acc07ffc-06ac-4649-a235-1bf37c13cc51.md",
@@ -44654,7 +44846,7 @@
     {
       "path": "tasks/tasks-linear-b02f8333-202c-49ed-9443-8daf921e297d.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "archived",
+      "status": "active",
       "last_review": "2026-05-22",
       "cadence_days": 365,
       "source_issue": {
@@ -44666,7 +44858,9 @@
       "lifecycle_state": "active",
       "created_at": "2026-05-21",
       "next_review": "2026-06-20",
-      "notes": "CO-573 remains the historical packet source issue; CO-575 is only the live global docs:freshness:maintain owner after terminal CO-573."
+      "notes": "CO-573 remains the historical packet source issue; CO-575 is only the live global docs:freshness:maintain owner after terminal CO-573. CO-584 registry integrity repair: status restored to active because local open checklist obligations prevent archive readiness; prior archived status retained only as terminal source lineage in notes.",
+      "terminal_source_lifecycle_state": "terminal_pending_archive",
+      "recommended_action": "resolve_local_checklist_obligations_before_archive"
     },
     {
       "path": "tasks/tasks-linear-b0aac010-12ec-4509-88a4-c2dbc6395e19.md",
@@ -44803,7 +44997,7 @@
     {
       "path": "tasks/tasks-linear-b9447b5a-224d-4731-bab9-95bb0597dbe0.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "archived",
+      "status": "active",
       "last_review": "2026-05-22",
       "cadence_days": 365,
       "source_issue": {
@@ -44815,7 +45009,9 @@
       "lifecycle_state": "active",
       "created_at": "2026-05-19",
       "next_review": "2026-06-19",
-      "notes": "CO-558 remains the historical packet source issue; CO-573 is only the live global docs:freshness:maintain owner after terminal CO-558."
+      "notes": "CO-558 remains the historical packet source issue; CO-573 is only the live global docs:freshness:maintain owner after terminal CO-558. CO-584 registry integrity repair: status restored to active because local open checklist obligations prevent archive readiness; prior archived status retained only as terminal source lineage in notes.",
+      "terminal_source_lifecycle_state": "terminal_pending_archive",
+      "recommended_action": "resolve_local_checklist_obligations_before_archive"
     },
     {
       "path": "tasks/tasks-linear-b9a1044e-03b0-49ef-8435-92840eaf90b9.md",

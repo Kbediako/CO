@@ -2246,6 +2246,45 @@ describe('docs freshness reporting', () => {
     ]);
   });
 
+  it('rejects archived registry rows that still declare active lifecycle state', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docs-freshness-archived-active-lifecycle-'));
+    createdDirs.push(repoRoot);
+    const packetPath = 'tasks/tasks-archived-active-lifecycle.md';
+
+    await mkdir(join(repoRoot, 'tasks'), { recursive: true });
+    await writeFile(join(repoRoot, packetPath), '# Archived packet with active lifecycle\n', 'utf8');
+    await writeDocsFreshnessFixture(repoRoot, {
+      registryEntries: [
+        {
+          path: packetPath,
+          owner: 'Codex',
+          status: 'archived',
+          lifecycle_state: 'active',
+          last_review: reviewDateDaysAgo(31),
+          cadence_days: 30
+        }
+      ],
+      catalogPatterns: [{ glob: 'tasks/**/*.md', doc_class: 'task_packet' }],
+      catalogPolicies: {
+        rolling_freshness_cohorts: rollingFreshnessPolicy({ max_entries: 300 })
+      }
+    });
+
+    const { report, hasFailures } = await runDocsFreshness(repoRoot, {
+      outRoot: join(repoRoot, 'out'),
+      taskId: 'fixture'
+    });
+
+    expect(hasFailures).toBe(true);
+    expect(report.totals.invalid_entries).toBe(1);
+    expect(report.invalid_entries).toEqual([
+      {
+        path: packetPath,
+        issues: ['archived registry status cannot declare active lifecycle_state']
+      }
+    ]);
+  });
+
   it('rejects archived task packets when linked packet paths still contain open checklist obligations', async () => {
     const repoRoot = await mkdtemp(join(tmpdir(), 'docs-freshness-archived-linked-open-checklist-'));
     createdDirs.push(repoRoot);

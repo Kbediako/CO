@@ -1,6 +1,48 @@
 {
   "items": [
     {
+      "id": "20260525-linear-bb7589e8-b79d-405a-8408-5842a75d8b5d",
+      "title": "CO-584 docs freshness registry lifecycle integrity hard block",
+      "relates_to": "tasks/tasks-linear-bb7589e8-b79d-405a-8408-5842a75d8b5d.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "status": "in_progress",
+      "last_review": "2026-05-25",
+      "canonical_owner_key": "docs:freshness:registry-integrity",
+      "canonical_owner_marker": "codex-orchestrator:canonical-owner-key=docs:freshness:registry-integrity",
+      "evidence": [
+        "docs/PRD-linear-bb7589e8-b79d-405a-8408-5842a75d8b5d.md",
+        "docs/TECH_SPEC-linear-bb7589e8-b79d-405a-8408-5842a75d8b5d.md",
+        "docs/ACTION_PLAN-linear-bb7589e8-b79d-405a-8408-5842a75d8b5d.md",
+        "tasks/specs/linear-bb7589e8-b79d-405a-8408-5842a75d8b5d.md",
+        "tasks/tasks-linear-bb7589e8-b79d-405a-8408-5842a75d8b5d.md",
+        ".agent/task/linear-bb7589e8-b79d-405a-8408-5842a75d8b5d.md",
+        "tasks/index.json",
+        "docs/TASKS.md",
+        "docs/docs-freshness-registry.json"
+      ],
+      "paths": {
+        "agent_task": ".agent/task/linear-bb7589e8-b79d-405a-8408-5842a75d8b5d.md",
+        "prd": "docs/PRD-linear-bb7589e8-b79d-405a-8408-5842a75d8b5d.md",
+        "docs": "docs/TECH_SPEC-linear-bb7589e8-b79d-405a-8408-5842a75d8b5d.md",
+        "tech_spec_mirror": "docs/TECH_SPEC-linear-bb7589e8-b79d-405a-8408-5842a75d8b5d.md",
+        "action_plan": "docs/ACTION_PLAN-linear-bb7589e8-b79d-405a-8408-5842a75d8b5d.md",
+        "spec": "tasks/specs/linear-bb7589e8-b79d-405a-8408-5842a75d8b5d.md",
+        "task": "tasks/tasks-linear-bb7589e8-b79d-405a-8408-5842a75d8b5d.md"
+      },
+      "source_issue": {
+        "id": "bb7589e8-b79d-405a-8408-5842a75d8b5d",
+        "identifier": "CO-584",
+        "url": "https://linear.app/asabeko/issue/CO-584/co-repair-docs-freshness-registry-lifecycle-integrity-hard-block"
+      },
+      "notes": {
+        "source_issue": "CO-584 registry integrity repair for docs freshness archived/active lifecycle contradiction.",
+        "gpt_pro_consult": "GPT Pro agreed registry integrity must precede owner/capacity routing and warned against blind last_review bumps."
+      }
+    },
+    {
       "id": "20260524-linear-2a51671e-14fa-46c8-bce4-bcfd71e66066",
       "title": "CO-581 preserve CO-558 May 19 retained docs freshness cohort owner",
       "relates_to": "tasks/tasks-linear-2a51671e-14fa-46c8-bce4-bcfd71e66066.md",
