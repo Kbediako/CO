@@ -5,7 +5,7 @@ relates_to: docs/PRD-linear-77fc72a8-6cc4-4a47-84cd-7b0dfd18bfaf.md
 risk: high
 owners:
   - Codex
-last_review: 2026-05-02
+last_review: 2026-05-25
 related_action_plan: docs/ACTION_PLAN-linear-77fc72a8-6cc4-4a47-84cd-7b0dfd18bfaf.md
 task_checklists:
   - tasks/tasks-linear-77fc72a8-6cc4-4a47-84cd-7b0dfd18bfaf.md
@@ -146,3 +146,6 @@ task_checklists:
 - Protected-term scan confirms all requested terms and canonical owner key are present.
 - Scoped diff review shows no edits outside declared file scope.
 - Parent can continue with docs-review, implementation, focused validation, and lifecycle work.
+
+## 2026-05-25 Review
+- CO-585 pre-expiry review checked the permission-profile/trust-flow posture against current `AGENTS.md`, `docs/guides/codex-version-policy.md`, `docs/guides/cloud-mode-preflight.md`, `orchestrator/src/cli/doctor.ts`, and review-launch tests. Current-facing guidance still rejects `--full-auto` as normal flow and preserves profile-backed posture evidence; no content change beyond truthful review metadata is required.

@@ -1,6 +1,50 @@
 {
   "items": [
     {
+      "id": "20260525-linear-d2e17480-ee95-4eab-b83d-21be17e58993",
+      "title": "CO-585 review docs freshness public and spec pre-expiry batch",
+      "relates_to": "tasks/tasks-linear-d2e17480-ee95-4eab-b83d-21be17e58993.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "status": "in_progress",
+      "last_review": "2026-05-25",
+      "canonical_owner_key": "docs:freshness:spec-and-public-pre-expiry:2026-06-01",
+      "canonical_owner_marker": "codex-orchestrator:canonical-owner-key=docs:freshness:spec-and-public-pre-expiry:2026-06-01",
+      "evidence": [
+        "docs/PRD-linear-d2e17480-ee95-4eab-b83d-21be17e58993.md",
+        "docs/TECH_SPEC-linear-d2e17480-ee95-4eab-b83d-21be17e58993.md",
+        "docs/ACTION_PLAN-linear-d2e17480-ee95-4eab-b83d-21be17e58993.md",
+        "tasks/specs/linear-d2e17480-ee95-4eab-b83d-21be17e58993.md",
+        "tasks/tasks-linear-d2e17480-ee95-4eab-b83d-21be17e58993.md",
+        ".agent/task/linear-d2e17480-ee95-4eab-b83d-21be17e58993.md",
+        "tasks/index.json",
+        "docs/TASKS.md",
+        "docs/docs-freshness-registry.json",
+        "out/linear-d2e17480-ee95-4eab-b83d-21be17e58993/baseline/docs-freshness-maintenance.json",
+        ".runs/linear-d2e17480-ee95-4eab-b83d-21be17e58993-public-guides-review/cli/2026-05-25T04-35-22-745Z-e33025f9/manifest.json"
+      ],
+      "paths": {
+        "agent_task": ".agent/task/linear-d2e17480-ee95-4eab-b83d-21be17e58993.md",
+        "prd": "docs/PRD-linear-d2e17480-ee95-4eab-b83d-21be17e58993.md",
+        "docs": "docs/TECH_SPEC-linear-d2e17480-ee95-4eab-b83d-21be17e58993.md",
+        "tech_spec_mirror": "docs/TECH_SPEC-linear-d2e17480-ee95-4eab-b83d-21be17e58993.md",
+        "action_plan": "docs/ACTION_PLAN-linear-d2e17480-ee95-4eab-b83d-21be17e58993.md",
+        "spec": "tasks/specs/linear-d2e17480-ee95-4eab-b83d-21be17e58993.md",
+        "task": "tasks/tasks-linear-d2e17480-ee95-4eab-b83d-21be17e58993.md"
+      },
+      "source_issue": {
+        "id": "d2e17480-ee95-4eab-b83d-21be17e58993",
+        "identifier": "CO-585",
+        "url": "https://linear.app/asabeko/issue/CO-585/co-review-docs-freshness-public-and-spec-pre-expiry-batch"
+      },
+      "notes": {
+        "source_issue": "CO-585 exact public-doc and active-spec pre-expiry review batch exposed after CO-584 registry repair.",
+        "child_lane": "public-guides-review accepted for bounded public guide review."
+      }
+    },
+    {
       "id": "20260525-linear-bb7589e8-b79d-405a-8408-5842a75d8b5d",
       "title": "CO-584 docs freshness registry lifecycle integrity hard block",
       "relates_to": "tasks/tasks-linear-bb7589e8-b79d-405a-8408-5842a75d8b5d.md",
@@ -5206,7 +5250,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-05-02",
+      "last_review": "2026-05-25",
       "status": "in_progress",
       "evidence": [
         "docs/PRD-linear-75023431-9350-4e9a-982e-71d244cbf204.md",
@@ -5437,7 +5481,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-05-02",
+      "last_review": "2026-05-25",
       "status": "in_progress",
       "evidence": [
         "docs/PRD-linear-6a92b5d9-3293-4e27-9bc5-28c8c62becfc.md",
@@ -5518,7 +5562,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-05-02",
+      "last_review": "2026-05-25",
       "status": "in_progress",
       "evidence": [
         "docs/PRD-linear-c21c8833-ce10-4c5d-a12f-e309bf6ffe3f.md",
@@ -5558,7 +5602,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-05-02",
+      "last_review": "2026-05-25",
       "status": "in_progress",
       "evidence": [
         "docs/PRD-linear-34faa7f9-640b-494f-af58-47096b6d0541.md",
@@ -5595,7 +5639,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-05-02",
+      "last_review": "2026-05-25",
       "status": "review_green_pre_pr",
       "evidence": [
         "docs/PRD-linear-77fc72a8-6cc4-4a47-84cd-7b0dfd18bfaf.md",
@@ -5697,7 +5741,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-05-02",
+      "last_review": "2026-05-25",
       "status": "review_green_pre_pr",
       "evidence": [
         "docs/PRD-linear-dc1c7783-0307-4a0a-8dcf-2ede6a889392.md",
@@ -5773,7 +5817,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-05-02",
+      "last_review": "2026-05-25",
       "evidence": [
         ".runs/linear-de299bad-c345-4259-8551-73dd429eccca-docs-packet/cli/2026-05-01T03-01-11-354Z-21ccbfb3/manifest.json"
       ],
@@ -5800,7 +5844,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-05-02",
+      "last_review": "2026-05-25",
       "status": "in_progress",
       "evidence": [
         "docs/PRD-linear-88a7529f-c7fa-443d-8b64-87b6b45ef312.md",
@@ -5881,7 +5925,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-05-02",
+      "last_review": "2026-05-25",
       "status": "in_progress",
       "evidence": [
         "docs/PRD-linear-b7381274-d6eb-4886-86f4-3976b154c26d.md",
@@ -5938,7 +5982,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-05-02",
+      "last_review": "2026-05-25",
       "status": "in_progress",
       "evidence": [
         "docs/PRD-linear-7badbb88-ab4b-4091-9cd1-5d74643b6443.md",
