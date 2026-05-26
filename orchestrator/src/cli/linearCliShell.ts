@@ -10,7 +10,9 @@ import {
 } from './control/linearDispatchSource.js';
 import {
   attachProviderLinearIssuePr,
+  buildFollowUpIssueDescription,
   buildFollowUpPacketTraceabilityEvidence,
+  buildFollowUpTraceabilitySection,
   createProviderLinearFollowUpIssue,
   deleteProviderLinearWorkpadComment,
   descriptionHasExactCanonicalOwnerMarker,
@@ -18,6 +20,7 @@ import {
   getProviderLinearIssueContext,
   reconcileProviderLinearFollowUpRelations,
   resolveFollowUpLabelsFromSourceIssue,
+  sameFollowUpDescriptionAfterLinearMarkdownNormalization,
   type ProviderLinearAttachPrResult,
   type ProviderLinearCreateFollowUpResult,
   type ProviderLinearDeleteWorkpadResult,
@@ -490,7 +493,11 @@ export async function runLinearCliShell(
         const retrySuppressed = await resolveCreateFollowUpRetrySuppression({
           issueId,
           title,
+          description,
           intentChecksum,
+          nonGoals,
+          notDoneIf,
+          acceptanceCriteria,
           canonicalOwnerKey,
           blockedBySource,
           parityLane,
@@ -779,7 +786,11 @@ async function resolveProviderLinearWorkerAttemptStartedAtForIssue(
 async function resolveCreateFollowUpRetrySuppression(input: {
   issueId: string;
   title: string;
+  description: string;
   intentChecksum: string;
+  nonGoals: string;
+  notDoneIf: string;
+  acceptanceCriteria: string;
   canonicalOwnerKey: string | null;
   blockedBySource: boolean;
   parityLane: boolean;
@@ -919,6 +930,14 @@ async function resolveCreateFollowUpRetrySuppression(input: {
       ? await buildLocallyReconciledFollowUpPacketRetryResult({
           entry: suppressionEntry,
           title: input.title,
+          expectedDescription: {
+            description: input.description,
+            intentChecksum: input.intentChecksum,
+            nonGoals: input.nonGoals,
+            notDoneIf: input.notDoneIf,
+            acceptanceCriteria: input.acceptanceCriteria,
+            parityMatrix: input.parityMatrix
+          },
           canonicalOwnerKey: input.canonicalOwnerKey,
           blockedBySource: input.blockedBySource,
           repoRoot: input.repoRoot,
@@ -1007,6 +1026,14 @@ function findLatestCreateFollowUpSuppressionAuditEntry(input: {
 async function buildLocallyReconciledFollowUpPacketRetryResult(input: {
   entry: ProviderLinearAuditEntry;
   title: string;
+  expectedDescription?: {
+    description: string;
+    intentChecksum: string;
+    nonGoals: string;
+    notDoneIf: string;
+    acceptanceCriteria: string;
+    parityMatrix: string | null;
+  } | null;
   canonicalOwnerKey: string | null;
   blockedBySource: boolean;
   repoRoot: string;
@@ -1102,6 +1129,29 @@ async function buildLocallyReconciledFollowUpPacketRetryResult(input: {
   });
   if (!sourceContext.ok) {
     return null;
+  }
+  if (input.expectedDescription) {
+    const expectedDescription = buildFollowUpIssueDescription({
+      description: input.expectedDescription.description,
+      intentChecksum: input.expectedDescription.intentChecksum,
+      nonGoals: input.expectedDescription.nonGoals,
+      notDoneIf: input.expectedDescription.notDoneIf,
+      acceptanceCriteria: input.expectedDescription.acceptanceCriteria,
+      parityMatrix: input.expectedDescription.parityMatrix,
+      canonicalOwner: canonicalOwnerKey && canonicalOwnerMarker
+        ? {
+            key: canonicalOwnerKey,
+            marker: canonicalOwnerMarker
+          }
+        : null,
+      traceability: buildFollowUpTraceabilitySection({
+        sourceIssue: sourceContext.issue,
+        followUpIssue: followUpContext.issue
+      })
+    });
+    if (!sameFollowUpDescriptionAfterLinearMarkdownNormalization(followUpContext.issue.description, expectedDescription)) {
+      return null;
+    }
   }
   const requestedLabels = resolveFollowUpLabelsFromSourceIssue(sourceContext.issue);
   if (!requestedLabels.ok) {

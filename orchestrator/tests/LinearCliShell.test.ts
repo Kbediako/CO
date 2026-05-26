@@ -5,6 +5,10 @@ import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { runLinearCliShell } from '../src/cli/linearCliShell.js';
+import {
+  buildFollowUpIssueDescription,
+  buildFollowUpTraceabilitySection
+} from '../src/cli/control/providerLinearWorkflowFacade.js';
 import { PROVIDER_LINEAR_WORKER_PROOF_FILENAME } from '../src/cli/providerLinearWorkerRunner.js';
 
 const tempDirs: string[] = [];
@@ -315,6 +319,26 @@ function buildRetryRelationReconcileMock() {
       source_setup: input.sourceSetup ?? null
     };
   }) as never;
+}
+
+function buildCompleteRetryFollowUpDescription() {
+  const sourceIssue = buildIssueContextResult({
+    id: 'lin-issue-1',
+    identifier: 'CO-1',
+    title: 'Source issue'
+  }).issue;
+  const followUpIssue = buildIssueContextResult().issue;
+  return buildFollowUpIssueDescription({
+    description: 'Investigate the remaining improvement',
+    intentChecksum: DEFAULT_FOLLOW_UP_INTENT_CHECKSUM,
+    nonGoals: '- [ ] Do not reopen the browser surface.',
+    notDoneIf: '- [ ] The issue still allows browser-first parity.',
+    acceptanceCriteria: '- [ ] Captured',
+    traceability: buildFollowUpTraceabilitySection({
+      sourceIssue,
+      followUpIssue
+    })
+  });
 }
 
 async function createSameAttemptFollowUpFixture(prefix: string, auditEntries: Record<string, unknown>[] = []) {
@@ -2707,7 +2731,9 @@ describe('runLinearCliShell', () => {
     await seedCliFollowUpPacketReadiness(repoRoot, 'linear-lin-issue-2');
     const createProviderLinearFollowUpIssueMock =
       vi.fn<typeof import('../src/cli/control/providerLinearWorkflowFacade.js').createProviderLinearFollowUpIssue>();
-    const getProviderLinearIssueContextMock = buildRetryIssueContextMock();
+    const getProviderLinearIssueContextMock = buildRetryIssueContextMock({
+      followUpDescription: buildCompleteRetryFollowUpDescription()
+    });
     const reconcileProviderLinearFollowUpRelationsMock = buildRetryRelationReconcileMock();
     const { auditPath, loadProviderLinearWorkerContextMock } = await createSameAttemptFollowUpFixture(
       'linear-cli-follow-up-description-ready-retry-',
@@ -2781,6 +2807,72 @@ describe('runLinearCliShell', () => {
       follow_up_issue_id: 'lin-issue-2',
       follow_up_issue_identifier: 'CO-2'
     }));
+  });
+
+  it('does not reuse description-update partial-success when the live description only has packet prefix', async () => {
+    const log = vi.fn();
+    const appendAuditEntry = vi.fn();
+    const setExitCode = vi.fn();
+    const repoRoot = await mkdtemp(join(tmpdir(), 'linear-cli-follow-up-description-prefix-only-retry-'));
+    tempDirs.push(repoRoot);
+    await seedCliFollowUpPacketReadiness(repoRoot, 'linear-lin-issue-2');
+    const createProviderLinearFollowUpIssueMock =
+      vi.fn<typeof import('../src/cli/control/providerLinearWorkflowFacade.js').createProviderLinearFollowUpIssue>();
+    const getProviderLinearIssueContextMock = buildRetryIssueContextMock();
+    const reconcileProviderLinearFollowUpRelationsMock = buildRetryRelationReconcileMock();
+    const { auditPath, loadProviderLinearWorkerContextMock } = await createSameAttemptFollowUpFixture(
+      'linear-cli-follow-up-description-prefix-only-retry-',
+      [buildDescriptionUpdateIncompleteAuditEntry()]
+    );
+
+    await runLinearCliShell(
+      {
+        positionals: ['create-follow-up'],
+        flags: {
+          format: 'json',
+          'issue-id': 'lin-issue-1',
+          title: 'Follow-up',
+          description: 'Investigate the remaining improvement',
+          'intent-checksum': DEFAULT_FOLLOW_UP_INTENT_CHECKSUM,
+          'non-goals': '- [ ] Do not reopen the browser surface.',
+          'not-done-if': '- [ ] The issue still allows browser-first parity.',
+          'acceptance-criteria': '- [ ] Captured'
+        },
+        printHelp: vi.fn()
+      },
+      {
+        createProviderLinearFollowUpIssue: createProviderLinearFollowUpIssueMock,
+        getProviderLinearIssueContext: getProviderLinearIssueContextMock,
+        reconcileProviderLinearFollowUpRelations: reconcileProviderLinearFollowUpRelationsMock,
+        loadProviderLinearWorkerContext: loadProviderLinearWorkerContextMock,
+        getEnv: () => ({
+          CO_LINEAR_API_TOKEN: 'lin-api-token',
+          CODEX_PROVIDER_LINEAR_AUDIT_PATH: auditPath
+        }),
+        getCwd: () => repoRoot,
+        now: () => '2026-04-22T08:06:00.000Z',
+        appendAuditEntry,
+        log,
+        setExitCode
+      }
+    );
+
+    expect(createProviderLinearFollowUpIssueMock).not.toHaveBeenCalled();
+    expect(reconcileProviderLinearFollowUpRelationsMock).not.toHaveBeenCalled();
+    expect(setExitCode).toHaveBeenCalledWith(1);
+    expect(JSON.parse(String(log.mock.calls[0]?.[0]))).toMatchObject({
+      ok: false,
+      operation: 'create-follow-up',
+      error: {
+        code: 'linear_follow_up_description_update_retry_suppressed',
+        details: {
+          follow_up_issue: {
+            id: 'lin-issue-2',
+            identifier: 'CO-2'
+          }
+        }
+      }
+    });
   });
 
   it('suppresses description-update partial-success retries until the existing follow-up is reconciled', async () => {
