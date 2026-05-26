@@ -37,7 +37,7 @@ Decision: `stay_serial` / `overlapping_scope`. Model-backed child lanes are quot
 - Codex model-backed review is currently quota-limited until 2026-05-31T07:51 local per CLI error; deterministic validation can continue.
 
 ## Validation
-- Checks / tests: focused provider Linear workflow facade tests, `node scripts/spec-guard.mjs --dry-run`, `npm run docs:check`, `npm run docs:freshness`, `npm run test`, diff budget, review/ready-review as quota allows.
+- Checks / tests: focused provider Linear workflow facade tests, explicit core-lane coverage with `npm run test:core -- orchestrator/tests/LinearCliShell.test.ts`, `node scripts/spec-guard.mjs --dry-run`, `npm run docs:check`, `npm run docs:freshness`, full core lane via `npm run test`, diff budget, review/ready-review as quota allows.
 - Rollback plan: revert CO-527 branch before PR merge; no Linear follow-up mutations are required for local tests.
 
 ## Risks & Mitigations
