@@ -12230,6 +12230,10 @@
       "status": "done",
       "validation": {
         "status": "done"
+      },
+      "completed_at": "2026-04-17",
+      "notes": {
+        "archive_headroom_terminal_evidence": "Live Linear CO-221 Done verified 2026-05-26 before docs/TASKS headroom archive."
       }
     },
     {
@@ -15545,7 +15549,11 @@
         "agent_task": ".agent/task/linear-ff81e5d8-2760-41ec-bdbb-5509ae2faade.md",
         "docs": "docs/TECH_SPEC-linear-ff81e5d8-2760-41ec-bdbb-5509ae2faade.md"
       },
-      "status": "completed"
+      "status": "completed",
+      "completed_at": "2026-04-19",
+      "notes": {
+        "archive_headroom_terminal_evidence": "Live Linear CO-111 Done verified 2026-05-26 before docs/TASKS headroom archive."
+      }
     },
     {
       "id": "20260409-linear-d43b6785-88d6-442b-a34e-2ad19d4f723a",
@@ -17561,7 +17569,11 @@
           "summary": "Reread during PR #719 Core Lane spec-guard/docs:freshness triage; preserved original task scope and refreshed cadence metadata only under live docs:freshness:maintain owner CO-409."
         }
       },
-      "status": "completed"
+      "status": "completed",
+      "completed_at": "2026-03-29",
+      "notes": {
+        "archive_headroom_terminal_evidence": "Live Linear CO-30 Done verified 2026-05-26 before docs/TASKS headroom archive."
+      }
     },
     {
       "id": "20260328-linear-62527426-2f74-4134-98e0-bb50c3da7913",
@@ -17881,7 +17893,11 @@
         "agent_task": ".agent/task/linear-964ca955-cf9b-4d1b-887b-4d3bb49069d8.md",
         "docs": "docs/TECH_SPEC-linear-964ca955-cf9b-4d1b-887b-4d3bb49069d8.md"
       },
-      "notes": {}
+      "notes": {
+        "archive_headroom_terminal_evidence": "Live Linear CO-5 Done verified 2026-05-26 before docs/TASKS headroom archive."
+      },
+      "status": "done",
+      "completed_at": "2026-03-26"
     },
     {
       "id": "20260326-linear-df2bd49b-2dd6-413f-8d90-af40d033dace",
@@ -17897,6 +17913,11 @@
         "task": "tasks/tasks-linear-df2bd49b-2dd6-413f-8d90-af40d033dace.md",
         "agent_task": ".agent/task/linear-df2bd49b-2dd6-413f-8d90-af40d033dace.md",
         "docs": "docs/TECH_SPEC-linear-df2bd49b-2dd6-413f-8d90-af40d033dace.md"
+      },
+      "status": "done",
+      "completed_at": "2026-03-27",
+      "notes": {
+        "archive_headroom_terminal_evidence": "Live Linear CO-21 Done verified 2026-05-26 before docs/TASKS headroom archive."
       }
     },
     {
@@ -28046,6 +28067,10 @@
       "status": "done",
       "validation": {
         "status": "done"
+      },
+      "completed_at": "2026-04-19",
+      "notes": {
+        "archive_headroom_terminal_evidence": "Live Linear CO-219 Done verified 2026-05-26 before docs/TASKS headroom archive."
       }
     },
     {
@@ -28239,7 +28264,10 @@
         "docs": "docs/TECH_SPEC-linear-cb221338-8cdc-41ad-880b-3bcfae49d4a8.md"
       },
       "status": "done",
-      "completed_at": null
+      "completed_at": "2026-04-25",
+      "notes": {
+        "archive_headroom_terminal_evidence": "Live Linear CO-304 Done verified 2026-05-26 before docs/TASKS headroom archive."
+      }
     },
     {
       "id": "20260423-linear-75a26ef8-4cb7-4b6e-9335-85edae0fd9be",
@@ -28446,7 +28474,10 @@
         "action_plan": "docs/ACTION_PLAN-linear-d469c73d-a540-427c-9088-5d4791c6f8ca.md"
       },
       "status": "done",
-      "completed_at": null
+      "completed_at": "2026-04-25",
+      "notes": {
+        "archive_headroom_terminal_evidence": "Live Linear CO-332 Done verified 2026-05-26 before docs/TASKS headroom archive."
+      }
     },
     {
       "id": "20260423-linear-5d1836b2-98e7-452a-93be-a17c64b3b5fe",
@@ -29412,6 +29443,62 @@
       },
       "notes": {
         "protected_terms": "linear_follow_up_description_update_incomplete; follow_up_issue_id; create-follow-up; partial-success; same-attempt retry; relation creation; packet traceability; canonical owner evidence.",
+        "parallelization_decision": "stay_serial/overlapping_scope"
+      }
+    },
+    {
+      "id": "20260526-linear-2807d702-edce-4847-84d3-ca8628ab77fc",
+      "title": "CO-529 archived registry rows require archive stubs or retained lifecycle evidence",
+      "relates_to": "tasks/tasks-linear-2807d702-edce-4847-84d3-ca8628ab77fc.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "status": "in_progress",
+      "last_review": "2026-05-26",
+      "canonical_owner_key": "implementation-docs-archive:archived-registry-stub-invariant",
+      "canonical_owner_marker": "codex-orchestrator:canonical-owner-key=implementation-docs-archive:archived-registry-stub-invariant",
+      "evidence": [
+        "docs/PRD-linear-2807d702-edce-4847-84d3-ca8628ab77fc.md",
+        "docs/TECH_SPEC-linear-2807d702-edce-4847-84d3-ca8628ab77fc.md",
+        "docs/ACTION_PLAN-linear-2807d702-edce-4847-84d3-ca8628ab77fc.md",
+        "tasks/specs/linear-2807d702-edce-4847-84d3-ca8628ab77fc.md",
+        "tasks/tasks-linear-2807d702-edce-4847-84d3-ca8628ab77fc.md",
+        ".agent/task/linear-2807d702-edce-4847-84d3-ca8628ab77fc.md",
+        "tasks/index.json",
+        "docs/TASKS.md",
+        "docs/docs-freshness-registry.json"
+      ],
+      "approvals": {
+        "issue_quality_review": {
+          "reviewer": "parent CO orchestrator",
+          "date": "2026-05-26",
+          "status": "approved_for_implementation",
+          "summary": "Live issue-context, open PR audit, provider-intake/co-status reads, and current-main registry scan confirm CO-529 owns the archived registry row truthfulness invariant."
+        },
+        "delegation_degraded_mode": {
+          "reviewer": "parent CO orchestrator",
+          "date": "2026-05-26",
+          "status": "delegate_spawn_transport_closed",
+          "summary": "delegate.spawn returned Transport closed for the attempted read-only queue-audit stream; lane records stay_serial/overlapping_scope and parent-owned validation."
+        }
+      },
+      "paths": {
+        "agent_task": ".agent/task/linear-2807d702-edce-4847-84d3-ca8628ab77fc.md",
+        "prd": "docs/PRD-linear-2807d702-edce-4847-84d3-ca8628ab77fc.md",
+        "docs": "docs/TECH_SPEC-linear-2807d702-edce-4847-84d3-ca8628ab77fc.md",
+        "tech_spec_mirror": "docs/TECH_SPEC-linear-2807d702-edce-4847-84d3-ca8628ab77fc.md",
+        "action_plan": "docs/ACTION_PLAN-linear-2807d702-edce-4847-84d3-ca8628ab77fc.md",
+        "spec": "tasks/specs/linear-2807d702-edce-4847-84d3-ca8628ab77fc.md",
+        "task": "tasks/tasks-linear-2807d702-edce-4847-84d3-ca8628ab77fc.md"
+      },
+      "source_issue": {
+        "id": "2807d702-edce-4847-84d3-ca8628ab77fc",
+        "identifier": "CO-529",
+        "url": "https://linear.app/asabeko/issue/CO-529"
+      },
+      "notes": {
+        "protected_terms": "implementation-docs archive automation; docs/docs-freshness-registry.json; status=archived; <!-- docs-archive:stub -->; Full content; Archive branch; Archive path; allow_registry_only; preserved_historical_stub; retained_terminal_packet; docs:freshness; PR #800; Codex P2.",
         "parallelization_decision": "stay_serial/overlapping_scope"
       }
     }
