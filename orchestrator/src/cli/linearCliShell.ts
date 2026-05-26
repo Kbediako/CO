@@ -1131,6 +1131,9 @@ async function buildLocallyReconciledFollowUpPacketRetryResult(input: {
     return null;
   }
   if (input.expectedDescription) {
+    if (followUpContext.issue.title.trim() !== input.title.trim()) {
+      return null;
+    }
     const expectedDescription = buildFollowUpIssueDescription({
       description: input.expectedDescription.description,
       intentChecksum: input.expectedDescription.intentChecksum,
