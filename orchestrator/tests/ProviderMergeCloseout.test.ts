@@ -102,29 +102,32 @@ function readMergingIssueContext(issueUpdatedAt = CO444_ISSUE_UPDATED_AT) {
   }));
 }
 
-function transitionToState(name: 'Blocked' | 'Done', updatedAt = CO444_NOW) {
-  const type = name === 'Done' ? 'completed' : 'started';
-  return vi.fn(async () => ({
-    ok: true as const,
-    operation: 'transition' as const,
-    action: 'updated' as const,
-    issue: {
-      id: 'lin-co-444',
-      identifier: 'CO-444',
-      state: { id: `state-${name.toLowerCase()}`, name, type },
-      updated_at: updatedAt
-    },
-    previous_state: { id: 'state-merging', name: 'Merging', type: 'started' },
-    target_state: { id: `state-${name.toLowerCase()}`, name, type },
-    source_setup: null
-  }));
+function transitionToState(defaultName: 'Backlog' | 'Blocked' | 'Done', updatedAt = CO444_NOW) {
+  return vi.fn(async (input: { stateName?: 'Backlog' | 'Blocked' | 'Done' } = {}) => {
+    const name = input.stateName ?? defaultName;
+    const type = name === 'Done' ? 'completed' : name === 'Backlog' ? 'backlog' : 'started';
+    return {
+      ok: true as const,
+      operation: 'transition' as const,
+      action: 'updated' as const,
+      issue: {
+        id: 'lin-co-444',
+        identifier: 'CO-444',
+        state: { id: `state-${name.toLowerCase()}`, name, type },
+        updated_at: updatedAt
+      },
+      previous_state: { id: 'state-merging', name: 'Merging', type: 'started' },
+      target_state: { id: `state-${name.toLowerCase()}`, name, type },
+      source_setup: null
+    };
+  });
 }
 
 async function runMergedCloseoutFixture(input: {
   repoRoot?: string;
   now?: string;
   issueUpdatedAt?: string;
-  transitionState?: 'Blocked' | 'Done';
+  transitionState?: 'Backlog' | 'Blocked' | 'Done';
   docsFreshnessOwner?: ProviderDocsFreshnessOwnerCloseoutRecord;
   useDefaultDocsFreshnessResolver?: boolean;
   omitIssueIdentifier?: boolean;
@@ -892,7 +895,7 @@ describe('runProviderDeterministicMergeCloseout', () => {
     expect(runCommand).not.toHaveBeenCalledWith(expect.objectContaining({ command: 'gh' }));
   });
 
-  it('moves a merged docs:freshness:maintain live-owner issue to Blocked instead of Done', async () => {
+  it('moves a merged docs:freshness:maintain live-owner issue to Backlog instead of Done', async () => {
     const { result, transitionIssueState } = await runMergedCloseoutFixture({
       docsFreshnessOwner: docsFreshnessOwnerCloseout({
         status: 'evidence_checked',
@@ -925,8 +928,8 @@ describe('runProviderDeterministicMergeCloseout', () => {
     expect(result).toMatchObject({
       status: 'action_required',
       reason: 'docs_freshness_live_owner_blocks_done_transition',
-      issue_state: 'Blocked',
-      issue_state_type: 'started',
+      issue_state: 'Backlog',
+      issue_state_type: 'backlog',
       shared_root: {
         status: 'reconciled',
         reason: 'shared_root_reconciled'
@@ -939,19 +942,104 @@ describe('runProviderDeterministicMergeCloseout', () => {
       },
       linear_transition: {
         status: 'transitioned',
-        target_state: 'Blocked',
-        issue_state: 'Blocked'
+        target_state: 'Backlog',
+        issue_state: 'Backlog',
+        issue_state_type: 'backlog'
       }
     });
-    expect(result.summary).toContain('moved the issue to Blocked instead of transitioning it to Done');
+    expect(result.summary).toContain('moved the issue to Backlog instead of transitioning it to Done');
     expect(transitionIssueState).toHaveBeenCalledTimes(1);
     expect(transitionIssueState).toHaveBeenCalledWith(expect.objectContaining({
       issueId: 'lin-co-444',
-      stateName: 'Blocked',
+      stateName: 'Backlog',
       expectedStateName: 'Merging',
       expectedStateType: 'started',
       expectedUpdatedAt: '2026-04-30T08:44:00.000Z'
     }));
+  });
+
+  it('treats restore-existing-owner finalizer evidence as valid live-owner closeout evidence', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'provider-merge-closeout-docs-finalizer-restore-'));
+    try {
+      await writeDocsFreshnessFixtureRepo({
+        repoRoot,
+        catalog: canonicalDocsFreshnessCatalog(),
+        maintainDecision: ownerMaintenanceDecision({
+          freshness_decision: 'block_unowned_repo_debt',
+          owner_issue: 'CO-444',
+          owner_issue_action: {
+            mode: 'restore_existing_owner',
+            issue: 'CO-444',
+            existing_issue: 'CO-444',
+            reason: 'move_to_backlog_not_done',
+            owner_lifecycle: 'active_owner',
+            target_state: 'Backlog',
+            target_state_type: 'backlog'
+          },
+          owner_finalizer: {
+            status: 'restore_existing_owner',
+            blocking_owner_issue: 'CO-444',
+            active_owner_issue: 'CO-444',
+            active_owner_issues: ['CO-444'],
+            active_owner_records: [
+              {
+                owner_issue: 'CO-444',
+                canonical_owner_key: 'docs:freshness:maintain',
+                owner_lifecycle: 'active_owner',
+                owner_issue_action_mode: 'restore_existing_owner',
+                cohort_id: 'co-420-apr-28-march-28-task-packet-mirror'
+              }
+            ],
+            canonical_owner_key: 'docs:freshness:maintain',
+            active_canonical_owner_key: 'docs:freshness:maintain',
+            reason: 'move_to_backlog_not_done',
+            target_state: 'Backlog',
+            target_state_type: 'backlog'
+          },
+          candidate_cohorts: [
+            {
+              id: 'co-420-apr-28-march-28-task-packet-mirror',
+              canonical_owner_key: 'docs:freshness:maintain',
+              owner_issue: 'CO-444',
+              owner_issue_action: {
+                mode: 'restore_existing_owner',
+                issue: 'CO-444',
+                owner_lifecycle: 'active_owner'
+              }
+            }
+          ],
+          blocking_changed_paths: []
+        })
+      });
+      const { result, transitionIssueState } = await runMergedCloseoutFixture({
+        repoRoot,
+        useDefaultDocsFreshnessResolver: true
+      });
+
+      expect(result).toMatchObject({
+        status: 'action_required',
+        reason: 'docs_freshness_live_owner_blocks_done_transition',
+        docs_freshness_owner: {
+          status: 'evidence_checked',
+          terminal_transition_blocked: true,
+          owner_finalizer: {
+            status: 'restore_existing_owner',
+            active_owner_issue: 'CO-444',
+            target_state: 'Backlog'
+          }
+        },
+        linear_transition: {
+          target_state: 'Backlog',
+          issue_state: 'Backlog',
+          issue_state_type: 'backlog'
+        }
+      });
+      expect(transitionIssueState).toHaveBeenCalledWith(expect.objectContaining({
+        stateName: 'Backlog'
+      }));
+    } finally {
+      await rm(repoRoot, { recursive: true, force: true });
+    }
   });
 
   it('keeps Done closeout when exact cohort owner mapping has no active freshness candidates', async () => {
@@ -1368,6 +1456,87 @@ describe('runProviderDeterministicMergeCloseout', () => {
     }
   });
 
+  it('moves a restore-existing docs freshness owner to Backlog instead of Done', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'provider-merge-closeout-docs-finalizer-restore-'));
+    try {
+      await writeDocsFreshnessFixtureRepo({
+        repoRoot,
+        catalog: canonicalDocsFreshnessCatalog(),
+        maintainDecision: ownerMaintenanceDecision({
+          freshness_decision: 'pass_with_owned_rolling_debt',
+          owner_issue: 'CO-444',
+          owner_issue_action: {
+            mode: 'restore_existing_owner',
+            issue: 'CO-444',
+            existing_issue: 'CO-444',
+            reason: 'move_to_backlog_not_done',
+            owner_lifecycle: 'active_owner'
+          },
+          owner_finalizer: {
+            status: 'restore_existing_owner',
+            active_owner_issue: 'CO-444',
+            active_owner_issues: ['CO-444'],
+            active_owner_records: [
+              {
+                owner_issue: 'CO-444',
+                canonical_owner_key: 'docs:freshness:maintain',
+                owner_lifecycle: 'active_owner',
+                owner_issue_action_mode: 'restore_existing_owner'
+              }
+            ],
+            active_canonical_owner_key: 'docs:freshness:maintain',
+            blocking_owner_issue: 'CO-444',
+            canonical_owner_key: 'docs:freshness:maintain',
+            reason: 'move_to_backlog_not_done',
+            target_state: 'Backlog',
+            target_state_type: 'backlog',
+            ignored_terminal_owner_issues: []
+          },
+          candidate_cohorts: [
+            {
+              id: 'co-579-active-owner',
+              canonical_owner_key: 'docs:freshness:maintain',
+              owner_issue: 'CO-444',
+              owner_issue_action: {
+                mode: 'restore_existing_owner',
+                issue: 'CO-444',
+                canonical_owner_key: 'docs:freshness:maintain'
+              }
+            }
+          ],
+          blocking_changed_paths: []
+        })
+      });
+      const { result, transitionIssueState } = await runMergedCloseoutFixture({
+        repoRoot,
+        useDefaultDocsFreshnessResolver: true,
+        transitionState: 'Backlog'
+      });
+
+      expect(result).toMatchObject({
+        status: 'action_required',
+        reason: 'docs_freshness_live_owner_blocks_done_transition',
+        docs_freshness_owner: {
+          terminal_transition_blocked: true,
+          owner_finalizer: {
+            status: 'restore_existing_owner',
+            blocking_owner_issue: 'CO-444',
+            target_state: 'Backlog',
+            reason: 'move_to_backlog_not_done'
+          }
+        },
+        linear_transition: {
+          target_state: 'Backlog'
+        }
+      });
+      expect(transitionIssueState).toHaveBeenCalledWith(expect.objectContaining({
+        stateName: 'Backlog'
+      }));
+    } finally {
+      await rm(repoRoot, { recursive: true, force: true });
+    }
+  });
+
   it('blocks Done closeout when owner finalizer verification is unavailable for a rehomed owner', async () => {
     const repoRoot = await mkdtemp(join(tmpdir(), 'provider-merge-closeout-docs-finalizer-verification-unavailable-'));
     try {
@@ -1641,7 +1810,7 @@ describe('runProviderDeterministicMergeCloseout', () => {
     }
   });
 
-  it('blocks Done closeout when the current issue is the second active docs freshness owner', async () => {
+  it('moves the current issue to Backlog when it is the second active docs freshness owner', async () => {
     const repoRoot = await mkdtemp(join(tmpdir(), 'provider-merge-closeout-docs-second-active-owner-'));
     try {
       await writeDocsFreshnessFixtureRepo({
@@ -1730,11 +1899,11 @@ describe('runProviderDeterministicMergeCloseout', () => {
           }
         },
         linear_transition: {
-          target_state: 'Blocked'
+          target_state: 'Backlog'
         }
       });
       expect(transitionIssueState).toHaveBeenCalledWith(expect.objectContaining({
-        stateName: 'Blocked'
+        stateName: 'Backlog'
       }));
     } finally {
       await rm(repoRoot, { recursive: true, force: true });

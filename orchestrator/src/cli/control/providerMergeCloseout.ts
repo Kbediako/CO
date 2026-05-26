@@ -932,22 +932,25 @@ export async function runProviderDeterministicMergeCloseout(
   });
   if (docsFreshnessOwner.terminal_transition_blocked) {
     const ownerEvidenceUnavailable = docsFreshnessOwner.status === 'evidence_unavailable';
+    const ownerCloseoutTargetState = docsFreshnessOwnerCloseoutTargetState(docsFreshnessOwner);
     const blockedTransitionReason = ownerEvidenceUnavailable
       ? 'docs_freshness_owner_evidence_unavailable'
       : 'docs_freshness_live_owner_blocks_done_transition';
     const blockedTransitionSummary = ownerEvidenceUnavailable
-      ? `Attached PR #${pr.number} merged and the shared root is reconciled, but ${DOCS_FRESHNESS_MAINTAIN_OWNER_KEY} owner evidence could not be verified; moved the issue to Blocked instead of transitioning it to Done.`
-      : `Attached PR #${pr.number} merged and the shared root is reconciled, but ${baseWithResolution.issue_identifier ?? input.issueId} is still the live ${DOCS_FRESHNESS_MAINTAIN_OWNER_KEY} owner; moved the issue to Blocked instead of transitioning it to Done.`;
+      ? `Attached PR #${pr.number} merged and the shared root is reconciled, but ${DOCS_FRESHNESS_MAINTAIN_OWNER_KEY} owner evidence could not be verified; moved the issue to ${ownerCloseoutTargetState} instead of transitioning it to Done.`
+      : `Attached PR #${pr.number} merged and the shared root is reconciled, but ${baseWithResolution.issue_identifier ?? input.issueId} is still the live ${DOCS_FRESHNESS_MAINTAIN_OWNER_KEY} owner; moved the issue to ${ownerCloseoutTargetState} instead of transitioning it to Done.`;
     const blockedTransitionFailureReason = ownerEvidenceUnavailable
       ? 'linear_blocked_transition_failed_for_docs_freshness_owner_evidence_unavailable'
-      : 'linear_blocked_transition_failed_for_docs_freshness_owner';
+      : ownerCloseoutTargetState === 'Backlog'
+        ? 'linear_backlog_transition_failed_for_docs_freshness_owner'
+        : 'linear_blocked_transition_failed_for_docs_freshness_owner';
     const blockedTransitionFailureSummary = ownerEvidenceUnavailable
-      ? `Attached PR #${pr.number} merged and the shared root is reconciled, but ${DOCS_FRESHNESS_MAINTAIN_OWNER_KEY} owner evidence could not be verified and the Linear issue could not transition to Blocked instead of Done.`
-      : `Attached PR #${pr.number} merged and the shared root is reconciled, but ${DOCS_FRESHNESS_MAINTAIN_OWNER_KEY} still identifies ${baseWithResolution.issue_identifier ?? input.issueId} as the live owner and the Linear issue could not transition to Blocked instead of Done.`;
+      ? `Attached PR #${pr.number} merged and the shared root is reconciled, but ${DOCS_FRESHNESS_MAINTAIN_OWNER_KEY} owner evidence could not be verified and the Linear issue could not transition to ${ownerCloseoutTargetState} instead of Done.`
+      : `Attached PR #${pr.number} merged and the shared root is reconciled, but ${DOCS_FRESHNESS_MAINTAIN_OWNER_KEY} still identifies ${baseWithResolution.issue_identifier ?? input.issueId} as the live owner and the Linear issue could not transition to ${ownerCloseoutTargetState} instead of Done.`;
     const transitionAttemptedAt = now();
     const transitionResult = await transitionIssueState({
       issueId: input.issueId,
-      stateName: 'Blocked',
+      stateName: ownerCloseoutTargetState,
       expectedStateName: currentIssueState,
       expectedStateType: currentIssueStateType,
       expectedUpdatedAt: currentIssueUpdatedAt,
@@ -969,7 +972,7 @@ export async function runProviderDeterministicMergeCloseout(
           status: 'failed',
           attempted_at: transitionAttemptedAt,
           previous_state: currentIssueState ?? null,
-          target_state: 'Blocked',
+          target_state: ownerCloseoutTargetState,
           issue_state: currentIssueState ?? null,
           issue_state_type: currentIssueStateType ?? null,
           issue_updated_at: currentIssueUpdatedAt,
@@ -2120,7 +2123,11 @@ function docsFreshnessOwnerFinalizerIsUsable(input: {
   if (status === 'not_applicable') {
     return !activeOwnedDebt;
   }
-  if (status === 'passed_active_owner_finalizer' || status === 'passed_exact_canonical_owner_precedence') {
+  if (
+    status === 'passed_active_owner_finalizer' ||
+    status === 'passed_exact_canonical_owner_precedence' ||
+    status === 'restore_existing_owner'
+  ) {
     const activeOwnerIssues = docsFreshnessOwnerFinalizerActiveOwnerIssues(input.ownerFinalizer);
     const activeOwnerRecords = docsFreshnessOwnerFinalizerActiveOwnerRecords(input.ownerFinalizer);
     if (activeOwnerIssues.size === 0 || activeOwnerRecords.size === 0 || candidateOwnerRecords.size === 0) {
@@ -2145,6 +2152,24 @@ function docsFreshnessOwnerFinalizerBlocksIssue(
     return true;
   }
   return docsFreshnessOwnerFinalizerActiveOwnerIssues(ownerFinalizer).has(issueIdentifier);
+}
+
+function docsFreshnessOwnerCloseoutTargetState(
+  docsFreshnessOwner: ProviderDocsFreshnessOwnerCloseoutRecord
+): 'Backlog' | 'Blocked' {
+  const ownerFinalizerStatus = normalizeOptionalString(docsFreshnessOwner.owner_finalizer?.status);
+  if (docsFreshnessOwner.status !== 'evidence_checked' || ownerFinalizerStatus?.startsWith('blocked_')) {
+    return 'Blocked';
+  }
+  if (
+    ownerFinalizerStatus === 'passed_active_owner_finalizer' ||
+    ownerFinalizerStatus === 'passed_exact_canonical_owner_precedence' ||
+    ownerFinalizerStatus === 'restore_existing_owner' ||
+    docsFreshnessOwner.freshness_decision === 'pass_with_owned_rolling_debt'
+  ) {
+    return 'Backlog';
+  }
+  return 'Blocked';
 }
 
 async function runProviderMergeCloseoutCommand(input: {

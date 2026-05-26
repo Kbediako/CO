@@ -17,6 +17,12 @@ const ALLOWED_FALLBACK_DECISIONS = new Set([
   'expire fallback',
   'justify retaining fallback'
 ]);
+const OWNER_LIFECYCLE_VALUES = new Set(['active_owner', 'retiring', 'retired_historical']);
+
+function normalizeOwnerLifecycle(value) {
+  const normalized = normalizeOptionalString(value)?.toLowerCase() ?? null;
+  return normalized && OWNER_LIFECYCLE_VALUES.has(normalized) ? normalized : null;
+}
 function fallbackTouchTokenPattern(standaloneTokenPattern, prefixedTokenPattern = standaloneTokenPattern) {
   const tokenEndBoundary = '(?=$|[^A-Za-z0-9]|[A-Z][a-z])';
   return new RegExp(
@@ -1239,7 +1245,8 @@ function normalizeCanonicalOwnerIssues(value) {
     }
     return {
       canonical_owner_key: canonicalOwnerKey,
-      owner_issue: ownerIssue
+      owner_issue: ownerIssue,
+      owner_lifecycle: normalizeOwnerLifecycle(item.owner_lifecycle ?? item.owner_issue_lifecycle)
     };
   });
 
@@ -1258,6 +1265,7 @@ function normalizeRollingFreshnessPolicy(rawPolicy) {
       is_valid: false,
       owner_issue: null,
       policy_doc: null,
+      owner_lifecycle: null,
       window_days: 0,
       max_cohorts: 0,
       max_entries: 0,
@@ -1289,6 +1297,7 @@ function normalizeRollingFreshnessPolicy(rawPolicy) {
         canonicalOwnerIssues.isValid
     ),
     owner_issue: ownerIssue,
+    owner_lifecycle: normalizeOwnerLifecycle(rawPolicy.owner_lifecycle ?? rawPolicy.owner_issue_lifecycle),
     policy_doc: policyDoc,
     window_days: windowDays ?? 0,
     max_cohorts: maxCohorts ?? 0,

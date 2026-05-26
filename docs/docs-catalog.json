@@ -137,6 +137,7 @@
       "enabled": true,
       "canonical_owner_key": "docs:freshness:maintain",
       "owner_issue": "CO-579",
+      "owner_lifecycle": "active_owner",
       "owner_issue_team_id": "d4eca09e-973f-4975-92b1-22fa2e914b33",
       "owner_issue_project_id": "f8543cb9-8bc9-4a85-bfde-45b270bcb48c",
       "require_live_owner_verification": true,
@@ -473,18 +474,22 @@
       "canonical_owner_issues": [
         {
           "canonical_owner_key": "baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance",
-          "owner_issue": "CO-581"
+          "owner_issue": "CO-581",
+          "owner_lifecycle": "active_owner"
         },
         {
           "canonical_owner_key": "baseline_cohort_id:co-558-may-20-apr-19-task-report-maintenance",
-          "owner_issue": "CO-569"
+          "owner_issue": "CO-569",
+          "owner_lifecycle": "active_owner"
         },
         {
           "canonical_owner_key": "docs_freshness_candidate|doc_class:task_packet|path_family:tasks/tasks-*|last_review:2026-03-23|cadence_days:30",
-          "owner_issue": "CO-320"
+          "owner_issue": "CO-320",
+          "owner_lifecycle": "retired_historical"
         }
       ],
-      "action_after_window": "refresh, archive, reclassify, or file a new same-project baseline owner before feature-lane review handoff"
+      "action_after_window": "refresh, archive, reclassify, or file a new same-project baseline owner before feature-lane review handoff",
+      "owner_lifecycle": "active_owner"
     }
   },
   "entries": [

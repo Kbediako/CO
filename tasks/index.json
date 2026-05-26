@@ -29302,6 +29302,62 @@
         "source_payload_status": "Parent corrected the accepted docs child fallback anchor to the prompt-provided source anchor and full protected-term contract.",
         "protected_terms": "control-host machine-status same-endpoint timeout; /ui/machine-status.json; snapshot-only status plane; source-root freshness; stale owner freshness; provider_refresh_lifecycle_stuck; dispatch_source_issue_by_id; node::SyncProcessRunner; uv_spawn; posix_spawn; /healthz; /readyz; CO-574; CO-572; CO-557; CO-579; CO-581; CO-569."
       }
+    },
+    {
+      "id": "20260526-linear-9b2d18f0-0062-494f-b37f-340cca5f9fba",
+      "title": "CO-582 split docs freshness owner binding lifecycle from PR completion",
+      "relates_to": "tasks/tasks-linear-9b2d18f0-0062-494f-b37f-340cca5f9fba.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "status": "in_progress",
+      "last_review": "2026-05-26",
+      "canonical_owner_key": "docs:freshness:owner-binding-lifecycle:v1",
+      "canonical_owner_marker": "codex-orchestrator:canonical-owner-key=docs:freshness:owner-binding-lifecycle:v1",
+      "evidence": [
+        "docs/PRD-linear-9b2d18f0-0062-494f-b37f-340cca5f9fba.md",
+        "docs/TECH_SPEC-linear-9b2d18f0-0062-494f-b37f-340cca5f9fba.md",
+        "docs/ACTION_PLAN-linear-9b2d18f0-0062-494f-b37f-340cca5f9fba.md",
+        "tasks/specs/linear-9b2d18f0-0062-494f-b37f-340cca5f9fba.md",
+        "tasks/tasks-linear-9b2d18f0-0062-494f-b37f-340cca5f9fba.md",
+        ".agent/task/linear-9b2d18f0-0062-494f-b37f-340cca5f9fba.md",
+        "tasks/index.json",
+        "docs/TASKS.md",
+        "docs/docs-freshness-registry.json"
+      ],
+      "approvals": {
+        "issue_quality_review": {
+          "reviewer": "parent CO orchestrator",
+          "date": "2026-05-26",
+          "status": "approved_for_implementation",
+          "summary": "Live issue-context, co-status, and docs:freshness:maintain evidence confirm CO-582 owns the terminal active-owner lifecycle repair without weakening docs/spec freshness gates."
+        },
+        "delegation_degraded_mode": {
+          "reviewer": "parent CO orchestrator",
+          "date": "2026-05-26",
+          "status": "delegate_spawn_transport_closed",
+          "summary": "delegate.spawn returned a closed transport; lane records stay_serial_after_degraded_delegate_spawn and uses task-scoped diagnostics evidence where available."
+        }
+      },
+      "paths": {
+        "agent_task": ".agent/task/linear-9b2d18f0-0062-494f-b37f-340cca5f9fba.md",
+        "prd": "docs/PRD-linear-9b2d18f0-0062-494f-b37f-340cca5f9fba.md",
+        "docs": "docs/TECH_SPEC-linear-9b2d18f0-0062-494f-b37f-340cca5f9fba.md",
+        "tech_spec_mirror": "docs/TECH_SPEC-linear-9b2d18f0-0062-494f-b37f-340cca5f9fba.md",
+        "action_plan": "docs/ACTION_PLAN-linear-9b2d18f0-0062-494f-b37f-340cca5f9fba.md",
+        "spec": "tasks/specs/linear-9b2d18f0-0062-494f-b37f-340cca5f9fba.md",
+        "task": "tasks/tasks-linear-9b2d18f0-0062-494f-b37f-340cca5f9fba.md"
+      },
+      "source_issue": {
+        "id": "9b2d18f0-0062-494f-b37f-340cca5f9fba",
+        "identifier": "CO-582",
+        "url": "https://linear.app/asabeko/issue/CO-582"
+      },
+      "notes": {
+        "protected_terms": "docs:freshness:maintain; canonical_owner_issues[]; canonical_owner_key; active_owner; retired_historical; restore_existing_owner; move_to_backlog_not_done; owner_finalizer; pass_with_owned_rolling_debt; block_unowned_repo_debt; CO-581; CO-569; CO-579; CO-568; PR #885.",
+        "parallelization_decision": "stay_serial_after_degraded_delegate_spawn"
+      }
     }
   ]
 }
