@@ -618,7 +618,7 @@
         "Codex"
       ],
       "status": "in_progress",
-      "last_review": "2026-05-24",
+      "last_review": "2026-05-26",
       "canonical_owner_key": "docs:freshness:maintain",
       "canonical_owner_marker": "codex-orchestrator:canonical-owner-key=docs:freshness:maintain",
       "evidence": [
@@ -676,7 +676,11 @@
           "node scripts/delegation-guard.mjs with explicit non-synthetic-child override after app-level gpt-5.5/GPT Pro review and quota hygiene cleanup",
           "codex-orchestrator hygiene quota --format json: latest zero-model audit observed model_calls=0, process_inventory.quota_burning_count=0, process_inventory.unowned_quota_burning_count=0; degraded findings are stale co-status/control-host endpoint state plus unconfirmed CO-555 provider-intake claim state",
           "sixth enforced standalone review rerun: findings P2 stray retained_terminal_packet archive skip lacked terminal lifecycle evidence, fixed in scripts/implementation-docs-archive.mjs and tests/implementation-docs-archive.spec.ts",
-          "final enforced gpt-5.5/xhigh standalone review: clean-success, valid contract, overall clean, finding_count=0"
+          "final enforced gpt-5.5/xhigh standalone review: clean-success, valid contract, overall clean, finding_count=0",
+          "2026-05-26 pre-expiry recurrence source issues CO-498, CO-442, CO-460, and CO-453 verified Done/completed via live Linear issue-context; task specs reclassified done, CO-498 packet rows retained_terminal_packet, and CO-442/CO-460/CO-453 packet rows kept active-reviewed because local checklist obligations remain open",
+          "2026-05-26 recurrence validation: node scripts/spec-guard.mjs --dry-run reported Spec guard: OK",
+          "2026-05-26 recurrence validation: docs:freshness:maintain produced block_policy_expired with invalid_entries=0, spec_guard_pre_expiry_entries=0, and blocking_changed_paths=[]; remaining blockers are separately owned stale cohorts under CO-581/CO-569/CO-579",
+          "2026-05-26 recurrence validation: docs:check, implementation-docs-archive dry-run, git diff --check, JSON parse, and diff budget passed"
         ],
         "pending": [
           "PR lifecycle",
@@ -703,7 +707,8 @@
         "docs_freshness_maintain": "latest validation passed after retained terminal packet lifecycle reclassification",
         "review_rework": "First enforced standalone review previously found P2 malformed review_notes frontmatter in a proactive pre-expiry sweep; CO-579 now handles the cohort from live Linear truth instead of active date-refreshes by reclassifying the verified Done/completed source specs inactive done and marking full packet registry rows retained_terminal_packet instead of false archive stubs. Second enforced review hit bounded-success contract failure while repeatedly inspecting spec-guard; parent fixed the real gap so spec-guard rolling cohort summaries also resolve exact baseline cohort canonical owners instead of collapsing to CO-579. Third enforced review found P2 missing report-level audit data for task-index review overrides that clear stale registry drift; CO-579 now emits task_index_review_overrides and regression coverage. Fourth enforced review found P1 implementation-docs archive could still stub retained packets and P2 duplicate CO-445 review_notes; CO-579 now skips retained_terminal_packet rows in archive automation and preserves both review_notes under one key. Fifth enforced review found P3 docs-catalog declaration drift; scripts/lib/docs-catalog.d.ts now includes retained_terminal_packet_entries. Sixth enforced review found P2 stray retained_terminal_packet archive skips trusted status without terminal lifecycle evidence; implementation-docs archive now requires task-index or registry task-status terminal evidence and archives nonterminal stray rows when otherwise eligible.",
         "admission_recheck": "Shared-root co-status after owner verification reports running=0, retrying=1, issues=1, max_allowed=3, with only CO-555 active-like in Rework on PR #834; CO-527 is Backlog with no PR and is not consuming active WIP.",
-        "quota_hygiene_20260524": "Zero-model quota hygiene initially found six unowned quota-burning codex exec audit processes under /Users/kbediako/Code/CO; parent terminated the stale process groups and reran hygiene with quota_burning_count=0 and unowned_quota_burning_count=0."
+        "quota_hygiene_20260524": "Zero-model quota hygiene initially found six unowned quota-burning codex exec audit processes under /Users/kbediako/Code/CO; parent terminated the stale process groups and reran hygiene with quota_burning_count=0 and unowned_quota_burning_count=0.",
+        "pre_expiry_recurrence_20260526": "Current-main docs:freshness:maintain reported block_spec_guard_pre_expiry for CO-498, CO-442, CO-460, and CO-453; live Linear issue-context verified all four Done/completed. CO-498 rows are retained terminal packet history; CO-442, CO-460, and CO-453 stay active-reviewed until open local checklist obligations are resolved."
       }
     },
     {
@@ -5378,7 +5383,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-05-03",
+      "last_review": "2026-05-26",
       "approvals": {
         "traceability_packet": {
           "reviewer": "CO-442 traceability packet branch",
@@ -5397,6 +5402,12 @@
           "date": "2026-05-03",
           "status": "blocked",
           "summary": "Forced appserver standalone review launched on gpt-5.5/xhigh but Codex hit the account usage limit before findings; final review must be rerun before handoff or merge unless an explicit quota waiver is recorded."
+        },
+        "co579_pre_expiry_terminal_review": {
+          "reviewer": "CO-579 pre-expiry terminal review",
+          "date": "2026-05-26",
+          "status": "terminal_verified",
+          "summary": "Live Linear issue-context verified CO-442 is Done/completed; CO-579 reclassified the task spec done and retains the full packet as terminal history rather than active docs freshness debt."
         }
       },
       "paths": {
@@ -5406,7 +5417,8 @@
         "prd": "docs/PRD-linear-8a453a7c-ba31-4604-a88e-2e4c6244ec51.md",
         "docs": "docs/TECH_SPEC-linear-8a453a7c-ba31-4604-a88e-2e4c6244ec51.md",
         "action_plan": "docs/ACTION_PLAN-linear-8a453a7c-ba31-4604-a88e-2e4c6244ec51.md"
-      }
+      },
+      "status": "done"
     },
     {
       "id": "20260501-linear-93785af4-9df9-4713-8a63-b0caddb5796f",
@@ -5416,8 +5428,8 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-05-03",
-      "status": "in_progress",
+      "last_review": "2026-05-26",
+      "status": "done",
       "evidence": [
         "docs/PRD-linear-93785af4-9df9-4713-8a63-b0caddb5796f.md",
         "docs/TECH_SPEC-linear-93785af4-9df9-4713-8a63-b0caddb5796f.md",
@@ -5466,6 +5478,12 @@
           "date": "2026-05-03",
           "status": "pending-current-post-merge-review",
           "summary": "Prior May 1 minimality pass found no simplification patch. A fresh post-merge elegance pass is still required after standalone review and before PR handoff."
+        },
+        "co579_pre_expiry_terminal_review": {
+          "reviewer": "CO-579 pre-expiry terminal review",
+          "date": "2026-05-26",
+          "status": "terminal_verified",
+          "summary": "Live Linear issue-context verified CO-460 is Done/completed; CO-579 reclassified the task spec done and retains the full packet as terminal history rather than active docs freshness debt."
         }
       },
       "paths": {
@@ -5483,8 +5501,8 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-05-03",
-      "status": "in_progress",
+      "last_review": "2026-05-26",
+      "status": "done",
       "evidence": [
         "docs/PRD-linear-dc136145-8df0-49f7-af80-21148dc37351.md",
         "docs/TECH_SPEC-linear-dc136145-8df0-49f7-af80-21148dc37351.md",
@@ -5505,6 +5523,12 @@
           "manifest": ".runs/linear-dc136145-8df0-49f7-af80-21148dc37351-docs-packet/cli/2026-05-03T12-07-21-112Z-a02619a1/manifest.json",
           "source_anchor": "ctx:sha256:10210d74b1aeda6ff0cb3656c91e02bc36497974d4817a4a180e3739db3aa5a9#chunk:c000001",
           "summary": "Created the CO-453 docs-first packet and declared mirrors only. The packet preserves provider-linear-worker-child-lanes.json, launching-*, real child run id/artifact paths, parent refresh/status logic, refresh request timeout, real child startup reconciliation, and CO-449 as related observed context only. It rejects CO-449 intake changes, broad recovery/freshness work, generic refresh-timeout remediation, dropping child-lane proof or decision evidence, and leaving placeholder paths as current authority after real startup."
+        },
+        "co579_pre_expiry_terminal_review": {
+          "reviewer": "CO-579 pre-expiry terminal review",
+          "date": "2026-05-26",
+          "status": "terminal_verified",
+          "summary": "Live Linear issue-context verified CO-453 is Done/completed; CO-579 reclassified the task spec done and retains the full packet as terminal history rather than active docs freshness debt."
         }
       },
       "paths": {
@@ -5645,8 +5669,8 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-05-03",
-      "status": "in_progress",
+      "last_review": "2026-05-26",
+      "status": "done",
       "evidence": [
         "docs/PRD-linear-46287ca7-10c3-4ad3-b8a5-9b3ba96059fe.md",
         "docs/TECH_SPEC-linear-46287ca7-10c3-4ad3-b8a5-9b3ba96059fe.md",
@@ -5696,6 +5720,12 @@
           "status": "no_simplification_patch_remaining",
           "evidence": "out/linear-46287ca7-10c3-4ad3-b8a5-9b3ba96059fe/manual/elegance-review.md",
           "summary": "Manual minimality pass found the broad metadata diff necessary for 15 verified terminal source issues plus the CO-498 packet; no source/script/validator behavior was added."
+        },
+        "co579_pre_expiry_terminal_review": {
+          "reviewer": "CO-579 pre-expiry terminal review",
+          "date": "2026-05-26",
+          "status": "terminal_verified",
+          "summary": "Live Linear issue-context verified CO-498 is Done/completed; CO-579 reclassified the task spec done and retains the full packet as terminal history rather than active docs freshness debt."
         }
       },
       "paths": {

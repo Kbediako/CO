@@ -4459,9 +4459,11 @@
     {
       "path": ".agent/task/linear-46287ca7-10c3-4ad3-b8a5-9b3ba96059fe.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-03",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-26",
+      "cadence_days": 365,
+      "notes": "CO-579 2026-05-26 pre-expiry terminal review: live Linear issue-context verified CO-498 is Done/completed; full packet is retained as terminal history, not refreshed as active docs freshness debt.",
+      "retained_reason": "CO-579 2026-05-26 pre-expiry terminal review: live Linear issue-context verified CO-498 is Done/completed; full packet is retained as terminal history, not refreshed as active docs freshness debt."
     },
     {
       "path": ".agent/task/linear-4646e08c-5c53-4072-b09e-ec1aeff6fb21.md",
@@ -4733,7 +4735,7 @@
       "path": ".agent/task/linear-5634bf98-fe59-41f5-8623-60c9ef0b2993.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-05-24",
+      "last_review": "2026-05-26",
       "cadence_days": 30,
       "source_issue": {
         "id": "5634bf98-fe59-41f5-8623-60c9ef0b2993",
@@ -5536,8 +5538,9 @@
       "path": ".agent/task/linear-8a453a7c-ba31-4604-a88e-2e4c6244ec51.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-05-03",
-      "cadence_days": 30
+      "last_review": "2026-05-26",
+      "cadence_days": 30,
+      "notes": "CO-579 2026-05-26 pre-expiry terminal review: live Linear issue-context verified CO-442 is Done/completed, but local packet checklists still contain open obligations; keep the packet active-reviewed instead of retained_terminal_packet until those obligations are resolved."
     },
     {
       "path": ".agent/task/linear-8a991d5a-8f02-4e50-9216-a5718569bf4a.md",
@@ -5669,8 +5672,9 @@
       "path": ".agent/task/linear-93785af4-9df9-4713-8a63-b0caddb5796f.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-05-03",
-      "cadence_days": 30
+      "last_review": "2026-05-26",
+      "cadence_days": 30,
+      "notes": "CO-579 2026-05-26 pre-expiry terminal review: live Linear issue-context verified CO-460 is Done/completed, but local packet checklists still contain open obligations; keep the packet active-reviewed instead of retained_terminal_packet until those obligations are resolved."
     },
     {
       "path": ".agent/task/linear-937a5264-87ce-47fa-a932-f940d70c6600.md",
@@ -6841,8 +6845,9 @@
       "path": ".agent/task/linear-dc136145-8df0-49f7-af80-21148dc37351.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-05-03",
-      "cadence_days": 30
+      "last_review": "2026-05-26",
+      "cadence_days": 30,
+      "notes": "CO-579 2026-05-26 pre-expiry terminal review: live Linear issue-context verified CO-453 is Done/completed, but local packet checklists still contain open obligations; keep the packet active-reviewed instead of retained_terminal_packet until those obligations are resolved."
     },
     {
       "path": ".agent/task/linear-dc1c7783-0307-4a0a-8dcf-2ede6a889392.md",
@@ -11266,9 +11271,11 @@
     {
       "path": "docs/ACTION_PLAN-linear-46287ca7-10c3-4ad3-b8a5-9b3ba96059fe.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-03",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-26",
+      "cadence_days": 365,
+      "notes": "CO-579 2026-05-26 pre-expiry terminal review: live Linear issue-context verified CO-498 is Done/completed; full packet is retained as terminal history, not refreshed as active docs freshness debt.",
+      "retained_reason": "CO-579 2026-05-26 pre-expiry terminal review: live Linear issue-context verified CO-498 is Done/completed; full packet is retained as terminal history, not refreshed as active docs freshness debt."
     },
     {
       "path": "docs/ACTION_PLAN-linear-4646e08c-5c53-4072-b09e-ec1aeff6fb21.md",
@@ -11541,7 +11548,7 @@
       "path": "docs/ACTION_PLAN-linear-5634bf98-fe59-41f5-8623-60c9ef0b2993.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-05-24",
+      "last_review": "2026-05-26",
       "cadence_days": 30,
       "source_issue": {
         "id": "5634bf98-fe59-41f5-8623-60c9ef0b2993",
@@ -12354,8 +12361,9 @@
       "path": "docs/ACTION_PLAN-linear-8a453a7c-ba31-4604-a88e-2e4c6244ec51.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-05-03",
-      "cadence_days": 30
+      "last_review": "2026-05-26",
+      "cadence_days": 30,
+      "notes": "CO-579 2026-05-26 pre-expiry terminal review: live Linear issue-context verified CO-442 is Done/completed, but local packet checklists still contain open obligations; keep the packet active-reviewed instead of retained_terminal_packet until those obligations are resolved."
     },
     {
       "path": "docs/ACTION_PLAN-linear-8a991d5a-8f02-4e50-9216-a5718569bf4a.md",
@@ -12503,8 +12511,9 @@
       "path": "docs/ACTION_PLAN-linear-93785af4-9df9-4713-8a63-b0caddb5796f.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-05-03",
-      "cadence_days": 30
+      "last_review": "2026-05-26",
+      "cadence_days": 30,
+      "notes": "CO-579 2026-05-26 pre-expiry terminal review: live Linear issue-context verified CO-460 is Done/completed, but local packet checklists still contain open obligations; keep the packet active-reviewed instead of retained_terminal_packet until those obligations are resolved."
     },
     {
       "path": "docs/ACTION_PLAN-linear-937a5264-87ce-47fa-a932-f940d70c6600.md",
@@ -13690,8 +13699,9 @@
       "path": "docs/ACTION_PLAN-linear-dc136145-8df0-49f7-af80-21148dc37351.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-05-03",
-      "cadence_days": 30
+      "last_review": "2026-05-26",
+      "cadence_days": 30,
+      "notes": "CO-579 2026-05-26 pre-expiry terminal review: live Linear issue-context verified CO-453 is Done/completed, but local packet checklists still contain open obligations; keep the packet active-reviewed instead of retained_terminal_packet until those obligations are resolved."
     },
     {
       "path": "docs/ACTION_PLAN-linear-dc1c7783-0307-4a0a-8dcf-2ede6a889392.md",
@@ -21450,9 +21460,11 @@
     {
       "path": "docs/PRD-linear-46287ca7-10c3-4ad3-b8a5-9b3ba96059fe.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-03",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-26",
+      "cadence_days": 365,
+      "notes": "CO-579 2026-05-26 pre-expiry terminal review: live Linear issue-context verified CO-498 is Done/completed; full packet is retained as terminal history, not refreshed as active docs freshness debt.",
+      "retained_reason": "CO-579 2026-05-26 pre-expiry terminal review: live Linear issue-context verified CO-498 is Done/completed; full packet is retained as terminal history, not refreshed as active docs freshness debt."
     },
     {
       "path": "docs/PRD-linear-4646e08c-5c53-4072-b09e-ec1aeff6fb21.md",
@@ -21725,7 +21737,7 @@
       "path": "docs/PRD-linear-5634bf98-fe59-41f5-8623-60c9ef0b2993.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-05-24",
+      "last_review": "2026-05-26",
       "cadence_days": 30,
       "source_issue": {
         "id": "5634bf98-fe59-41f5-8623-60c9ef0b2993",
@@ -22538,8 +22550,9 @@
       "path": "docs/PRD-linear-8a453a7c-ba31-4604-a88e-2e4c6244ec51.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-05-03",
-      "cadence_days": 30
+      "last_review": "2026-05-26",
+      "cadence_days": 30,
+      "notes": "CO-579 2026-05-26 pre-expiry terminal review: live Linear issue-context verified CO-442 is Done/completed, but local packet checklists still contain open obligations; keep the packet active-reviewed instead of retained_terminal_packet until those obligations are resolved."
     },
     {
       "path": "docs/PRD-linear-8a991d5a-8f02-4e50-9216-a5718569bf4a.md",
@@ -22687,8 +22700,9 @@
       "path": "docs/PRD-linear-93785af4-9df9-4713-8a63-b0caddb5796f.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-05-03",
-      "cadence_days": 30
+      "last_review": "2026-05-26",
+      "cadence_days": 30,
+      "notes": "CO-579 2026-05-26 pre-expiry terminal review: live Linear issue-context verified CO-460 is Done/completed, but local packet checklists still contain open obligations; keep the packet active-reviewed instead of retained_terminal_packet until those obligations are resolved."
     },
     {
       "path": "docs/PRD-linear-937a5264-87ce-47fa-a932-f940d70c6600.md",
@@ -23870,8 +23884,9 @@
       "path": "docs/PRD-linear-dc136145-8df0-49f7-af80-21148dc37351.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-05-03",
-      "cadence_days": 30
+      "last_review": "2026-05-26",
+      "cadence_days": 30,
+      "notes": "CO-579 2026-05-26 pre-expiry terminal review: live Linear issue-context verified CO-453 is Done/completed, but local packet checklists still contain open obligations; keep the packet active-reviewed instead of retained_terminal_packet until those obligations are resolved."
     },
     {
       "path": "docs/PRD-linear-dc1c7783-0307-4a0a-8dcf-2ede6a889392.md",
@@ -28711,9 +28726,11 @@
     {
       "path": "docs/TECH_SPEC-linear-46287ca7-10c3-4ad3-b8a5-9b3ba96059fe.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-03",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-26",
+      "cadence_days": 365,
+      "notes": "CO-579 2026-05-26 pre-expiry terminal review: live Linear issue-context verified CO-498 is Done/completed; full packet is retained as terminal history, not refreshed as active docs freshness debt.",
+      "retained_reason": "CO-579 2026-05-26 pre-expiry terminal review: live Linear issue-context verified CO-498 is Done/completed; full packet is retained as terminal history, not refreshed as active docs freshness debt."
     },
     {
       "path": "docs/TECH_SPEC-linear-4646e08c-5c53-4072-b09e-ec1aeff6fb21.md",
@@ -28979,7 +28996,7 @@
       "path": "docs/TECH_SPEC-linear-5634bf98-fe59-41f5-8623-60c9ef0b2993.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-05-24",
+      "last_review": "2026-05-26",
       "cadence_days": 30,
       "source_issue": {
         "id": "5634bf98-fe59-41f5-8623-60c9ef0b2993",
@@ -29769,8 +29786,9 @@
       "path": "docs/TECH_SPEC-linear-8a453a7c-ba31-4604-a88e-2e4c6244ec51.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-05-03",
-      "cadence_days": 30
+      "last_review": "2026-05-26",
+      "cadence_days": 30,
+      "notes": "CO-579 2026-05-26 pre-expiry terminal review: live Linear issue-context verified CO-442 is Done/completed, but local packet checklists still contain open obligations; keep the packet active-reviewed instead of retained_terminal_packet until those obligations are resolved."
     },
     {
       "path": "docs/TECH_SPEC-linear-8a991d5a-8f02-4e50-9216-a5718569bf4a.md",
@@ -29911,8 +29929,9 @@
       "path": "docs/TECH_SPEC-linear-93785af4-9df9-4713-8a63-b0caddb5796f.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-05-03",
-      "cadence_days": 30
+      "last_review": "2026-05-26",
+      "cadence_days": 30,
+      "notes": "CO-579 2026-05-26 pre-expiry terminal review: live Linear issue-context verified CO-460 is Done/completed, but local packet checklists still contain open obligations; keep the packet active-reviewed instead of retained_terminal_packet until those obligations are resolved."
     },
     {
       "path": "docs/TECH_SPEC-linear-937a5264-87ce-47fa-a932-f940d70c6600.md",
@@ -31068,8 +31087,9 @@
       "path": "docs/TECH_SPEC-linear-dc136145-8df0-49f7-af80-21148dc37351.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-05-03",
-      "cadence_days": 30
+      "last_review": "2026-05-26",
+      "cadence_days": 30,
+      "notes": "CO-579 2026-05-26 pre-expiry terminal review: live Linear issue-context verified CO-453 is Done/completed, but local packet checklists still contain open obligations; keep the packet active-reviewed instead of retained_terminal_packet until those obligations are resolved."
     },
     {
       "path": "docs/TECH_SPEC-linear-dc1c7783-0307-4a0a-8dcf-2ede6a889392.md",
@@ -36244,9 +36264,11 @@
     {
       "path": "tasks/specs/linear-46287ca7-10c3-4ad3-b8a5-9b3ba96059fe.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-03",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-26",
+      "cadence_days": 365,
+      "notes": "CO-579 2026-05-26 pre-expiry terminal review: live Linear issue-context verified CO-498 is Done/completed; full packet is retained as terminal history, not refreshed as active docs freshness debt.",
+      "retained_reason": "CO-579 2026-05-26 pre-expiry terminal review: live Linear issue-context verified CO-498 is Done/completed; full packet is retained as terminal history, not refreshed as active docs freshness debt."
     },
     {
       "path": "tasks/specs/linear-4646e08c-5c53-4072-b09e-ec1aeff6fb21.md",
@@ -36527,7 +36549,7 @@
       "path": "tasks/specs/linear-5634bf98-fe59-41f5-8623-60c9ef0b2993.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-05-24",
+      "last_review": "2026-05-26",
       "cadence_days": 30,
       "source_issue": {
         "id": "5634bf98-fe59-41f5-8623-60c9ef0b2993",
@@ -37343,8 +37365,9 @@
       "path": "tasks/specs/linear-8a453a7c-ba31-4604-a88e-2e4c6244ec51.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-05-03",
-      "cadence_days": 30
+      "last_review": "2026-05-26",
+      "cadence_days": 30,
+      "notes": "CO-579 2026-05-26 pre-expiry terminal review: live Linear issue-context verified CO-442 is Done/completed, but local packet checklists still contain open obligations; keep the packet active-reviewed instead of retained_terminal_packet until those obligations are resolved."
     },
     {
       "path": "tasks/specs/linear-8a991d5a-8f02-4e50-9216-a5718569bf4a.md",
@@ -37492,8 +37515,9 @@
       "path": "tasks/specs/linear-93785af4-9df9-4713-8a63-b0caddb5796f.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-05-03",
-      "cadence_days": 30
+      "last_review": "2026-05-26",
+      "cadence_days": 30,
+      "notes": "CO-579 2026-05-26 pre-expiry terminal review: live Linear issue-context verified CO-460 is Done/completed, but local packet checklists still contain open obligations; keep the packet active-reviewed instead of retained_terminal_packet until those obligations are resolved."
     },
     {
       "path": "tasks/specs/linear-937a5264-87ce-47fa-a932-f940d70c6600.md",
@@ -38672,8 +38696,9 @@
       "path": "tasks/specs/linear-dc136145-8df0-49f7-af80-21148dc37351.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-05-03",
-      "cadence_days": 30
+      "last_review": "2026-05-26",
+      "cadence_days": 30,
+      "notes": "CO-579 2026-05-26 pre-expiry terminal review: live Linear issue-context verified CO-453 is Done/completed, but local packet checklists still contain open obligations; keep the packet active-reviewed instead of retained_terminal_packet until those obligations are resolved."
     },
     {
       "path": "tasks/specs/linear-dc1c7783-0307-4a0a-8dcf-2ede6a889392.md",
@@ -43473,9 +43498,11 @@
     {
       "path": "tasks/tasks-linear-46287ca7-10c3-4ad3-b8a5-9b3ba96059fe.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-03",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-26",
+      "cadence_days": 365,
+      "notes": "CO-579 2026-05-26 pre-expiry terminal review: live Linear issue-context verified CO-498 is Done/completed; full packet is retained as terminal history, not refreshed as active docs freshness debt.",
+      "retained_reason": "CO-579 2026-05-26 pre-expiry terminal review: live Linear issue-context verified CO-498 is Done/completed; full packet is retained as terminal history, not refreshed as active docs freshness debt."
     },
     {
       "path": "tasks/tasks-linear-4646e08c-5c53-4072-b09e-ec1aeff6fb21.md",
@@ -43755,7 +43782,7 @@
       "path": "tasks/tasks-linear-5634bf98-fe59-41f5-8623-60c9ef0b2993.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-05-24",
+      "last_review": "2026-05-26",
       "cadence_days": 30,
       "source_issue": {
         "id": "5634bf98-fe59-41f5-8623-60c9ef0b2993",
@@ -44567,8 +44594,9 @@
       "path": "tasks/tasks-linear-8a453a7c-ba31-4604-a88e-2e4c6244ec51.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-05-03",
-      "cadence_days": 30
+      "last_review": "2026-05-26",
+      "cadence_days": 30,
+      "notes": "CO-579 2026-05-26 pre-expiry terminal review: live Linear issue-context verified CO-442 is Done/completed, but local packet checklists still contain open obligations; keep the packet active-reviewed instead of retained_terminal_packet until those obligations are resolved."
     },
     {
       "path": "tasks/tasks-linear-8a991d5a-8f02-4e50-9216-a5718569bf4a.md",
@@ -44716,8 +44744,9 @@
       "path": "tasks/tasks-linear-93785af4-9df9-4713-8a63-b0caddb5796f.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-05-03",
-      "cadence_days": 30
+      "last_review": "2026-05-26",
+      "cadence_days": 30,
+      "notes": "CO-579 2026-05-26 pre-expiry terminal review: live Linear issue-context verified CO-460 is Done/completed, but local packet checklists still contain open obligations; keep the packet active-reviewed instead of retained_terminal_packet until those obligations are resolved."
     },
     {
       "path": "tasks/tasks-linear-937a5264-87ce-47fa-a932-f940d70c6600.md",
@@ -45904,8 +45933,9 @@
       "path": "tasks/tasks-linear-dc136145-8df0-49f7-af80-21148dc37351.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-05-03",
-      "cadence_days": 30
+      "last_review": "2026-05-26",
+      "cadence_days": 30,
+      "notes": "CO-579 2026-05-26 pre-expiry terminal review: live Linear issue-context verified CO-453 is Done/completed, but local packet checklists still contain open obligations; keep the packet active-reviewed instead of retained_terminal_packet until those obligations are resolved."
     },
     {
       "path": "tasks/tasks-linear-dc1c7783-0307-4a0a-8dcf-2ede6a889392.md",
