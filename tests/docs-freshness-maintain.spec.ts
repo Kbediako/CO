@@ -1503,8 +1503,8 @@ last_review: ${lastReview}
         ownerIssueVerification: {
           issue: 'CO-175',
           issue_id: 'owner-id',
-          state: 'Done',
-          state_type: 'completed',
+          state: 'Canceled',
+          state_type: 'canceled',
           is_terminal: true,
           usable: false,
           workspace_id: 'workspace-1',
@@ -1554,7 +1554,7 @@ last_review: ${lastReview}
             mode: 'restore_existing_owner',
             owner_issue: 'CO-175',
             copyable_command: expect.stringContaining(
-              'codex-orchestrator linear transition --issue-id CO-175 --expected-state "Done"'
+              'codex-orchestrator linear transition --issue-id CO-175 --expected-state "Canceled" --expected-state-type "canceled"'
             )
           })
         ]
@@ -2277,7 +2277,7 @@ last_review: ${lastReview}
           mode: 'restore_existing_owner',
           owner_issue: 'CO-581',
           copyable_command: expect.stringContaining(
-            'codex-orchestrator linear transition --issue-id CO-581 --expected-state "Done"'
+            'codex-orchestrator linear transition --issue-id CO-581 --expected-state "Done" --expected-state-type "completed"'
           )
         })
       ],

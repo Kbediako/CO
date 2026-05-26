@@ -1244,6 +1244,12 @@ function buildCanonicalOwnerBody({ decision, cohort, mode, routeId }) {
   const canonicalOwnerMarker = canonicalOwnerMarkerForKey(canonicalOwnerKey);
   const action = cohort?.owner_issue_action ?? decision?.owner_issue_action ?? {};
   const ownerIssue = ownerActionIssueForCohort(cohort, decision);
+  const ownerIssueState = normalizeOptionalString(
+    action.issue_state ?? action.verified_terminal_state ?? action.verified_state ?? action.owner_issue_state
+  );
+  const ownerIssueStateType = normalizeOptionalString(
+    action.issue_state_type ?? action.verified_state_type ?? action.verified_stateType ?? action.owner_issue_state_type
+  );
   const configuredOwnerIssue =
     action.existing_issue ?? ownerIssue ?? cohort?.configured_owner_issue ?? decision?.owner_issue ?? null;
   const samplePaths = Array.isArray(cohort?.sample_paths) ? cohort.sample_paths.slice(0, 10) : [];
@@ -1298,6 +1304,8 @@ function buildCanonicalOwnerBody({ decision, cohort, mode, routeId }) {
     route_id: routeId,
     cohort_id: cohort?.id ?? null,
     owner_issue: ownerIssue,
+    owner_issue_state: ownerIssueState,
+    owner_issue_state_type: ownerIssueStateType,
     configured_owner_issue: configuredOwnerIssue,
     sample_paths: samplePaths
   };
@@ -1310,11 +1318,16 @@ function shouldEmitCreateOwnerCommand(actionMode) {
 function buildCopyableOwnerCommand(body, sourceIssue = '<source-linear-issue-id>', actionMode = null) {
   if (actionMode === 'restore_existing_owner') {
     const issue = body.owner_issue ?? body.configured_owner_issue ?? sourceIssue;
+    const expectedState =
+      normalizeOptionalString(body.verified_terminal_state ?? body.verified_state ?? body.owner_issue_state) ?? 'Done';
+    const expectedStateType =
+      normalizeOptionalString(body.verified_state_type ?? body.verified_stateType ?? body.owner_issue_state_type) ??
+      'completed';
     return [
       'codex-orchestrator linear transition',
       `--issue-id ${issue}`,
-      '--expected-state "Done"',
-      '--expected-state-type completed',
+      `--expected-state ${JSON.stringify(expectedState)}`,
+      `--expected-state-type ${JSON.stringify(expectedStateType)}`,
       '--state "Backlog"',
       '--force',
       '--force-reason "restore active docs freshness owner; move_to_backlog_not_done"',

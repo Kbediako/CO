@@ -27,6 +27,16 @@
 - Exact owner mappings for CO-581 and CO-569 leak across cohorts.
 - Backlog owner bindings count as active provider-worker WIP without actual repair/archive/reclassification work.
 
+## Fallback / Refactor Decision
+- Applies to fallback, compatibility, legacy, stale, cached, break-glass, or minor-seam behavior? Yes.
+- Large-refactor check: required for the docs freshness ownership control surface.
+- Minor-seam decision: remove the replacement-owner seam rather than retaining another compatibility branch.
+
+| Surface | Fallback / seam | Decision | Owner | Trigger | Introduced date | Review date | Maximum lifetime | Removal condition | Validation |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Terminal active owner replacement | Terminal same-project active owners route to `create_required`. | remove fallback | CO-582 | CO-579 terminal while still configured as owner. | 2026-05-24 | 2026-05-26 | Not retained | terminal active owner emits restoration action or blocks with impossible-restoration evidence. | focused maintainer tests and JSON output. |
+| Active owner issue as PR deliverable | Owner issue can close as `Done` when owner PR merges. | remove fallback | CO-582 | `PR #885` owner issue lifecycle made retained debt unowned. | 2026-05-24 | 2026-05-26 | Not retained | owner issue remains non-terminal/Backlog while retained cohorts resolve to it, or finalizer repairs it. | merge finalizer coverage. |
+
 ## Validation
 - [x] JSON parse for `tasks/index.json`, `docs/docs-freshness-registry.json`, and `docs/docs-catalog.json`. Evidence: post-implementation `json ok`.
 - [x] Protected-term scan over packet files. Evidence: pre-implementation protected-term `rg` scan covered all required packet files.

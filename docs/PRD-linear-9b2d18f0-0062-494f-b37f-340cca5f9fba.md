@@ -16,19 +16,20 @@
 - Preserve the exact issue contract for `CO-582`: fix the lifecycle design flaw behind the `CO-568` / `CO-579` / `CO-581` replacement-owner chain and make terminal active owners restore to Backlog when possible.
 - Do not weaken `docs:freshness`, `docs:freshness:maintain`, or `spec-guard`.
 - Keep `CO-569` and `CO-581` as exact owned rolling-debt blockers while their retained cohorts remain live.
-- Treat current `CO-579` terminal-owner evidence as the live symptom to repair, not as a reason to create another replacement owner.
+- Treat the observed `CO-579` terminal-owner evidence as the motivating symptom to repair, not as a reason to create another replacement owner.
 
 ## Intent Checksum
 - Protected terms: `docs:freshness:maintain`, `canonical_owner_issues[]`, `canonical_owner_key`, `active_owner`, `retired_historical`, `restore_existing_owner`, `move_to_backlog_not_done`, `owner_finalizer`, `pass_with_owned_rolling_debt`, `block_unowned_repo_debt`, `CO-581`, `CO-569`, `CO-579`, `CO-568`, `PR #885`.
 - Nearby wrong interpretations to reject: do not weaken `docs:freshness` or `spec-guard`; do not blindly bump `last_review`; do not delete historical packets just to pass gates; do not create another replacement owner as the durable fix; do not treat registry row status or fallback expiry as owner lifecycle authority.
 - Explicit non-goals: no broad owner mapping, no cap increase, no historical packet deletion, no passive Backlog owner WIP consumption, and no retained exception expiry weakening.
 
-## Current Truth
-- Shared root is clean on `origin/main` at `974fe72002` after CO-576 merged.
-- `co-status --format json` reports no running or retrying issues and no active claims before CO-582 implementation work.
-- Current `docs:freshness:maintain -- --format json --dry-run-linear-actions --warn` reports `freshness_decision=block_spec_guard_pre_expiry`, `owner_finalizer.status=blocked_terminal_owner`, and `owner_finalizer.blocking_owner_issue=CO-579`.
-- The same maintainer output verifies `CO-581` and `CO-569` as live same-project Blocked exact owners for their canonical owner keys.
-- The observed bug is that `CO-579` is terminal while still configured as the global `docs:freshness:maintain` owner, causing terminal-owner routing instead of an owner lifecycle repair action.
+## Motivating Symptom Before PR #898
+- Shared root was clean on `origin/main` at `974fe72002` after CO-576 merged.
+- `co-status --format json` reported no running or retrying issues and no active claims before CO-582 implementation work.
+- Pre-PR #898 `docs:freshness:maintain -- --format json --dry-run-linear-actions --warn` reported `freshness_decision=block_spec_guard_pre_expiry`, `owner_finalizer.status=blocked_terminal_owner`, and `owner_finalizer.blocking_owner_issue=CO-579`.
+- The same maintainer output verified `CO-581` and `CO-569` as live same-project Blocked exact owners for their canonical owner keys.
+- The observed bug was that `CO-579` was terminal while still configured as the global `docs:freshness:maintain` owner, causing terminal-owner routing instead of an owner lifecycle repair action.
+- PR #898 cleared the immediate CO-569 / CO-581 / CO-579 retained-owner blockers on `main`; CO-582 keeps that symptom as regression coverage so future active owners restore to Backlog instead of requiring another replacement chain.
 
 ## Parity / Alignment Matrix
 

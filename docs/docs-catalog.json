@@ -488,8 +488,7 @@
           "owner_lifecycle": "retired_historical"
         }
       ],
-      "action_after_window": "refresh, archive, reclassify, or file a new same-project baseline owner before feature-lane review handoff",
-      "owner_lifecycle": "active_owner"
+      "action_after_window": "refresh, archive, reclassify, or file a new same-project baseline owner before feature-lane review handoff"
     }
   },
   "entries": [

@@ -2,8 +2,8 @@
 
 ## Assumptions
 - `docs:freshness:maintain` remains the authoritative owner-truth surface for retained docs freshness debt.
-- `CO-569` and `CO-581` are still live exact rolling-debt owners and must remain blocked until their retained cohorts expire or are resolved.
-- `CO-579` terminal-owner evidence is the current symptom that proves active owner lifecycle must be separated from PR completion.
+- `CO-569` and `CO-581` remain exact rolling-debt owner lineage and regression coverage after PR #898 cleared the immediate blockers.
+- `CO-579` terminal-owner evidence is the motivating symptom that proves active owner lifecycle must be separated from PR completion.
 - Passive Backlog owners should verify as owner bindings without counting as provider-worker WIP.
 
 ## Sequencing
@@ -26,6 +26,16 @@
 
 ## Parallelization Decision
 - `stay_serial_after_degraded_delegate_spawn`: implementation remains serial in this worktree because the same owner lifecycle resolver, maintainer report, and merge finalizer behavior must stay coherent. Delegation evidence is limited to the diagnostics child run after `delegate.spawn` returned a closed transport.
+
+## Fallback / Refactor Decision
+- Applies to fallback, compatibility, legacy, stale, cached, break-glass, or minor-seam behavior? Yes.
+- Large-refactor check: required; owner authority was split across policy metadata, Linear state, registry lifecycle, fallback expiry, and PR closeout.
+- Minor-seam decision: remove the replacement-owner seam instead of retaining another minor compatibility path.
+
+| Surface | Fallback / seam | Decision | Owner | Trigger | Introduced date | Review date | Maximum lifetime | Removal condition | Validation |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Terminal active owner replacement | Terminal same-project active owners route to `create_required`. | remove fallback | CO-582 | CO-579 terminal while still configured as owner. | 2026-05-24 | 2026-05-26 | Not retained | terminal active owner emits restoration action or blocks with impossible-restoration evidence. | focused maintainer tests and JSON output. |
+| Active owner issue as PR deliverable | Owner issue can close as `Done` when owner PR merges. | remove fallback | CO-582 | `PR #885` owner issue lifecycle made retained debt unowned. | 2026-05-24 | 2026-05-26 | Not retained | owner issue remains non-terminal/Backlog while retained cohorts resolve to it, or finalizer repairs it. | merge finalizer coverage. |
 
 ## Validation Plan
 - `node scripts/delegation-guard.mjs`
