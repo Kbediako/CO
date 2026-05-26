@@ -42,6 +42,7 @@ import {
 } from './control/providerLinearWorkflowAudit.js';
 import {
   findDeterministicProviderMutationSuppression,
+  isFollowUpDescriptionUpdateSuppressionCode,
   isFollowUpLabelResolutionSuppressionCode,
   isFollowUpParityMatrixSuppressionCode,
   isFollowUpPacketTraceabilitySuppressionCode,
@@ -883,6 +884,57 @@ async function resolveCreateFollowUpRetrySuppression(input: {
       operation: 'create-follow-up',
       error: {
         code: 'linear_follow_up_packet_traceability_retry_suppressed',
+        message: `Same-attempt retry suppressed: ${suppression.instruction}`,
+        status: 409,
+        details: {
+          follow_up_issue: suppressionEntry
+            ? {
+                id: suppressionEntry.follow_up_issue_id,
+                identifier: suppressionEntry.follow_up_issue_identifier
+              }
+            : null,
+          audit_entry: suppressionEntry
+            ? {
+                recorded_at: suppressionEntry.recorded_at,
+                action: suppressionEntry.action,
+                via: suppressionEntry.via,
+                state: suppressionEntry.state,
+                follow_up_intent_key: suppressionEntry.follow_up_intent_key ?? null,
+                error_code: suppressionEntry.error_code
+              }
+            : null
+        }
+      }
+    };
+  }
+  if (isFollowUpDescriptionUpdateSuppressionCode(suppression.error_code)) {
+    const suppressionEntry = findLatestCreateFollowUpSuppressionAuditEntry({
+      audit,
+      issueId: input.issueId,
+      recordedAtNotBefore: attemptStartedAt,
+      followUpIntentKey,
+      matchesErrorCode: isFollowUpDescriptionUpdateIncompleteCode
+    });
+    const reconciledRetry = suppressionEntry
+      ? await buildLocallyReconciledFollowUpPacketRetryResult({
+          entry: suppressionEntry,
+          title: input.title,
+          canonicalOwnerKey: input.canonicalOwnerKey,
+          blockedBySource: input.blockedBySource,
+          repoRoot: input.repoRoot,
+          sourceSetup: input.sourceSetup,
+          env: input.env,
+          dependencies: input.dependencies
+        })
+      : null;
+    if (reconciledRetry) {
+      return reconciledRetry;
+    }
+    return {
+      ok: false,
+      operation: 'create-follow-up',
+      error: {
+        code: 'linear_follow_up_description_update_retry_suppressed',
         message: `Same-attempt retry suppressed: ${suppression.instruction}`,
         status: 409,
         details: {
@@ -2215,6 +2267,10 @@ function normalizeOptionalString(value: unknown): string | null {
 
 function isFollowUpPacketTraceabilityPendingCode(errorCode: string | null | undefined): boolean {
   return normalizeOptionalString(errorCode) === 'linear_follow_up_packet_traceability_pending';
+}
+
+function isFollowUpDescriptionUpdateIncompleteCode(errorCode: string | null | undefined): boolean {
+  return normalizeOptionalString(errorCode) === 'linear_follow_up_description_update_incomplete';
 }
 
 function readUnknownInteger(value: unknown): number | null {

@@ -29358,6 +29358,62 @@
         "protected_terms": "docs:freshness:maintain; canonical_owner_issues[]; canonical_owner_key; active_owner; retired_historical; restore_existing_owner; move_to_backlog_not_done; owner_finalizer; pass_with_owned_rolling_debt; block_unowned_repo_debt; CO-581; CO-569; CO-579; CO-568; PR #885.",
         "parallelization_decision": "stay_serial_after_degraded_delegate_spawn"
       }
+    },
+    {
+      "id": "20260526-linear-0fe32de1-063e-459c-8189-859670087aac",
+      "title": "CO-527 reconcile create-follow-up partial-success retries",
+      "relates_to": "tasks/tasks-linear-0fe32de1-063e-459c-8189-859670087aac.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "status": "in_progress",
+      "last_review": "2026-05-26",
+      "canonical_owner_key": "linear:create-follow-up-partial-success-reconcile",
+      "canonical_owner_marker": "codex-orchestrator:canonical-owner-key=linear:create-follow-up-partial-success-reconcile",
+      "evidence": [
+        "docs/PRD-linear-0fe32de1-063e-459c-8189-859670087aac.md",
+        "docs/TECH_SPEC-linear-0fe32de1-063e-459c-8189-859670087aac.md",
+        "docs/ACTION_PLAN-linear-0fe32de1-063e-459c-8189-859670087aac.md",
+        "tasks/specs/linear-0fe32de1-063e-459c-8189-859670087aac.md",
+        "tasks/tasks-linear-0fe32de1-063e-459c-8189-859670087aac.md",
+        ".agent/task/linear-0fe32de1-063e-459c-8189-859670087aac.md",
+        "tasks/index.json",
+        "docs/TASKS.md",
+        "docs/docs-freshness-registry.json"
+      ],
+      "approvals": {
+        "issue_quality_review": {
+          "reviewer": "parent CO orchestrator",
+          "date": "2026-05-26",
+          "status": "approved_for_implementation",
+          "summary": "Live issue-context and current code/memory evidence confirm CO-527 owns the duplicate follow-up partial-success retry seam."
+        },
+        "delegation_degraded_mode": {
+          "reviewer": "parent CO orchestrator",
+          "date": "2026-05-26",
+          "status": "codex_cli_usage_limited",
+          "summary": "Four read-only Codex CLI subagent attempts failed on usage quota; lane records stay_serial/overlapping_scope and uses deterministic parent validation."
+        }
+      },
+      "paths": {
+        "agent_task": ".agent/task/linear-0fe32de1-063e-459c-8189-859670087aac.md",
+        "prd": "docs/PRD-linear-0fe32de1-063e-459c-8189-859670087aac.md",
+        "docs": "docs/TECH_SPEC-linear-0fe32de1-063e-459c-8189-859670087aac.md",
+        "tech_spec_mirror": "docs/TECH_SPEC-linear-0fe32de1-063e-459c-8189-859670087aac.md",
+        "action_plan": "docs/ACTION_PLAN-linear-0fe32de1-063e-459c-8189-859670087aac.md",
+        "spec": "tasks/specs/linear-0fe32de1-063e-459c-8189-859670087aac.md",
+        "task": "tasks/tasks-linear-0fe32de1-063e-459c-8189-859670087aac.md"
+      },
+      "source_issue": {
+        "id": "0fe32de1-063e-459c-8189-859670087aac",
+        "identifier": "CO-527",
+        "url": "https://linear.app/asabeko/issue/CO-527"
+      },
+      "notes": {
+        "protected_terms": "linear_follow_up_description_update_incomplete; follow_up_issue_id; create-follow-up; partial-success; same-attempt retry; relation creation; packet traceability; canonical owner evidence.",
+        "parallelization_decision": "stay_serial/overlapping_scope"
+      }
     }
   ]
 }
