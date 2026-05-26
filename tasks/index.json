@@ -18952,7 +18952,7 @@
         "spec": "tasks/specs/1293-coordinator-symphony-aligned-flow-cli-remaining-boundary-freeze-reassessment.md",
         "task": "tasks/tasks-1293-coordinator-symphony-aligned-flow-cli-remaining-boundary-freeze-reassessment.md",
         "agent_task": ".agent/task/1293-coordinator-symphony-aligned-flow-cli-remaining-boundary-freeze-reassessment.md",
-        "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-flow-cli-remaining-boundary-freeze-reassessment-revisit.md"
+        "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-flow-cli-remaining-boundary-freeze-reassessment.md"
       },
       "status": "done",
       "approvals": {
