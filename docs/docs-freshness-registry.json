@@ -3395,72 +3395,102 @@
     {
       "path": ".agent/task/1289-coordinator-symphony-aligned-start-cli-request-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-18",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-26",
+      "cadence_days": 365,
+      "task_status": "done",
+      "notes": "CO-581 2026-05-26 expired May 19 retained cohort review: task 1289 is done in tasks/specs/1289-coordinator-symphony-aligned-start-cli-request-shell-extraction.md and local packet/report checklist obligations are closed; retain this row as terminal history for baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance, not as active docs freshness debt.",
+      "retained_reason": "CO-581 2026-05-26 expired May 19 retained cohort review: task 1289 is done in tasks/specs/1289-coordinator-symphony-aligned-start-cli-request-shell-extraction.md and local packet/report checklist obligations are closed; retain this row as terminal history for baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance, not as active docs freshness debt."
     },
     {
       "path": ".agent/task/1290-coordinator-symphony-aligned-start-cli-remaining-boundary-freeze-reassessment.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-18",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-26",
+      "cadence_days": 365,
+      "task_status": "done",
+      "notes": "CO-581 2026-05-26 expired May 19 retained cohort review: task 1290 is done in tasks/specs/1290-coordinator-symphony-aligned-start-cli-remaining-boundary-freeze-reassessment.md and local packet/report checklist obligations are closed; retain this row as terminal history for baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance, not as active docs freshness debt.",
+      "retained_reason": "CO-581 2026-05-26 expired May 19 retained cohort review: task 1290 is done in tasks/specs/1290-coordinator-symphony-aligned-start-cli-remaining-boundary-freeze-reassessment.md and local packet/report checklist obligations are closed; retain this row as terminal history for baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance, not as active docs freshness debt."
     },
     {
       "path": ".agent/task/1291-coordinator-symphony-aligned-flow-cli-boundary-reassessment-revisit.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-18",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-26",
+      "cadence_days": 365,
+      "task_status": "done",
+      "notes": "CO-581 2026-05-26 expired May 19 retained cohort review: task 1291 is done in tasks/specs/1291-coordinator-symphony-aligned-flow-cli-boundary-reassessment-revisit.md and local packet/report checklist obligations are closed; retain this row as terminal history for baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance, not as active docs freshness debt.",
+      "retained_reason": "CO-581 2026-05-26 expired May 19 retained cohort review: task 1291 is done in tasks/specs/1291-coordinator-symphony-aligned-flow-cli-boundary-reassessment-revisit.md and local packet/report checklist obligations are closed; retain this row as terminal history for baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance, not as active docs freshness debt."
     },
     {
       "path": ".agent/task/1292-coordinator-symphony-aligned-flow-cli-request-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-18",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-26",
+      "cadence_days": 365,
+      "task_status": "done",
+      "notes": "CO-581 2026-05-26 expired May 19 retained cohort review: task 1292 is done in tasks/specs/1292-coordinator-symphony-aligned-flow-cli-request-shell-extraction.md and local packet/report checklist obligations are closed; retain this row as terminal history for baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance, not as active docs freshness debt.",
+      "retained_reason": "CO-581 2026-05-26 expired May 19 retained cohort review: task 1292 is done in tasks/specs/1292-coordinator-symphony-aligned-flow-cli-request-shell-extraction.md and local packet/report checklist obligations are closed; retain this row as terminal history for baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance, not as active docs freshness debt."
     },
     {
       "path": ".agent/task/1293-coordinator-symphony-aligned-flow-cli-remaining-boundary-freeze-reassessment.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-18",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-26",
+      "cadence_days": 365,
+      "task_status": "done",
+      "notes": "CO-581 2026-05-26 expired May 19 retained cohort review: task 1293 is done in tasks/specs/1293-coordinator-symphony-aligned-flow-cli-remaining-boundary-freeze-reassessment.md and local packet/report checklist obligations are closed; retain this row as terminal history for baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance, not as active docs freshness debt.",
+      "retained_reason": "CO-581 2026-05-26 expired May 19 retained cohort review: task 1293 is done in tasks/specs/1293-coordinator-symphony-aligned-flow-cli-remaining-boundary-freeze-reassessment.md and local packet/report checklist obligations are closed; retain this row as terminal history for baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance, not as active docs freshness debt."
     },
     {
       "path": ".agent/task/1294-coordinator-symphony-aligned-rlm-cli-boundary-reassessment-revisit.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-18",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-26",
+      "cadence_days": 365,
+      "task_status": "done",
+      "notes": "CO-581 2026-05-26 expired May 19 retained cohort review: task 1294 is done in tasks/specs/1294-coordinator-symphony-aligned-rlm-cli-boundary-reassessment-revisit.md and local packet/report checklist obligations are closed; retain this row as terminal history for baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance, not as active docs freshness debt.",
+      "retained_reason": "CO-581 2026-05-26 expired May 19 retained cohort review: task 1294 is done in tasks/specs/1294-coordinator-symphony-aligned-rlm-cli-boundary-reassessment-revisit.md and local packet/report checklist obligations are closed; retain this row as terminal history for baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance, not as active docs freshness debt."
     },
     {
       "path": ".agent/task/1295-coordinator-symphony-aligned-rlm-cli-request-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-18",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-26",
+      "cadence_days": 365,
+      "task_status": "done",
+      "notes": "CO-581 2026-05-26 expired May 19 retained cohort review: task 1295 is done in tasks/specs/1295-coordinator-symphony-aligned-rlm-cli-request-shell-extraction.md and local packet/report checklist obligations are closed; retain this row as terminal history for baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance, not as active docs freshness debt.",
+      "retained_reason": "CO-581 2026-05-26 expired May 19 retained cohort review: task 1295 is done in tasks/specs/1295-coordinator-symphony-aligned-rlm-cli-request-shell-extraction.md and local packet/report checklist obligations are closed; retain this row as terminal history for baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance, not as active docs freshness debt."
     },
     {
       "path": ".agent/task/1296-coordinator-symphony-aligned-rlm-cli-remaining-boundary-freeze-reassessment-revisit.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-18",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-26",
+      "cadence_days": 365,
+      "task_status": "done",
+      "notes": "CO-581 2026-05-26 expired May 19 retained cohort review: task 1296 is done in tasks/specs/1296-coordinator-symphony-aligned-rlm-cli-remaining-boundary-freeze-reassessment-revisit.md and local packet/report checklist obligations are closed; retain this row as terminal history for baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance, not as active docs freshness debt.",
+      "retained_reason": "CO-581 2026-05-26 expired May 19 retained cohort review: task 1296 is done in tasks/specs/1296-coordinator-symphony-aligned-rlm-cli-remaining-boundary-freeze-reassessment-revisit.md and local packet/report checklist obligations are closed; retain this row as terminal history for baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance, not as active docs freshness debt."
     },
     {
       "path": ".agent/task/1297-coordinator-symphony-aligned-frontend-test-cli-boundary-reassessment-revisit.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-18",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-26",
+      "cadence_days": 365,
+      "task_status": "done",
+      "notes": "CO-581 2026-05-26 expired May 19 retained cohort review: task 1297 is done in tasks/specs/1297-coordinator-symphony-aligned-frontend-test-cli-boundary-reassessment-revisit.md and local packet/report checklist obligations are closed; retain this row as terminal history for baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance, not as active docs freshness debt.",
+      "retained_reason": "CO-581 2026-05-26 expired May 19 retained cohort review: task 1297 is done in tasks/specs/1297-coordinator-symphony-aligned-frontend-test-cli-boundary-reassessment-revisit.md and local packet/report checklist obligations are closed; retain this row as terminal history for baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance, not as active docs freshness debt."
     },
     {
       "path": ".agent/task/1298-coordinator-symphony-aligned-frontend-test-cli-request-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-18",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-26",
+      "cadence_days": 365,
+      "task_status": "done",
+      "notes": "CO-581 2026-05-26 expired May 19 retained cohort review: task 1298 is done in tasks/specs/1298-coordinator-symphony-aligned-frontend-test-cli-request-shell-extraction.md and local packet/report checklist obligations are closed; retain this row as terminal history for baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance, not as active docs freshness debt.",
+      "retained_reason": "CO-581 2026-05-26 expired May 19 retained cohort review: task 1298 is done in tasks/specs/1298-coordinator-symphony-aligned-frontend-test-cli-request-shell-extraction.md and local packet/report checklist obligations are closed; retain this row as terminal history for baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance, not as active docs freshness debt."
     },
     {
       "path": ".agent/task/1299-coordinator-symphony-aligned-frontend-test-cli-remaining-boundary-freeze-reassessment.md",
@@ -4185,7 +4215,7 @@
       "path": ".agent/task/linear-2a51671e-14fa-46c8-bce4-bcfd71e66066.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-05-24",
+      "last_review": "2026-05-26",
       "cadence_days": 30,
       "source_issue": {
         "id": "2a51671e-14fa-46c8-bce4-bcfd71e66066",
@@ -4196,7 +4226,7 @@
       "lifecycle_state": "active",
       "created_at": "2026-05-24",
       "next_review": "2026-06-23",
-      "notes": "CO-581 docs-first packet for exact-key retained May 19 docs freshness cohort owner."
+      "notes": "CO-581 docs-first packet for exact-key retained May 19 docs freshness cohort owner. 2026-05-26 resume refresh: CO-581 expanded to expired May 19 retained cohort cleanup while preserving exact owner scope."
     },
     {
       "path": ".agent/task/linear-2a8f00cf-a39a-4b15-aeca-23bacd618af1.md",
@@ -8567,16 +8597,22 @@
     {
       "path": "docs/ACTION_PLAN-coordinator-symphony-aligned-flow-cli-boundary-reassessment-revisit.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-18",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-26",
+      "cadence_days": 365,
+      "task_status": "done",
+      "notes": "CO-581 2026-05-26 expired May 19 retained cohort review: task 1291 is done in tasks/specs/1291-coordinator-symphony-aligned-flow-cli-boundary-reassessment-revisit.md and local packet/report checklist obligations are closed; retain this row as terminal history for baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance, not as active docs freshness debt.",
+      "retained_reason": "CO-581 2026-05-26 expired May 19 retained cohort review: task 1291 is done in tasks/specs/1291-coordinator-symphony-aligned-flow-cli-boundary-reassessment-revisit.md and local packet/report checklist obligations are closed; retain this row as terminal history for baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance, not as active docs freshness debt."
     },
     {
       "path": "docs/ACTION_PLAN-coordinator-symphony-aligned-flow-cli-remaining-boundary-freeze-reassessment-revisit.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-18",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-26",
+      "cadence_days": 365,
+      "task_status": "done",
+      "notes": "CO-581 2026-05-26 expired May 19 retained cohort review: task 1293 is done in tasks/specs/1293-coordinator-symphony-aligned-flow-cli-remaining-boundary-freeze-reassessment.md and local packet/report checklist obligations are closed; retain this row as terminal history for baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance, not as active docs freshness debt.",
+      "retained_reason": "CO-581 2026-05-26 expired May 19 retained cohort review: task 1293 is done in tasks/specs/1293-coordinator-symphony-aligned-flow-cli-remaining-boundary-freeze-reassessment.md and local packet/report checklist obligations are closed; retain this row as terminal history for baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance, not as active docs freshness debt."
     },
     {
       "path": "docs/ACTION_PLAN-coordinator-symphony-aligned-flow-cli-remaining-boundary-freeze-reassessment.md",
@@ -8591,9 +8627,12 @@
     {
       "path": "docs/ACTION_PLAN-coordinator-symphony-aligned-flow-cli-request-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-18",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-26",
+      "cadence_days": 365,
+      "task_status": "done",
+      "notes": "CO-581 2026-05-26 expired May 19 retained cohort review: task 1292 is done in tasks/specs/1292-coordinator-symphony-aligned-flow-cli-request-shell-extraction.md and local packet/report checklist obligations are closed; retain this row as terminal history for baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance, not as active docs freshness debt.",
+      "retained_reason": "CO-581 2026-05-26 expired May 19 retained cohort review: task 1292 is done in tasks/specs/1292-coordinator-symphony-aligned-flow-cli-request-shell-extraction.md and local packet/report checklist obligations are closed; retain this row as terminal history for baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance, not as active docs freshness debt."
     },
     {
       "path": "docs/ACTION_PLAN-coordinator-symphony-aligned-flow-cli-shell-extraction.md",
@@ -8608,9 +8647,12 @@
     {
       "path": "docs/ACTION_PLAN-coordinator-symphony-aligned-frontend-test-cli-boundary-reassessment-revisit.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-18",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-26",
+      "cadence_days": 365,
+      "task_status": "done",
+      "notes": "CO-581 2026-05-26 expired May 19 retained cohort review: task 1297 is done in tasks/specs/1297-coordinator-symphony-aligned-frontend-test-cli-boundary-reassessment-revisit.md and local packet/report checklist obligations are closed; retain this row as terminal history for baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance, not as active docs freshness debt.",
+      "retained_reason": "CO-581 2026-05-26 expired May 19 retained cohort review: task 1297 is done in tasks/specs/1297-coordinator-symphony-aligned-frontend-test-cli-boundary-reassessment-revisit.md and local packet/report checklist obligations are closed; retain this row as terminal history for baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance, not as active docs freshness debt."
     },
     {
       "path": "docs/ACTION_PLAN-coordinator-symphony-aligned-frontend-test-cli-help-surface-completion.md",
@@ -8636,9 +8678,12 @@
     {
       "path": "docs/ACTION_PLAN-coordinator-symphony-aligned-frontend-test-cli-request-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-18",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-26",
+      "cadence_days": 365,
+      "task_status": "done",
+      "notes": "CO-581 2026-05-26 expired May 19 retained cohort review: task 1298 is done in tasks/specs/1298-coordinator-symphony-aligned-frontend-test-cli-request-shell-extraction.md and local packet/report checklist obligations are closed; retain this row as terminal history for baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance, not as active docs freshness debt.",
+      "retained_reason": "CO-581 2026-05-26 expired May 19 retained cohort review: task 1298 is done in tasks/specs/1298-coordinator-symphony-aligned-frontend-test-cli-request-shell-extraction.md and local packet/report checklist obligations are closed; retain this row as terminal history for baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance, not as active docs freshness debt."
     },
     {
       "path": "docs/ACTION_PLAN-coordinator-symphony-aligned-frontend-test-cli-shell-extraction.md",
@@ -9211,9 +9256,12 @@
     {
       "path": "docs/ACTION_PLAN-coordinator-symphony-aligned-rlm-cli-boundary-reassessment-revisit.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-18",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-26",
+      "cadence_days": 365,
+      "task_status": "done",
+      "notes": "CO-581 2026-05-26 expired May 19 retained cohort review: task 1294 is done in tasks/specs/1294-coordinator-symphony-aligned-rlm-cli-boundary-reassessment-revisit.md and local packet/report checklist obligations are closed; retain this row as terminal history for baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance, not as active docs freshness debt.",
+      "retained_reason": "CO-581 2026-05-26 expired May 19 retained cohort review: task 1294 is done in tasks/specs/1294-coordinator-symphony-aligned-rlm-cli-boundary-reassessment-revisit.md and local packet/report checklist obligations are closed; retain this row as terminal history for baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance, not as active docs freshness debt."
     },
     {
       "path": "docs/ACTION_PLAN-coordinator-symphony-aligned-rlm-cli-boundary-reassessment.md",
@@ -9239,9 +9287,12 @@
     {
       "path": "docs/ACTION_PLAN-coordinator-symphony-aligned-rlm-cli-remaining-boundary-freeze-reassessment-revisit.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-18",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-26",
+      "cadence_days": 365,
+      "task_status": "done",
+      "notes": "CO-581 2026-05-26 expired May 19 retained cohort review: task 1296 is done in tasks/specs/1296-coordinator-symphony-aligned-rlm-cli-remaining-boundary-freeze-reassessment-revisit.md and local packet/report checklist obligations are closed; retain this row as terminal history for baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance, not as active docs freshness debt.",
+      "retained_reason": "CO-581 2026-05-26 expired May 19 retained cohort review: task 1296 is done in tasks/specs/1296-coordinator-symphony-aligned-rlm-cli-remaining-boundary-freeze-reassessment-revisit.md and local packet/report checklist obligations are closed; retain this row as terminal history for baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance, not as active docs freshness debt."
     },
     {
       "path": "docs/ACTION_PLAN-coordinator-symphony-aligned-rlm-cli-remaining-boundary-freeze-reassessment.md",
@@ -9253,9 +9304,12 @@
     {
       "path": "docs/ACTION_PLAN-coordinator-symphony-aligned-rlm-cli-request-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-18",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-26",
+      "cadence_days": 365,
+      "task_status": "done",
+      "notes": "CO-581 2026-05-26 expired May 19 retained cohort review: task 1295 is done in tasks/specs/1295-coordinator-symphony-aligned-rlm-cli-request-shell-extraction.md and local packet/report checklist obligations are closed; retain this row as terminal history for baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance, not as active docs freshness debt.",
+      "retained_reason": "CO-581 2026-05-26 expired May 19 retained cohort review: task 1295 is done in tasks/specs/1295-coordinator-symphony-aligned-rlm-cli-request-shell-extraction.md and local packet/report checklist obligations are closed; retain this row as terminal history for baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance, not as active docs freshness debt."
     },
     {
       "path": "docs/ACTION_PLAN-coordinator-symphony-aligned-rlm-runner-codex-runtime-and-collab-lifecycle-shell-extraction.md",
@@ -9982,16 +10036,22 @@
     {
       "path": "docs/ACTION_PLAN-coordinator-symphony-aligned-start-cli-remaining-boundary-freeze-reassessment.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-18",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-26",
+      "cadence_days": 365,
+      "task_status": "done",
+      "notes": "CO-581 2026-05-26 expired May 19 retained cohort review: task 1290 is done in tasks/specs/1290-coordinator-symphony-aligned-start-cli-remaining-boundary-freeze-reassessment.md and local packet/report checklist obligations are closed; retain this row as terminal history for baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance, not as active docs freshness debt.",
+      "retained_reason": "CO-581 2026-05-26 expired May 19 retained cohort review: task 1290 is done in tasks/specs/1290-coordinator-symphony-aligned-start-cli-remaining-boundary-freeze-reassessment.md and local packet/report checklist obligations are closed; retain this row as terminal history for baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance, not as active docs freshness debt."
     },
     {
       "path": "docs/ACTION_PLAN-coordinator-symphony-aligned-start-cli-request-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-18",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-26",
+      "cadence_days": 365,
+      "task_status": "done",
+      "notes": "CO-581 2026-05-26 expired May 19 retained cohort review: task 1289 is done in tasks/specs/1289-coordinator-symphony-aligned-start-cli-request-shell-extraction.md and local packet/report checklist obligations are closed; retain this row as terminal history for baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance, not as active docs freshness debt.",
+      "retained_reason": "CO-581 2026-05-26 expired May 19 retained cohort review: task 1289 is done in tasks/specs/1289-coordinator-symphony-aligned-start-cli-request-shell-extraction.md and local packet/report checklist obligations are closed; retain this row as terminal history for baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance, not as active docs freshness debt."
     },
     {
       "path": "docs/ACTION_PLAN-coordinator-symphony-aligned-start-cli-shell-extraction.md",
@@ -10987,7 +11047,7 @@
       "path": "docs/ACTION_PLAN-linear-2a51671e-14fa-46c8-bce4-bcfd71e66066.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-05-24",
+      "last_review": "2026-05-26",
       "cadence_days": 30,
       "source_issue": {
         "id": "2a51671e-14fa-46c8-bce4-bcfd71e66066",
@@ -10998,7 +11058,7 @@
       "lifecycle_state": "active",
       "created_at": "2026-05-24",
       "next_review": "2026-06-23",
-      "notes": "CO-581 docs-first packet for exact-key retained May 19 docs freshness cohort owner."
+      "notes": "CO-581 docs-first packet for exact-key retained May 19 docs freshness cohort owner. 2026-05-26 resume refresh: CO-581 expanded to expired May 19 retained cohort cleanup while preserving exact owner scope."
     },
     {
       "path": "docs/ACTION_PLAN-linear-2a8f00cf-a39a-4b15-aeca-23bacd618af1.md",
@@ -17138,72 +17198,102 @@
     {
       "path": "docs/findings/1289-start-cli-request-shell-extraction-deliberation.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-18",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-26",
+      "cadence_days": 365,
+      "task_status": "done",
+      "notes": "CO-581 2026-05-26 expired May 19 retained cohort review: task 1289 is done in tasks/specs/1289-coordinator-symphony-aligned-start-cli-request-shell-extraction.md and local packet/report checklist obligations are closed; retain this row as terminal history for baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance, not as active docs freshness debt.",
+      "retained_reason": "CO-581 2026-05-26 expired May 19 retained cohort review: task 1289 is done in tasks/specs/1289-coordinator-symphony-aligned-start-cli-request-shell-extraction.md and local packet/report checklist obligations are closed; retain this row as terminal history for baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance, not as active docs freshness debt."
     },
     {
       "path": "docs/findings/1290-start-cli-remaining-boundary-freeze-reassessment-deliberation.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-18",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-26",
+      "cadence_days": 365,
+      "task_status": "done",
+      "notes": "CO-581 2026-05-26 expired May 19 retained cohort review: task 1290 is done in tasks/specs/1290-coordinator-symphony-aligned-start-cli-remaining-boundary-freeze-reassessment.md and local packet/report checklist obligations are closed; retain this row as terminal history for baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance, not as active docs freshness debt.",
+      "retained_reason": "CO-581 2026-05-26 expired May 19 retained cohort review: task 1290 is done in tasks/specs/1290-coordinator-symphony-aligned-start-cli-remaining-boundary-freeze-reassessment.md and local packet/report checklist obligations are closed; retain this row as terminal history for baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance, not as active docs freshness debt."
     },
     {
       "path": "docs/findings/1291-flow-cli-boundary-reassessment-revisit-deliberation.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-18",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-26",
+      "cadence_days": 365,
+      "task_status": "done",
+      "notes": "CO-581 2026-05-26 expired May 19 retained cohort review: task 1291 is done in tasks/specs/1291-coordinator-symphony-aligned-flow-cli-boundary-reassessment-revisit.md and local packet/report checklist obligations are closed; retain this row as terminal history for baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance, not as active docs freshness debt.",
+      "retained_reason": "CO-581 2026-05-26 expired May 19 retained cohort review: task 1291 is done in tasks/specs/1291-coordinator-symphony-aligned-flow-cli-boundary-reassessment-revisit.md and local packet/report checklist obligations are closed; retain this row as terminal history for baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance, not as active docs freshness debt."
     },
     {
       "path": "docs/findings/1292-flow-cli-request-shell-extraction-deliberation.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-18",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-26",
+      "cadence_days": 365,
+      "task_status": "done",
+      "notes": "CO-581 2026-05-26 expired May 19 retained cohort review: task 1292 is done in tasks/specs/1292-coordinator-symphony-aligned-flow-cli-request-shell-extraction.md and local packet/report checklist obligations are closed; retain this row as terminal history for baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance, not as active docs freshness debt.",
+      "retained_reason": "CO-581 2026-05-26 expired May 19 retained cohort review: task 1292 is done in tasks/specs/1292-coordinator-symphony-aligned-flow-cli-request-shell-extraction.md and local packet/report checklist obligations are closed; retain this row as terminal history for baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance, not as active docs freshness debt."
     },
     {
       "path": "docs/findings/1293-flow-cli-remaining-boundary-freeze-reassessment-revisit-deliberation.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-18",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-26",
+      "cadence_days": 365,
+      "task_status": "done",
+      "notes": "CO-581 2026-05-26 expired May 19 retained cohort review: task 1293 is done in tasks/specs/1293-coordinator-symphony-aligned-flow-cli-remaining-boundary-freeze-reassessment.md and local packet/report checklist obligations are closed; retain this row as terminal history for baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance, not as active docs freshness debt.",
+      "retained_reason": "CO-581 2026-05-26 expired May 19 retained cohort review: task 1293 is done in tasks/specs/1293-coordinator-symphony-aligned-flow-cli-remaining-boundary-freeze-reassessment.md and local packet/report checklist obligations are closed; retain this row as terminal history for baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance, not as active docs freshness debt."
     },
     {
       "path": "docs/findings/1294-rlm-cli-boundary-reassessment-revisit-deliberation.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-18",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-26",
+      "cadence_days": 365,
+      "task_status": "done",
+      "notes": "CO-581 2026-05-26 expired May 19 retained cohort review: task 1294 is done in tasks/specs/1294-coordinator-symphony-aligned-rlm-cli-boundary-reassessment-revisit.md and local packet/report checklist obligations are closed; retain this row as terminal history for baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance, not as active docs freshness debt.",
+      "retained_reason": "CO-581 2026-05-26 expired May 19 retained cohort review: task 1294 is done in tasks/specs/1294-coordinator-symphony-aligned-rlm-cli-boundary-reassessment-revisit.md and local packet/report checklist obligations are closed; retain this row as terminal history for baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance, not as active docs freshness debt."
     },
     {
       "path": "docs/findings/1295-rlm-cli-request-shell-extraction-deliberation.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-18",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-26",
+      "cadence_days": 365,
+      "task_status": "done",
+      "notes": "CO-581 2026-05-26 expired May 19 retained cohort review: task 1295 is done in tasks/specs/1295-coordinator-symphony-aligned-rlm-cli-request-shell-extraction.md and local packet/report checklist obligations are closed; retain this row as terminal history for baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance, not as active docs freshness debt.",
+      "retained_reason": "CO-581 2026-05-26 expired May 19 retained cohort review: task 1295 is done in tasks/specs/1295-coordinator-symphony-aligned-rlm-cli-request-shell-extraction.md and local packet/report checklist obligations are closed; retain this row as terminal history for baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance, not as active docs freshness debt."
     },
     {
       "path": "docs/findings/1296-rlm-cli-remaining-boundary-freeze-reassessment-revisit-deliberation.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-18",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-26",
+      "cadence_days": 365,
+      "task_status": "done",
+      "notes": "CO-581 2026-05-26 expired May 19 retained cohort review: task 1296 is done in tasks/specs/1296-coordinator-symphony-aligned-rlm-cli-remaining-boundary-freeze-reassessment-revisit.md and local packet/report checklist obligations are closed; retain this row as terminal history for baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance, not as active docs freshness debt.",
+      "retained_reason": "CO-581 2026-05-26 expired May 19 retained cohort review: task 1296 is done in tasks/specs/1296-coordinator-symphony-aligned-rlm-cli-remaining-boundary-freeze-reassessment-revisit.md and local packet/report checklist obligations are closed; retain this row as terminal history for baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance, not as active docs freshness debt."
     },
     {
       "path": "docs/findings/1297-frontend-test-cli-boundary-reassessment-revisit-deliberation.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-18",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-26",
+      "cadence_days": 365,
+      "task_status": "done",
+      "notes": "CO-581 2026-05-26 expired May 19 retained cohort review: task 1297 is done in tasks/specs/1297-coordinator-symphony-aligned-frontend-test-cli-boundary-reassessment-revisit.md and local packet/report checklist obligations are closed; retain this row as terminal history for baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance, not as active docs freshness debt.",
+      "retained_reason": "CO-581 2026-05-26 expired May 19 retained cohort review: task 1297 is done in tasks/specs/1297-coordinator-symphony-aligned-frontend-test-cli-boundary-reassessment-revisit.md and local packet/report checklist obligations are closed; retain this row as terminal history for baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance, not as active docs freshness debt."
     },
     {
       "path": "docs/findings/1298-frontend-test-cli-request-shell-extraction-deliberation.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-18",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-26",
+      "cadence_days": 365,
+      "task_status": "done",
+      "notes": "CO-581 2026-05-26 expired May 19 retained cohort review: task 1298 is done in tasks/specs/1298-coordinator-symphony-aligned-frontend-test-cli-request-shell-extraction.md and local packet/report checklist obligations are closed; retain this row as terminal history for baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance, not as active docs freshness debt.",
+      "retained_reason": "CO-581 2026-05-26 expired May 19 retained cohort review: task 1298 is done in tasks/specs/1298-coordinator-symphony-aligned-frontend-test-cli-request-shell-extraction.md and local packet/report checklist obligations are closed; retain this row as terminal history for baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance, not as active docs freshness debt."
     },
     {
       "path": "docs/findings/1299-frontend-test-cli-remaining-boundary-freeze-reassessment-deliberation.md",
@@ -17394,9 +17484,17 @@
     {
       "path": "docs/findings/linear-a710d9a7-5187-414d-8a8b-beab7853e446-docs-freshness-classification.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-18",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-26",
+      "cadence_days": 365,
+      "task_status": "done",
+      "notes": "CO-581 2026-05-26 expired May 19 retained cohort review: live Linear issue-context verified CO-239 is Done/completed and tasks/index.json marks its packet done; retain this classification report as terminal history for baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance, not as active docs freshness debt.",
+      "retained_reason": "CO-581 2026-05-26 expired May 19 retained cohort review: live Linear issue-context verified CO-239 is Done/completed and tasks/index.json marks its packet done; retain this classification report as terminal history for baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance, not as active docs freshness debt.",
+      "source_issue": {
+        "identifier": "CO-239",
+        "id": "a710d9a7-5187-414d-8a8b-beab7853e446",
+        "url": "https://linear.app/asabeko/issue/CO-239/co-workflow-restore-apr-18-docsfreshness-baseline-for-mar-18-stale"
+      }
     },
     {
       "path": "docs/findings/linear-c101cb88-3097-4502-bcd7-723d80da7955-docs-freshness-classification.md",
@@ -18726,16 +18824,22 @@
     {
       "path": "docs/PRD-coordinator-symphony-aligned-flow-cli-boundary-reassessment-revisit.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-18",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-26",
+      "cadence_days": 365,
+      "task_status": "done",
+      "notes": "CO-581 2026-05-26 expired May 19 retained cohort review: task 1291 is done in tasks/specs/1291-coordinator-symphony-aligned-flow-cli-boundary-reassessment-revisit.md and local packet/report checklist obligations are closed; retain this row as terminal history for baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance, not as active docs freshness debt.",
+      "retained_reason": "CO-581 2026-05-26 expired May 19 retained cohort review: task 1291 is done in tasks/specs/1291-coordinator-symphony-aligned-flow-cli-boundary-reassessment-revisit.md and local packet/report checklist obligations are closed; retain this row as terminal history for baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance, not as active docs freshness debt."
     },
     {
       "path": "docs/PRD-coordinator-symphony-aligned-flow-cli-remaining-boundary-freeze-reassessment-revisit.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-18",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-26",
+      "cadence_days": 365,
+      "task_status": "done",
+      "notes": "CO-581 2026-05-26 expired May 19 retained cohort review: task 1293 is done in tasks/specs/1293-coordinator-symphony-aligned-flow-cli-remaining-boundary-freeze-reassessment.md and local packet/report checklist obligations are closed; retain this row as terminal history for baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance, not as active docs freshness debt.",
+      "retained_reason": "CO-581 2026-05-26 expired May 19 retained cohort review: task 1293 is done in tasks/specs/1293-coordinator-symphony-aligned-flow-cli-remaining-boundary-freeze-reassessment.md and local packet/report checklist obligations are closed; retain this row as terminal history for baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance, not as active docs freshness debt."
     },
     {
       "path": "docs/PRD-coordinator-symphony-aligned-flow-cli-remaining-boundary-freeze-reassessment.md",
@@ -18750,9 +18854,12 @@
     {
       "path": "docs/PRD-coordinator-symphony-aligned-flow-cli-request-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-18",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-26",
+      "cadence_days": 365,
+      "task_status": "done",
+      "notes": "CO-581 2026-05-26 expired May 19 retained cohort review: task 1292 is done in tasks/specs/1292-coordinator-symphony-aligned-flow-cli-request-shell-extraction.md and local packet/report checklist obligations are closed; retain this row as terminal history for baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance, not as active docs freshness debt.",
+      "retained_reason": "CO-581 2026-05-26 expired May 19 retained cohort review: task 1292 is done in tasks/specs/1292-coordinator-symphony-aligned-flow-cli-request-shell-extraction.md and local packet/report checklist obligations are closed; retain this row as terminal history for baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance, not as active docs freshness debt."
     },
     {
       "path": "docs/PRD-coordinator-symphony-aligned-flow-cli-shell-extraction.md",
@@ -18767,9 +18874,12 @@
     {
       "path": "docs/PRD-coordinator-symphony-aligned-frontend-test-cli-boundary-reassessment-revisit.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-18",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-26",
+      "cadence_days": 365,
+      "task_status": "done",
+      "notes": "CO-581 2026-05-26 expired May 19 retained cohort review: task 1297 is done in tasks/specs/1297-coordinator-symphony-aligned-frontend-test-cli-boundary-reassessment-revisit.md and local packet/report checklist obligations are closed; retain this row as terminal history for baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance, not as active docs freshness debt.",
+      "retained_reason": "CO-581 2026-05-26 expired May 19 retained cohort review: task 1297 is done in tasks/specs/1297-coordinator-symphony-aligned-frontend-test-cli-boundary-reassessment-revisit.md and local packet/report checklist obligations are closed; retain this row as terminal history for baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance, not as active docs freshness debt."
     },
     {
       "path": "docs/PRD-coordinator-symphony-aligned-frontend-test-cli-help-surface-completion.md",
@@ -18795,9 +18905,12 @@
     {
       "path": "docs/PRD-coordinator-symphony-aligned-frontend-test-cli-request-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-18",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-26",
+      "cadence_days": 365,
+      "task_status": "done",
+      "notes": "CO-581 2026-05-26 expired May 19 retained cohort review: task 1298 is done in tasks/specs/1298-coordinator-symphony-aligned-frontend-test-cli-request-shell-extraction.md and local packet/report checklist obligations are closed; retain this row as terminal history for baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance, not as active docs freshness debt.",
+      "retained_reason": "CO-581 2026-05-26 expired May 19 retained cohort review: task 1298 is done in tasks/specs/1298-coordinator-symphony-aligned-frontend-test-cli-request-shell-extraction.md and local packet/report checklist obligations are closed; retain this row as terminal history for baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance, not as active docs freshness debt."
     },
     {
       "path": "docs/PRD-coordinator-symphony-aligned-frontend-test-cli-shell-extraction.md",
@@ -19393,9 +19506,12 @@
     {
       "path": "docs/PRD-coordinator-symphony-aligned-rlm-cli-boundary-reassessment-revisit.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-18",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-26",
+      "cadence_days": 365,
+      "task_status": "done",
+      "notes": "CO-581 2026-05-26 expired May 19 retained cohort review: task 1294 is done in tasks/specs/1294-coordinator-symphony-aligned-rlm-cli-boundary-reassessment-revisit.md and local packet/report checklist obligations are closed; retain this row as terminal history for baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance, not as active docs freshness debt.",
+      "retained_reason": "CO-581 2026-05-26 expired May 19 retained cohort review: task 1294 is done in tasks/specs/1294-coordinator-symphony-aligned-rlm-cli-boundary-reassessment-revisit.md and local packet/report checklist obligations are closed; retain this row as terminal history for baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance, not as active docs freshness debt."
     },
     {
       "path": "docs/PRD-coordinator-symphony-aligned-rlm-cli-boundary-reassessment.md",
@@ -19421,9 +19537,12 @@
     {
       "path": "docs/PRD-coordinator-symphony-aligned-rlm-cli-remaining-boundary-freeze-reassessment-revisit.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-18",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-26",
+      "cadence_days": 365,
+      "task_status": "done",
+      "notes": "CO-581 2026-05-26 expired May 19 retained cohort review: task 1296 is done in tasks/specs/1296-coordinator-symphony-aligned-rlm-cli-remaining-boundary-freeze-reassessment-revisit.md and local packet/report checklist obligations are closed; retain this row as terminal history for baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance, not as active docs freshness debt.",
+      "retained_reason": "CO-581 2026-05-26 expired May 19 retained cohort review: task 1296 is done in tasks/specs/1296-coordinator-symphony-aligned-rlm-cli-remaining-boundary-freeze-reassessment-revisit.md and local packet/report checklist obligations are closed; retain this row as terminal history for baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance, not as active docs freshness debt."
     },
     {
       "path": "docs/PRD-coordinator-symphony-aligned-rlm-cli-remaining-boundary-freeze-reassessment.md",
@@ -19435,9 +19554,12 @@
     {
       "path": "docs/PRD-coordinator-symphony-aligned-rlm-cli-request-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-18",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-26",
+      "cadence_days": 365,
+      "task_status": "done",
+      "notes": "CO-581 2026-05-26 expired May 19 retained cohort review: task 1295 is done in tasks/specs/1295-coordinator-symphony-aligned-rlm-cli-request-shell-extraction.md and local packet/report checklist obligations are closed; retain this row as terminal history for baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance, not as active docs freshness debt.",
+      "retained_reason": "CO-581 2026-05-26 expired May 19 retained cohort review: task 1295 is done in tasks/specs/1295-coordinator-symphony-aligned-rlm-cli-request-shell-extraction.md and local packet/report checklist obligations are closed; retain this row as terminal history for baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance, not as active docs freshness debt."
     },
     {
       "path": "docs/PRD-coordinator-symphony-aligned-rlm-runner-codex-runtime-and-collab-lifecycle-shell-extraction.md",
@@ -20164,16 +20286,22 @@
     {
       "path": "docs/PRD-coordinator-symphony-aligned-start-cli-remaining-boundary-freeze-reassessment.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-18",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-26",
+      "cadence_days": 365,
+      "task_status": "done",
+      "notes": "CO-581 2026-05-26 expired May 19 retained cohort review: task 1290 is done in tasks/specs/1290-coordinator-symphony-aligned-start-cli-remaining-boundary-freeze-reassessment.md and local packet/report checklist obligations are closed; retain this row as terminal history for baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance, not as active docs freshness debt.",
+      "retained_reason": "CO-581 2026-05-26 expired May 19 retained cohort review: task 1290 is done in tasks/specs/1290-coordinator-symphony-aligned-start-cli-remaining-boundary-freeze-reassessment.md and local packet/report checklist obligations are closed; retain this row as terminal history for baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance, not as active docs freshness debt."
     },
     {
       "path": "docs/PRD-coordinator-symphony-aligned-start-cli-request-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-18",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-26",
+      "cadence_days": 365,
+      "task_status": "done",
+      "notes": "CO-581 2026-05-26 expired May 19 retained cohort review: task 1289 is done in tasks/specs/1289-coordinator-symphony-aligned-start-cli-request-shell-extraction.md and local packet/report checklist obligations are closed; retain this row as terminal history for baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance, not as active docs freshness debt.",
+      "retained_reason": "CO-581 2026-05-26 expired May 19 retained cohort review: task 1289 is done in tasks/specs/1289-coordinator-symphony-aligned-start-cli-request-shell-extraction.md and local packet/report checklist obligations are closed; retain this row as terminal history for baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance, not as active docs freshness debt."
     },
     {
       "path": "docs/PRD-coordinator-symphony-aligned-start-cli-shell-extraction.md",
@@ -21176,7 +21304,7 @@
       "path": "docs/PRD-linear-2a51671e-14fa-46c8-bce4-bcfd71e66066.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-05-24",
+      "last_review": "2026-05-26",
       "cadence_days": 30,
       "source_issue": {
         "id": "2a51671e-14fa-46c8-bce4-bcfd71e66066",
@@ -21187,7 +21315,7 @@
       "lifecycle_state": "active",
       "created_at": "2026-05-24",
       "next_review": "2026-06-23",
-      "notes": "CO-581 docs-first packet for exact-key retained May 19 docs freshness cohort owner."
+      "notes": "CO-581 docs-first packet for exact-key retained May 19 docs freshness cohort owner. 2026-05-26 resume refresh: CO-581 expanded to expired May 19 retained cohort cleanup while preserving exact owner scope."
     },
     {
       "path": "docs/PRD-linear-2a8f00cf-a39a-4b15-aeca-23bacd618af1.md",
@@ -26000,16 +26128,22 @@
     {
       "path": "docs/TECH_SPEC-coordinator-symphony-aligned-flow-cli-boundary-reassessment-revisit.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-18",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-26",
+      "cadence_days": 365,
+      "task_status": "done",
+      "notes": "CO-581 2026-05-26 expired May 19 retained cohort review: task 1291 is done in tasks/specs/1291-coordinator-symphony-aligned-flow-cli-boundary-reassessment-revisit.md and local packet/report checklist obligations are closed; retain this row as terminal history for baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance, not as active docs freshness debt.",
+      "retained_reason": "CO-581 2026-05-26 expired May 19 retained cohort review: task 1291 is done in tasks/specs/1291-coordinator-symphony-aligned-flow-cli-boundary-reassessment-revisit.md and local packet/report checklist obligations are closed; retain this row as terminal history for baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance, not as active docs freshness debt."
     },
     {
       "path": "docs/TECH_SPEC-coordinator-symphony-aligned-flow-cli-remaining-boundary-freeze-reassessment-revisit.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-18",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-26",
+      "cadence_days": 365,
+      "task_status": "done",
+      "notes": "CO-581 2026-05-26 expired May 19 retained cohort review: task 1293 is done in tasks/specs/1293-coordinator-symphony-aligned-flow-cli-remaining-boundary-freeze-reassessment.md and local packet/report checklist obligations are closed; retain this row as terminal history for baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance, not as active docs freshness debt.",
+      "retained_reason": "CO-581 2026-05-26 expired May 19 retained cohort review: task 1293 is done in tasks/specs/1293-coordinator-symphony-aligned-flow-cli-remaining-boundary-freeze-reassessment.md and local packet/report checklist obligations are closed; retain this row as terminal history for baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance, not as active docs freshness debt."
     },
     {
       "path": "docs/TECH_SPEC-coordinator-symphony-aligned-flow-cli-remaining-boundary-freeze-reassessment.md",
@@ -26024,9 +26158,12 @@
     {
       "path": "docs/TECH_SPEC-coordinator-symphony-aligned-flow-cli-request-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-18",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-26",
+      "cadence_days": 365,
+      "task_status": "done",
+      "notes": "CO-581 2026-05-26 expired May 19 retained cohort review: task 1292 is done in tasks/specs/1292-coordinator-symphony-aligned-flow-cli-request-shell-extraction.md and local packet/report checklist obligations are closed; retain this row as terminal history for baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance, not as active docs freshness debt.",
+      "retained_reason": "CO-581 2026-05-26 expired May 19 retained cohort review: task 1292 is done in tasks/specs/1292-coordinator-symphony-aligned-flow-cli-request-shell-extraction.md and local packet/report checklist obligations are closed; retain this row as terminal history for baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance, not as active docs freshness debt."
     },
     {
       "path": "docs/TECH_SPEC-coordinator-symphony-aligned-flow-cli-shell-extraction.md",
@@ -26041,9 +26178,12 @@
     {
       "path": "docs/TECH_SPEC-coordinator-symphony-aligned-frontend-test-cli-boundary-reassessment-revisit.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-18",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-26",
+      "cadence_days": 365,
+      "task_status": "done",
+      "notes": "CO-581 2026-05-26 expired May 19 retained cohort review: task 1297 is done in tasks/specs/1297-coordinator-symphony-aligned-frontend-test-cli-boundary-reassessment-revisit.md and local packet/report checklist obligations are closed; retain this row as terminal history for baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance, not as active docs freshness debt.",
+      "retained_reason": "CO-581 2026-05-26 expired May 19 retained cohort review: task 1297 is done in tasks/specs/1297-coordinator-symphony-aligned-frontend-test-cli-boundary-reassessment-revisit.md and local packet/report checklist obligations are closed; retain this row as terminal history for baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance, not as active docs freshness debt."
     },
     {
       "path": "docs/TECH_SPEC-coordinator-symphony-aligned-frontend-test-cli-help-surface-completion.md",
@@ -26069,9 +26209,12 @@
     {
       "path": "docs/TECH_SPEC-coordinator-symphony-aligned-frontend-test-cli-request-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-18",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-26",
+      "cadence_days": 365,
+      "task_status": "done",
+      "notes": "CO-581 2026-05-26 expired May 19 retained cohort review: task 1298 is done in tasks/specs/1298-coordinator-symphony-aligned-frontend-test-cli-request-shell-extraction.md and local packet/report checklist obligations are closed; retain this row as terminal history for baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance, not as active docs freshness debt.",
+      "retained_reason": "CO-581 2026-05-26 expired May 19 retained cohort review: task 1298 is done in tasks/specs/1298-coordinator-symphony-aligned-frontend-test-cli-request-shell-extraction.md and local packet/report checklist obligations are closed; retain this row as terminal history for baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance, not as active docs freshness debt."
     },
     {
       "path": "docs/TECH_SPEC-coordinator-symphony-aligned-frontend-test-cli-shell-extraction.md",
@@ -26667,9 +26810,12 @@
     {
       "path": "docs/TECH_SPEC-coordinator-symphony-aligned-rlm-cli-boundary-reassessment-revisit.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-18",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-26",
+      "cadence_days": 365,
+      "task_status": "done",
+      "notes": "CO-581 2026-05-26 expired May 19 retained cohort review: task 1294 is done in tasks/specs/1294-coordinator-symphony-aligned-rlm-cli-boundary-reassessment-revisit.md and local packet/report checklist obligations are closed; retain this row as terminal history for baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance, not as active docs freshness debt.",
+      "retained_reason": "CO-581 2026-05-26 expired May 19 retained cohort review: task 1294 is done in tasks/specs/1294-coordinator-symphony-aligned-rlm-cli-boundary-reassessment-revisit.md and local packet/report checklist obligations are closed; retain this row as terminal history for baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance, not as active docs freshness debt."
     },
     {
       "path": "docs/TECH_SPEC-coordinator-symphony-aligned-rlm-cli-boundary-reassessment.md",
@@ -26695,9 +26841,12 @@
     {
       "path": "docs/TECH_SPEC-coordinator-symphony-aligned-rlm-cli-remaining-boundary-freeze-reassessment-revisit.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-18",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-26",
+      "cadence_days": 365,
+      "task_status": "done",
+      "notes": "CO-581 2026-05-26 expired May 19 retained cohort review: task 1296 is done in tasks/specs/1296-coordinator-symphony-aligned-rlm-cli-remaining-boundary-freeze-reassessment-revisit.md and local packet/report checklist obligations are closed; retain this row as terminal history for baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance, not as active docs freshness debt.",
+      "retained_reason": "CO-581 2026-05-26 expired May 19 retained cohort review: task 1296 is done in tasks/specs/1296-coordinator-symphony-aligned-rlm-cli-remaining-boundary-freeze-reassessment-revisit.md and local packet/report checklist obligations are closed; retain this row as terminal history for baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance, not as active docs freshness debt."
     },
     {
       "path": "docs/TECH_SPEC-coordinator-symphony-aligned-rlm-cli-remaining-boundary-freeze-reassessment.md",
@@ -26709,9 +26858,12 @@
     {
       "path": "docs/TECH_SPEC-coordinator-symphony-aligned-rlm-cli-request-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-18",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-26",
+      "cadence_days": 365,
+      "task_status": "done",
+      "notes": "CO-581 2026-05-26 expired May 19 retained cohort review: task 1295 is done in tasks/specs/1295-coordinator-symphony-aligned-rlm-cli-request-shell-extraction.md and local packet/report checklist obligations are closed; retain this row as terminal history for baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance, not as active docs freshness debt.",
+      "retained_reason": "CO-581 2026-05-26 expired May 19 retained cohort review: task 1295 is done in tasks/specs/1295-coordinator-symphony-aligned-rlm-cli-request-shell-extraction.md and local packet/report checklist obligations are closed; retain this row as terminal history for baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance, not as active docs freshness debt."
     },
     {
       "path": "docs/TECH_SPEC-coordinator-symphony-aligned-rlm-runner-codex-runtime-and-collab-lifecycle-shell-extraction.md",
@@ -27438,16 +27590,22 @@
     {
       "path": "docs/TECH_SPEC-coordinator-symphony-aligned-start-cli-remaining-boundary-freeze-reassessment.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-18",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-26",
+      "cadence_days": 365,
+      "task_status": "done",
+      "notes": "CO-581 2026-05-26 expired May 19 retained cohort review: task 1290 is done in tasks/specs/1290-coordinator-symphony-aligned-start-cli-remaining-boundary-freeze-reassessment.md and local packet/report checklist obligations are closed; retain this row as terminal history for baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance, not as active docs freshness debt.",
+      "retained_reason": "CO-581 2026-05-26 expired May 19 retained cohort review: task 1290 is done in tasks/specs/1290-coordinator-symphony-aligned-start-cli-remaining-boundary-freeze-reassessment.md and local packet/report checklist obligations are closed; retain this row as terminal history for baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance, not as active docs freshness debt."
     },
     {
       "path": "docs/TECH_SPEC-coordinator-symphony-aligned-start-cli-request-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-18",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-26",
+      "cadence_days": 365,
+      "task_status": "done",
+      "notes": "CO-581 2026-05-26 expired May 19 retained cohort review: task 1289 is done in tasks/specs/1289-coordinator-symphony-aligned-start-cli-request-shell-extraction.md and local packet/report checklist obligations are closed; retain this row as terminal history for baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance, not as active docs freshness debt.",
+      "retained_reason": "CO-581 2026-05-26 expired May 19 retained cohort review: task 1289 is done in tasks/specs/1289-coordinator-symphony-aligned-start-cli-request-shell-extraction.md and local packet/report checklist obligations are closed; retain this row as terminal history for baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance, not as active docs freshness debt."
     },
     {
       "path": "docs/TECH_SPEC-coordinator-symphony-aligned-start-cli-shell-extraction.md",
@@ -28442,7 +28600,7 @@
       "path": "docs/TECH_SPEC-linear-2a51671e-14fa-46c8-bce4-bcfd71e66066.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-05-24",
+      "last_review": "2026-05-26",
       "cadence_days": 30,
       "source_issue": {
         "id": "2a51671e-14fa-46c8-bce4-bcfd71e66066",
@@ -28453,7 +28611,7 @@
       "lifecycle_state": "active",
       "created_at": "2026-05-24",
       "next_review": "2026-06-23",
-      "notes": "CO-581 docs-first packet for exact-key retained May 19 docs freshness cohort owner."
+      "notes": "CO-581 docs-first packet for exact-key retained May 19 docs freshness cohort owner. 2026-05-26 resume refresh: CO-581 expanded to expired May 19 retained cohort cleanup while preserving exact owner scope."
     },
     {
       "path": "docs/TECH_SPEC-linear-2a8f00cf-a39a-4b15-aeca-23bacd618af1.md",
@@ -35197,72 +35355,102 @@
     {
       "path": "tasks/specs/1289-coordinator-symphony-aligned-start-cli-request-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-18",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-26",
+      "cadence_days": 365,
+      "task_status": "done",
+      "notes": "CO-581 2026-05-26 expired May 19 retained cohort review: task 1289 is done in tasks/specs/1289-coordinator-symphony-aligned-start-cli-request-shell-extraction.md and local packet/report checklist obligations are closed; retain this row as terminal history for baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance, not as active docs freshness debt.",
+      "retained_reason": "CO-581 2026-05-26 expired May 19 retained cohort review: task 1289 is done in tasks/specs/1289-coordinator-symphony-aligned-start-cli-request-shell-extraction.md and local packet/report checklist obligations are closed; retain this row as terminal history for baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance, not as active docs freshness debt."
     },
     {
       "path": "tasks/specs/1290-coordinator-symphony-aligned-start-cli-remaining-boundary-freeze-reassessment.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-18",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-26",
+      "cadence_days": 365,
+      "task_status": "done",
+      "notes": "CO-581 2026-05-26 expired May 19 retained cohort review: task 1290 is done in tasks/specs/1290-coordinator-symphony-aligned-start-cli-remaining-boundary-freeze-reassessment.md and local packet/report checklist obligations are closed; retain this row as terminal history for baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance, not as active docs freshness debt.",
+      "retained_reason": "CO-581 2026-05-26 expired May 19 retained cohort review: task 1290 is done in tasks/specs/1290-coordinator-symphony-aligned-start-cli-remaining-boundary-freeze-reassessment.md and local packet/report checklist obligations are closed; retain this row as terminal history for baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance, not as active docs freshness debt."
     },
     {
       "path": "tasks/specs/1291-coordinator-symphony-aligned-flow-cli-boundary-reassessment-revisit.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-18",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-26",
+      "cadence_days": 365,
+      "task_status": "done",
+      "notes": "CO-581 2026-05-26 expired May 19 retained cohort review: task 1291 is done in tasks/specs/1291-coordinator-symphony-aligned-flow-cli-boundary-reassessment-revisit.md and local packet/report checklist obligations are closed; retain this row as terminal history for baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance, not as active docs freshness debt.",
+      "retained_reason": "CO-581 2026-05-26 expired May 19 retained cohort review: task 1291 is done in tasks/specs/1291-coordinator-symphony-aligned-flow-cli-boundary-reassessment-revisit.md and local packet/report checklist obligations are closed; retain this row as terminal history for baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance, not as active docs freshness debt."
     },
     {
       "path": "tasks/specs/1292-coordinator-symphony-aligned-flow-cli-request-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-18",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-26",
+      "cadence_days": 365,
+      "task_status": "done",
+      "notes": "CO-581 2026-05-26 expired May 19 retained cohort review: task 1292 is done in tasks/specs/1292-coordinator-symphony-aligned-flow-cli-request-shell-extraction.md and local packet/report checklist obligations are closed; retain this row as terminal history for baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance, not as active docs freshness debt.",
+      "retained_reason": "CO-581 2026-05-26 expired May 19 retained cohort review: task 1292 is done in tasks/specs/1292-coordinator-symphony-aligned-flow-cli-request-shell-extraction.md and local packet/report checklist obligations are closed; retain this row as terminal history for baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance, not as active docs freshness debt."
     },
     {
       "path": "tasks/specs/1293-coordinator-symphony-aligned-flow-cli-remaining-boundary-freeze-reassessment.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-18",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-26",
+      "cadence_days": 365,
+      "task_status": "done",
+      "notes": "CO-581 2026-05-26 expired May 19 retained cohort review: task 1293 is done in tasks/specs/1293-coordinator-symphony-aligned-flow-cli-remaining-boundary-freeze-reassessment.md and local packet/report checklist obligations are closed; retain this row as terminal history for baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance, not as active docs freshness debt.",
+      "retained_reason": "CO-581 2026-05-26 expired May 19 retained cohort review: task 1293 is done in tasks/specs/1293-coordinator-symphony-aligned-flow-cli-remaining-boundary-freeze-reassessment.md and local packet/report checklist obligations are closed; retain this row as terminal history for baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance, not as active docs freshness debt."
     },
     {
       "path": "tasks/specs/1294-coordinator-symphony-aligned-rlm-cli-boundary-reassessment-revisit.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-18",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-26",
+      "cadence_days": 365,
+      "task_status": "done",
+      "notes": "CO-581 2026-05-26 expired May 19 retained cohort review: task 1294 is done in tasks/specs/1294-coordinator-symphony-aligned-rlm-cli-boundary-reassessment-revisit.md and local packet/report checklist obligations are closed; retain this row as terminal history for baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance, not as active docs freshness debt.",
+      "retained_reason": "CO-581 2026-05-26 expired May 19 retained cohort review: task 1294 is done in tasks/specs/1294-coordinator-symphony-aligned-rlm-cli-boundary-reassessment-revisit.md and local packet/report checklist obligations are closed; retain this row as terminal history for baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance, not as active docs freshness debt."
     },
     {
       "path": "tasks/specs/1295-coordinator-symphony-aligned-rlm-cli-request-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-18",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-26",
+      "cadence_days": 365,
+      "task_status": "done",
+      "notes": "CO-581 2026-05-26 expired May 19 retained cohort review: task 1295 is done in tasks/specs/1295-coordinator-symphony-aligned-rlm-cli-request-shell-extraction.md and local packet/report checklist obligations are closed; retain this row as terminal history for baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance, not as active docs freshness debt.",
+      "retained_reason": "CO-581 2026-05-26 expired May 19 retained cohort review: task 1295 is done in tasks/specs/1295-coordinator-symphony-aligned-rlm-cli-request-shell-extraction.md and local packet/report checklist obligations are closed; retain this row as terminal history for baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance, not as active docs freshness debt."
     },
     {
       "path": "tasks/specs/1296-coordinator-symphony-aligned-rlm-cli-remaining-boundary-freeze-reassessment-revisit.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-18",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-26",
+      "cadence_days": 365,
+      "task_status": "done",
+      "notes": "CO-581 2026-05-26 expired May 19 retained cohort review: task 1296 is done in tasks/specs/1296-coordinator-symphony-aligned-rlm-cli-remaining-boundary-freeze-reassessment-revisit.md and local packet/report checklist obligations are closed; retain this row as terminal history for baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance, not as active docs freshness debt.",
+      "retained_reason": "CO-581 2026-05-26 expired May 19 retained cohort review: task 1296 is done in tasks/specs/1296-coordinator-symphony-aligned-rlm-cli-remaining-boundary-freeze-reassessment-revisit.md and local packet/report checklist obligations are closed; retain this row as terminal history for baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance, not as active docs freshness debt."
     },
     {
       "path": "tasks/specs/1297-coordinator-symphony-aligned-frontend-test-cli-boundary-reassessment-revisit.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-18",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-26",
+      "cadence_days": 365,
+      "task_status": "done",
+      "notes": "CO-581 2026-05-26 expired May 19 retained cohort review: task 1297 is done in tasks/specs/1297-coordinator-symphony-aligned-frontend-test-cli-boundary-reassessment-revisit.md and local packet/report checklist obligations are closed; retain this row as terminal history for baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance, not as active docs freshness debt.",
+      "retained_reason": "CO-581 2026-05-26 expired May 19 retained cohort review: task 1297 is done in tasks/specs/1297-coordinator-symphony-aligned-frontend-test-cli-boundary-reassessment-revisit.md and local packet/report checklist obligations are closed; retain this row as terminal history for baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance, not as active docs freshness debt."
     },
     {
       "path": "tasks/specs/1298-coordinator-symphony-aligned-frontend-test-cli-request-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-18",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-26",
+      "cadence_days": 365,
+      "task_status": "done",
+      "notes": "CO-581 2026-05-26 expired May 19 retained cohort review: task 1298 is done in tasks/specs/1298-coordinator-symphony-aligned-frontend-test-cli-request-shell-extraction.md and local packet/report checklist obligations are closed; retain this row as terminal history for baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance, not as active docs freshness debt.",
+      "retained_reason": "CO-581 2026-05-26 expired May 19 retained cohort review: task 1298 is done in tasks/specs/1298-coordinator-symphony-aligned-frontend-test-cli-request-shell-extraction.md and local packet/report checklist obligations are closed; retain this row as terminal history for baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance, not as active docs freshness debt."
     },
     {
       "path": "tasks/specs/1299-coordinator-symphony-aligned-frontend-test-cli-remaining-boundary-freeze-reassessment.md",
@@ -35982,7 +36170,7 @@
       "path": "tasks/specs/linear-2a51671e-14fa-46c8-bce4-bcfd71e66066.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-05-24",
+      "last_review": "2026-05-26",
       "cadence_days": 30,
       "source_issue": {
         "id": "2a51671e-14fa-46c8-bce4-bcfd71e66066",
@@ -35993,7 +36181,7 @@
       "lifecycle_state": "active",
       "created_at": "2026-05-24",
       "next_review": "2026-06-23",
-      "notes": "CO-581 docs-first packet for exact-key retained May 19 docs freshness cohort owner."
+      "notes": "CO-581 docs-first packet for exact-key retained May 19 docs freshness cohort owner. 2026-05-26 resume refresh: CO-581 expanded to expired May 19 retained cohort cleanup while preserving exact owner scope."
     },
     {
       "path": "tasks/specs/linear-2a8f00cf-a39a-4b15-aeca-23bacd618af1.md",
@@ -42431,72 +42619,102 @@
     {
       "path": "tasks/tasks-1289-coordinator-symphony-aligned-start-cli-request-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-18",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-26",
+      "cadence_days": 365,
+      "task_status": "done",
+      "notes": "CO-581 2026-05-26 expired May 19 retained cohort review: task 1289 is done in tasks/specs/1289-coordinator-symphony-aligned-start-cli-request-shell-extraction.md and local packet/report checklist obligations are closed; retain this row as terminal history for baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance, not as active docs freshness debt.",
+      "retained_reason": "CO-581 2026-05-26 expired May 19 retained cohort review: task 1289 is done in tasks/specs/1289-coordinator-symphony-aligned-start-cli-request-shell-extraction.md and local packet/report checklist obligations are closed; retain this row as terminal history for baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance, not as active docs freshness debt."
     },
     {
       "path": "tasks/tasks-1290-coordinator-symphony-aligned-start-cli-remaining-boundary-freeze-reassessment.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-18",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-26",
+      "cadence_days": 365,
+      "task_status": "done",
+      "notes": "CO-581 2026-05-26 expired May 19 retained cohort review: task 1290 is done in tasks/specs/1290-coordinator-symphony-aligned-start-cli-remaining-boundary-freeze-reassessment.md and local packet/report checklist obligations are closed; retain this row as terminal history for baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance, not as active docs freshness debt.",
+      "retained_reason": "CO-581 2026-05-26 expired May 19 retained cohort review: task 1290 is done in tasks/specs/1290-coordinator-symphony-aligned-start-cli-remaining-boundary-freeze-reassessment.md and local packet/report checklist obligations are closed; retain this row as terminal history for baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance, not as active docs freshness debt."
     },
     {
       "path": "tasks/tasks-1291-coordinator-symphony-aligned-flow-cli-boundary-reassessment-revisit.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-18",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-26",
+      "cadence_days": 365,
+      "task_status": "done",
+      "notes": "CO-581 2026-05-26 expired May 19 retained cohort review: task 1291 is done in tasks/specs/1291-coordinator-symphony-aligned-flow-cli-boundary-reassessment-revisit.md and local packet/report checklist obligations are closed; retain this row as terminal history for baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance, not as active docs freshness debt.",
+      "retained_reason": "CO-581 2026-05-26 expired May 19 retained cohort review: task 1291 is done in tasks/specs/1291-coordinator-symphony-aligned-flow-cli-boundary-reassessment-revisit.md and local packet/report checklist obligations are closed; retain this row as terminal history for baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance, not as active docs freshness debt."
     },
     {
       "path": "tasks/tasks-1292-coordinator-symphony-aligned-flow-cli-request-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-18",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-26",
+      "cadence_days": 365,
+      "task_status": "done",
+      "notes": "CO-581 2026-05-26 expired May 19 retained cohort review: task 1292 is done in tasks/specs/1292-coordinator-symphony-aligned-flow-cli-request-shell-extraction.md and local packet/report checklist obligations are closed; retain this row as terminal history for baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance, not as active docs freshness debt.",
+      "retained_reason": "CO-581 2026-05-26 expired May 19 retained cohort review: task 1292 is done in tasks/specs/1292-coordinator-symphony-aligned-flow-cli-request-shell-extraction.md and local packet/report checklist obligations are closed; retain this row as terminal history for baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance, not as active docs freshness debt."
     },
     {
       "path": "tasks/tasks-1293-coordinator-symphony-aligned-flow-cli-remaining-boundary-freeze-reassessment.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-18",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-26",
+      "cadence_days": 365,
+      "task_status": "done",
+      "notes": "CO-581 2026-05-26 expired May 19 retained cohort review: task 1293 is done in tasks/specs/1293-coordinator-symphony-aligned-flow-cli-remaining-boundary-freeze-reassessment.md and local packet/report checklist obligations are closed; retain this row as terminal history for baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance, not as active docs freshness debt.",
+      "retained_reason": "CO-581 2026-05-26 expired May 19 retained cohort review: task 1293 is done in tasks/specs/1293-coordinator-symphony-aligned-flow-cli-remaining-boundary-freeze-reassessment.md and local packet/report checklist obligations are closed; retain this row as terminal history for baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance, not as active docs freshness debt."
     },
     {
       "path": "tasks/tasks-1294-coordinator-symphony-aligned-rlm-cli-boundary-reassessment-revisit.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-18",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-26",
+      "cadence_days": 365,
+      "task_status": "done",
+      "notes": "CO-581 2026-05-26 expired May 19 retained cohort review: task 1294 is done in tasks/specs/1294-coordinator-symphony-aligned-rlm-cli-boundary-reassessment-revisit.md and local packet/report checklist obligations are closed; retain this row as terminal history for baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance, not as active docs freshness debt.",
+      "retained_reason": "CO-581 2026-05-26 expired May 19 retained cohort review: task 1294 is done in tasks/specs/1294-coordinator-symphony-aligned-rlm-cli-boundary-reassessment-revisit.md and local packet/report checklist obligations are closed; retain this row as terminal history for baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance, not as active docs freshness debt."
     },
     {
       "path": "tasks/tasks-1295-coordinator-symphony-aligned-rlm-cli-request-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-18",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-26",
+      "cadence_days": 365,
+      "task_status": "done",
+      "notes": "CO-581 2026-05-26 expired May 19 retained cohort review: task 1295 is done in tasks/specs/1295-coordinator-symphony-aligned-rlm-cli-request-shell-extraction.md and local packet/report checklist obligations are closed; retain this row as terminal history for baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance, not as active docs freshness debt.",
+      "retained_reason": "CO-581 2026-05-26 expired May 19 retained cohort review: task 1295 is done in tasks/specs/1295-coordinator-symphony-aligned-rlm-cli-request-shell-extraction.md and local packet/report checklist obligations are closed; retain this row as terminal history for baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance, not as active docs freshness debt."
     },
     {
       "path": "tasks/tasks-1296-coordinator-symphony-aligned-rlm-cli-remaining-boundary-freeze-reassessment-revisit.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-18",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-26",
+      "cadence_days": 365,
+      "task_status": "done",
+      "notes": "CO-581 2026-05-26 expired May 19 retained cohort review: task 1296 is done in tasks/specs/1296-coordinator-symphony-aligned-rlm-cli-remaining-boundary-freeze-reassessment-revisit.md and local packet/report checklist obligations are closed; retain this row as terminal history for baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance, not as active docs freshness debt.",
+      "retained_reason": "CO-581 2026-05-26 expired May 19 retained cohort review: task 1296 is done in tasks/specs/1296-coordinator-symphony-aligned-rlm-cli-remaining-boundary-freeze-reassessment-revisit.md and local packet/report checklist obligations are closed; retain this row as terminal history for baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance, not as active docs freshness debt."
     },
     {
       "path": "tasks/tasks-1297-coordinator-symphony-aligned-frontend-test-cli-boundary-reassessment-revisit.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-18",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-26",
+      "cadence_days": 365,
+      "task_status": "done",
+      "notes": "CO-581 2026-05-26 expired May 19 retained cohort review: task 1297 is done in tasks/specs/1297-coordinator-symphony-aligned-frontend-test-cli-boundary-reassessment-revisit.md and local packet/report checklist obligations are closed; retain this row as terminal history for baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance, not as active docs freshness debt.",
+      "retained_reason": "CO-581 2026-05-26 expired May 19 retained cohort review: task 1297 is done in tasks/specs/1297-coordinator-symphony-aligned-frontend-test-cli-boundary-reassessment-revisit.md and local packet/report checklist obligations are closed; retain this row as terminal history for baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance, not as active docs freshness debt."
     },
     {
       "path": "tasks/tasks-1298-coordinator-symphony-aligned-frontend-test-cli-request-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-18",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-26",
+      "cadence_days": 365,
+      "task_status": "done",
+      "notes": "CO-581 2026-05-26 expired May 19 retained cohort review: task 1298 is done in tasks/specs/1298-coordinator-symphony-aligned-frontend-test-cli-request-shell-extraction.md and local packet/report checklist obligations are closed; retain this row as terminal history for baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance, not as active docs freshness debt.",
+      "retained_reason": "CO-581 2026-05-26 expired May 19 retained cohort review: task 1298 is done in tasks/specs/1298-coordinator-symphony-aligned-frontend-test-cli-request-shell-extraction.md and local packet/report checklist obligations are closed; retain this row as terminal history for baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance, not as active docs freshness debt."
     },
     {
       "path": "tasks/tasks-1299-coordinator-symphony-aligned-frontend-test-cli-remaining-boundary-freeze-reassessment.md",
@@ -43215,7 +43433,7 @@
       "path": "tasks/tasks-linear-2a51671e-14fa-46c8-bce4-bcfd71e66066.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-05-24",
+      "last_review": "2026-05-26",
       "cadence_days": 30,
       "source_issue": {
         "id": "2a51671e-14fa-46c8-bce4-bcfd71e66066",
@@ -43226,7 +43444,7 @@
       "lifecycle_state": "active",
       "created_at": "2026-05-24",
       "next_review": "2026-06-23",
-      "notes": "CO-581 docs-first packet for exact-key retained May 19 docs freshness cohort owner."
+      "notes": "CO-581 docs-first packet for exact-key retained May 19 docs freshness cohort owner. 2026-05-26 resume refresh: CO-581 expanded to expired May 19 retained cohort cleanup while preserving exact owner scope."
     },
     {
       "path": "tasks/tasks-linear-2a8f00cf-a39a-4b15-aeca-23bacd618af1.md",

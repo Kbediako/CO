@@ -20,6 +20,14 @@
 - Problem Statement: `CO-581` needs a docs-first packet and registry mirrors for the May 19 retained `docs:freshness:maintain` rolling-debt cohort keyed by `baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance`.
 - Desired Outcome: packet and registry evidence keep the canonical owner key, marker, cohort id, configured global owner evidence, live exact owner issue, source anchor, and non-goals visible before any parent-owned owner verification, implementation, validation, Linear update, PR lifecycle, or handoff.
 
+## 2026-05-26 Resume Scope
+- Current problem: after CO-581's owner-rehome PR merged and CO-582 restored active owner lifecycle semantics, the May 19 retained cohort is no longer merely owner-backed; it is expired. Current `docs:freshness:maintain` reports `policy_capacity_status.status=expired`, `expires_after=2026-05-25`, and `freshness_decision=block_spec_guard_pre_expiry` with CO-581 still the live exact owner for `baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance`.
+- Desired outcome: review the May 19 retained cohort as historical packet/report evidence, then refresh, archive, or reclassify it truthfully so expired retained debt no longer blocks freshness gates.
+- Scope boundary: do not blind-bump `last_review`, delete historical packets to pass gates, weaken `docs:freshness`, weaken `docs:freshness:maintain`, weaken `spec-guard`, or absorb CO-569 / CO-579 / new spec pre-expiry work into this issue.
+- Active worktree: `.workspaces/linear-2a51671e-14fa-46c8-bce4-bcfd71e66066-retained-refresh` on branch `linear/co-581-retained-cohort-refresh` from `origin/main`.
+- Parallelization decision: `stay_serial` / `overlapping_scope` because the May 19 cohort requires one consistent classification across packet, mirror, report, registry, and task-index surfaces; appserver/subagent review is quota-blocked until 2026-05-31 07:51.
+- Implementation result: all 71 expired May 19 cohort rows are reclassified as `retained_terminal_packet` with explicit `task_status: done`, retained-history rationale, and terminal evidence from tasks 1289-1298 plus live CO-239 Done/completed issue-context.
+
 ## User Request Translation
 - Create only the docs-first packet and registry mirror files for Linear issue `CO-581`.
 - Preserve the exact retained-cohort owner contract:
@@ -70,6 +78,8 @@
 4. Packet preserves `docs:freshness:maintain`, `canonical owner key`, `terminal-owner replacement`, `completed-lane registry residue`, `rolling-debt cohort`, `co-430-terminal-owner-replacement`, and `dry-run/no-token copyable body`.
 5. Packet rejects blind `last_review` bumps, historical packet deletion, docs/spec freshness gate weakening, fuzzy title matching, terminal owner reuse, duplicate owner creation, and unrelated provider-worker behavior.
 6. Parent-owned validation and lifecycle work stays outside this child lane.
+7. The resumed lane classifies the expired May 19 retained cohort with evidence and removes the expired retained exception by truthful refresh, archival, or reclassification.
+8. `docs:freshness:maintain -- --format json` no longer reports the May 19 CO-581 cohort as expired retained debt; any remaining blocker is separately owned and named.
 
 ## Not Done If
 - The exact canonical owner key or marker is missing.
@@ -103,6 +113,8 @@
 | Surface | Fallback / seam | Decision | Owner | Trigger | Introduced date | Review date | Maximum lifetime | Removal condition | Validation |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | `docs freshness` exact-key owner override | May 19 retained rolling cohort remains owner-backed through `canonical_owner_issues[]` instead of blind `last_review` refresh or historical packet deletion. | expire fallback | CO-581 | Terminal `CO-568` could no longer serve as live owner while the May 19 rolling cohort was still inside its freshness window. | 2026-05-18 | 2026-05-24 | 2026-05-25 | Refresh, archive, reclassify, or let the May 19 cohort expire; if live owner verification fails before expiry, reuse or create the exact canonical owner and intentionally re-home `docs/docs-catalog.json`. | `node scripts/spec-guard.mjs --dry-run`, `npm run docs:freshness`, and `npm run docs:freshness:maintain -- --format json`. |
+
+2026-05-26 resolution: the expired owner-backed fallback is removed; `docs:freshness:maintain` no longer reports `co-558-may-19-apr-18-task-report-maintenance`, and the remaining blockers are owned by CO-569 and CO-579.
 
 ## Open Questions
 - Parent lane must verify live owner truth in the authoritative workspace before any owner mutation, catalog update, or lifecycle transition.
