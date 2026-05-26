@@ -32,6 +32,14 @@ const SPEC_GUARD_FRESHNESS_CADENCE_DAYS = 30;
 const SPEC_GUARD_PRE_EXPIRY_WINDOW_DAYS = 7;
 const TERMINAL_WORKFLOW_STATE_TYPES = new Set(['completed', 'canceled', 'cancelled', 'duplicate']);
 const TERMINAL_WORKFLOW_STATES = new Set(['done', 'completed', 'canceled', 'cancelled', 'duplicate']);
+const OWNER_LIFECYCLE_ACTIVE = 'active_owner';
+const OWNER_LIFECYCLE_RETIRING = 'retiring';
+const OWNER_LIFECYCLE_RETIRED = 'retired_historical';
+const OWNER_LIFECYCLE_VALUES = new Set([
+  OWNER_LIFECYCLE_ACTIVE,
+  OWNER_LIFECYCLE_RETIRING,
+  OWNER_LIFECYCLE_RETIRED
+]);
 const INACTIVE_SPEC_STATUSES = new Set([
   'archived',
   'canceled',
@@ -142,6 +150,32 @@ function normalizeOptionalString(value) {
 
 function normalizeOptionalBoolean(value) {
   return typeof value === 'boolean' ? value : null;
+}
+
+function normalizeOwnerLifecycle(value) {
+  const normalized = normalizeOptionalString(value)?.toLowerCase() ?? null;
+  return normalized && OWNER_LIFECYCLE_VALUES.has(normalized) ? normalized : null;
+}
+
+function ownerLifecycleForConfig(config) {
+  return normalizeOwnerLifecycle(config?.owner_lifecycle ?? config?.owner_issue_lifecycle);
+}
+
+function isActiveOwnerLifecycle(config) {
+  const lifecycle = ownerLifecycleForConfig(config);
+  return lifecycle === OWNER_LIFECYCLE_ACTIVE || lifecycle === OWNER_LIFECYCLE_RETIRING;
+}
+
+function isRetiredOwnerLifecycle(config) {
+  return ownerLifecycleForConfig(config) === OWNER_LIFECYCLE_RETIRED;
+}
+
+function terminalActiveOwnerCanBeRestored(config, verification) {
+  return (
+    isActiveOwnerLifecycle(config) &&
+    normalizeOptionalString(verification?.verification_status) === 'succeeded' &&
+    normalizeOptionalBoolean(verification?.same_project) === true
+  );
 }
 
 const SPEC_GUARD_STALE_SPEC_PATTERN =
@@ -615,10 +649,12 @@ function verificationConfirmsLiveSameProject(verification) {
 
 function buildOwnerIssueActionBase(config, overrides = {}) {
   const canonicalOwnerKey = normalizeOptionalString(config?.canonical_owner_key);
+  const ownerLifecycle = ownerLifecycleForConfig(config);
   return {
     duplicate_policy: ownerActionDuplicatePolicy(config),
     policy_doc: config?.policy_doc ?? null,
     ...(canonicalOwnerKey ? { canonical_owner_key: canonicalOwnerKey } : {}),
+    ...(ownerLifecycle ? { owner_lifecycle: ownerLifecycle } : {}),
     ...overrides
   };
 }
@@ -634,7 +670,27 @@ function buildOwnerIssueAction(policy, ownerIssueVerification = null) {
       reason: 'missing_owner_issue'
     });
   }
+  if (isRetiredOwnerLifecycle(policy)) {
+    return buildOwnerIssueActionBase(policy, {
+      mode: 'create_required',
+      issue: null,
+      existing_issue: configuredIssue,
+      reason: 'configured_owner_retired_historical'
+    });
+  }
   if (verification?.usable === false && verification?.is_terminal === true) {
+    if (terminalActiveOwnerCanBeRestored(policy, verification)) {
+      return buildOwnerIssueActionBase(policy, {
+        mode: 'restore_existing_owner',
+        issue: configuredIssue,
+        existing_issue: configuredIssue,
+        reason: 'move_to_backlog_not_done',
+        issue_state: verification.state ?? null,
+        issue_state_type: verification.state_type ?? null,
+        target_state: 'Backlog',
+        target_state_type: 'backlog'
+      });
+    }
     return buildOwnerIssueActionBase(policy, {
       mode: 'create_required',
       issue: null,
@@ -708,6 +764,7 @@ function buildUnresolvedCanonicalOwnerAction(ownerConfig, verification) {
     existing_issue: normalizeOptionalString(ownerConfig?.owner_issue),
     duplicate_policy: 'one_owner_issue_per_canonical_owner_key',
     canonical_owner_key: ownerConfig?.canonical_owner_key ?? null,
+    owner_lifecycle: ownerLifecycleForConfig(ownerConfig),
     policy_doc: ownerConfig?.policy_doc ?? null,
     reason,
     verification_status: verificationStatus,
@@ -746,6 +803,7 @@ function normalizeCanonicalOwnerIssues(policy) {
         owner_issue_state: normalizeOptionalString(entry.owner_issue_state),
         owner_issue_state_type: normalizeOptionalString(entry.owner_issue_state_type),
         owner_issue_is_terminal: normalizeOptionalBoolean(entry.owner_issue_is_terminal),
+        owner_lifecycle: ownerLifecycleForConfig(entry),
         require_live_owner_verification:
           normalizeOptionalBoolean(entry.require_live_owner_verification) ??
           normalizeOptionalBoolean(policy?.require_live_owner_verification),
@@ -888,6 +946,9 @@ function describeOwnerIssuePath(ownerIssueAction) {
   }
   if (ownerIssueAction?.mode === 'update_existing' && ownerIssueAction.issue) {
     return `owner issue ${ownerIssueAction.issue}`;
+  }
+  if (ownerIssueAction?.mode === 'restore_existing_owner' && ownerIssueAction.existing_issue) {
+    return `owner issue ${ownerIssueAction.existing_issue} restored to Backlog; move_to_backlog_not_done`;
   }
   if (ownerIssueAction?.reason === 'configured_owner_terminal' && ownerIssueAction.existing_issue) {
     return `a new live same-project owner issue; configured owner ${ownerIssueAction.existing_issue} is terminal`;
@@ -1135,6 +1196,9 @@ function docsFreshnessOwnerKeyForDecision(decision, cohort = null) {
 }
 
 function routeIdForCohort(cohort) {
+  if (cohort?.owner_issue_action?.mode === 'restore_existing_owner') {
+    return 'docs-freshness-owner-restore';
+  }
   if (cohort?.owner_issue_action?.reason === 'configured_owner_terminal') {
     return 'co-430-terminal-owner-replacement';
   }
@@ -1152,6 +1216,9 @@ function routeIdForCohort(cohort) {
 
 function ownerActionModeForCohort(cohort, decision) {
   const action = cohort?.owner_issue_action ?? decision?.owner_issue_action ?? {};
+  if (action.mode === 'restore_existing_owner') {
+    return 'restore_existing_owner';
+  }
   if (action.reason === 'configured_owner_terminal') {
     return 'replace_terminal_owner';
   }
@@ -1175,15 +1242,23 @@ function ownerActionIssueForCohort(cohort, decision) {
 function buildCanonicalOwnerBody({ decision, cohort, mode, routeId }) {
   const canonicalOwnerKey = docsFreshnessOwnerKeyForDecision(decision, cohort);
   const canonicalOwnerMarker = canonicalOwnerMarkerForKey(canonicalOwnerKey);
+  const action = cohort?.owner_issue_action ?? decision?.owner_issue_action ?? {};
+  const ownerIssue = ownerActionIssueForCohort(cohort, decision);
+  const ownerIssueState = normalizeOptionalString(
+    action.issue_state ?? action.verified_terminal_state ?? action.verified_state ?? action.owner_issue_state
+  );
+  const ownerIssueStateType = normalizeOptionalString(
+    action.issue_state_type ?? action.verified_state_type ?? action.verified_stateType ?? action.owner_issue_state_type
+  );
   const configuredOwnerIssue =
-    cohort?.configured_owner_issue ?? decision?.owner_issue_action?.existing_issue ?? decision?.owner_issue ?? null;
+    action.existing_issue ?? ownerIssue ?? cohort?.configured_owner_issue ?? decision?.owner_issue ?? null;
   const samplePaths = Array.isArray(cohort?.sample_paths) ? cohort.sample_paths.slice(0, 10) : [];
   const title = `CO: docs freshness canonical owner for ${canonicalOwnerKey}`;
   const description = [
     `Canonical owner automation for \`docs:freshness:maintain\` route \`${routeId}\`.`,
     '',
     '## Intent Checksum',
-    'Protected terms: `docs:freshness:maintain`, canonical owner key, terminal-owner replacement, completed-lane registry residue, stale active-spec routing, fallback/seam metadata routing, dry-run/no-token copyable body.',
+    'Protected terms: `docs:freshness:maintain`, canonical owner key, active-owner restoration, retired-owner replacement, completed-lane registry residue, stale active-spec routing, fallback/seam metadata routing, dry-run/no-token copyable body.',
     'Reject blind `last_review` bumps, historical packet deletion, fuzzy duplicate matching, or weakening `docs:freshness` / `spec-guard`.',
     '',
     '## Non-Goals',
@@ -1194,10 +1269,11 @@ function buildCanonicalOwnerBody({ decision, cohort, mode, routeId }) {
     '',
     '## Not Done If',
     '- The exact canonical owner key can still create duplicate open owner issues.',
-    '- Terminal owners are treated as usable without replacement action.',
+    '- Terminal active owners remain in `Done` when restoration to `Backlog` is possible.',
     '- Scheduled/preflight maintenance emits only warnings with no deterministic owner action.',
     '',
     '## Acceptance Criteria',
+    '- [ ] Owner lifecycle is explicit as `active_owner`, `retiring`, or `retired_historical`.',
     '- [ ] Owner issue is stamped with the exact canonical owner marker.',
     '- [ ] Owner state is live and non-terminal before provider gates rely on it.',
     '- [ ] Future runs with the same canonical key reuse/update this owner instead of creating duplicates.',
@@ -1227,6 +1303,9 @@ function buildCanonicalOwnerBody({ decision, cohort, mode, routeId }) {
     canonical_owner_marker: canonicalOwnerMarker,
     route_id: routeId,
     cohort_id: cohort?.id ?? null,
+    owner_issue: ownerIssue,
+    owner_issue_state: ownerIssueState,
+    owner_issue_state_type: ownerIssueStateType,
     configured_owner_issue: configuredOwnerIssue,
     sample_paths: samplePaths
   };
@@ -1237,6 +1316,29 @@ function shouldEmitCreateOwnerCommand(actionMode) {
 }
 
 function buildCopyableOwnerCommand(body, sourceIssue = '<source-linear-issue-id>', actionMode = null) {
+  if (actionMode === 'restore_existing_owner') {
+    const issue = body.owner_issue ?? body.configured_owner_issue ?? sourceIssue;
+    const expectedState =
+      normalizeOptionalString(body.verified_terminal_state ?? body.verified_state ?? body.owner_issue_state) ?? 'Done';
+    const expectedStateType = normalizeOptionalString(
+      body.verified_state_type ?? body.verified_stateType ?? body.owner_issue_state_type
+    );
+    const command = [
+      'codex-orchestrator linear transition',
+      `--issue-id ${issue}`,
+      `--expected-state ${JSON.stringify(expectedState)}`
+    ];
+    if (expectedStateType !== null) {
+      command.push(`--expected-state-type ${JSON.stringify(expectedStateType)}`);
+    }
+    command.push(
+      '--state "Backlog"',
+      '--force',
+      '--force-reason "restore active docs freshness owner; move_to_backlog_not_done"',
+      '--format json'
+    );
+    return command.join(' ');
+  }
   if (!shouldEmitCreateOwnerCommand(actionMode)) {
     return null;
   }
@@ -1343,7 +1445,9 @@ function buildSpecGuardPreExpiryOwnerAction(decision) {
   const action = decision?.owner_issue_action ?? {};
   const routeId = 'co-554-spec-guard-pre-expiry';
   let mode = normalizeOptionalString(action.mode) ?? 'create_or_update_required';
-  if (action.reason === 'configured_owner_terminal') {
+  if (action.mode === 'restore_existing_owner') {
+    mode = 'restore_existing_owner';
+  } else if (action.reason === 'configured_owner_terminal') {
     mode = 'replace_terminal_owner';
   } else if (!['create_required', 'update_existing', 'update_existing_multiple'].includes(mode)) {
     mode = 'create_or_update_required';
@@ -1390,7 +1494,9 @@ function shouldOwnerActionBlock(decision, action) {
   if (!PASSING_DECISIONS.has(decision?.freshness_decision)) {
     return true;
   }
-  return ['create_required', 'create_or_update_required', 'replace_terminal_owner'].includes(action.mode);
+  return ['create_required', 'create_or_update_required', 'replace_terminal_owner', 'restore_existing_owner'].includes(
+    action.mode
+  );
 }
 
 function buildOwnerActionEvidenceResult(decision, actions, { env = process.env, dryRunLinearActions = false } = {}) {
@@ -1454,6 +1560,8 @@ function ownerFinalizerRecordsForDecision(decision) {
       return {
         owner_issue: ownerIssue,
         canonical_owner_key: docsFreshnessOwnerKeyForDecision(decision, cohort),
+        owner_lifecycle: ownerLifecycleForConfig(cohort?.owner_issue_action),
+        owner_issue_action_mode: normalizeOptionalString(cohort?.owner_issue_action?.mode),
         cohort_id: normalizeOptionalString(cohort?.id),
         sample_paths: Array.isArray(cohort?.sample_paths) ? cohort.sample_paths.slice(0, 10) : []
       };
@@ -1494,6 +1602,8 @@ function ownerFinalizerRecordPayload(record) {
   return {
     owner_issue: record.owner_issue,
     canonical_owner_key: record.canonical_owner_key,
+    owner_lifecycle: record.owner_lifecycle ?? null,
+    owner_issue_action_mode: record.owner_issue_action_mode ?? null,
     cohort_id: record.cohort_id,
     sample_paths: record.sample_paths
   };
@@ -1547,6 +1657,29 @@ function buildDocsFreshnessOwnerFinalizer(decision, ownerFinalizerVerifications 
       );
     }
     if (verification?.is_terminal) {
+      if (
+        (record.owner_lifecycle === OWNER_LIFECYCLE_ACTIVE ||
+          record.owner_lifecycle === OWNER_LIFECYCLE_RETIRING) &&
+        record.owner_issue_action_mode === 'restore_existing_owner'
+      ) {
+        return {
+          status: 'restore_existing_owner',
+          blocking_owner_issue: record.owner_issue,
+          active_owner_issue: record.owner_issue,
+          active_owner_issues: activeOwnerIssues,
+          active_owner_records: activeOwnerRecords,
+          canonical_owner_key: record.canonical_owner_key,
+          active_canonical_owner_key: record.canonical_owner_key,
+          reason: 'move_to_backlog_not_done',
+          target_state: 'Backlog',
+          target_state_type: 'backlog',
+          state: verification.state,
+          state_type: verification.state_type,
+          cohort_id: record.cohort_id,
+          sample_paths: record.sample_paths,
+          ignored_terminal_owner_issues: []
+        };
+      }
       return {
         status: 'blocked_terminal_owner',
         blocking_owner_issue: record.owner_issue,
@@ -2024,6 +2157,9 @@ function buildRecommendedAction(
     }
     return `Open or update the single owner path through ${describeOwnerIssuePath(ownerIssueAction)} with refresh/archive action evidence; do not expand rolling caps to pass an unrelated lane.`;
   }
+  if (ownerIssueAction?.mode === 'restore_existing_owner' && ownerIssueAction.existing_issue) {
+    return `Move active owner ${ownerIssueAction.existing_issue} back to Backlog with move_to_backlog_not_done; do not create another replacement owner while restoration is possible.`;
+  }
   if (ownerIssueAction?.reason === 'configured_owner_terminal' && ownerIssueAction.existing_issue) {
     return `Open a new live same-project owner issue for the historical batch; configured owner ${ownerIssueAction.existing_issue} is terminal, so do not reuse it as the live owner path.`;
   }
@@ -2132,15 +2268,15 @@ function repoGateOwnerSourceUsesPolicyOwner(ownerSource, decision, normalizedIss
 
 function repoGateOwnerCanonicalKey(ownerSource, decision) {
   return (
+    normalizeOptionalString(ownerSource?.owner_issue_action?.canonical_owner_key) ??
     normalizeOptionalString(ownerSource?.canonical_owner_key) ??
     normalizeOptionalString(ownerSource?.cohort_canonical_owner_key) ??
-    normalizeOptionalString(ownerSource?.owner_issue_action?.canonical_owner_key) ??
     normalizeOptionalString(decision?.owner_issue_action?.canonical_owner_key)
   );
 }
 
 function isRepoGateOwnerActionUsable(actionMode) {
-  return !['create_required', 'create_or_update_required', 'replace_terminal_owner'].includes(
+  return !['create_required', 'create_or_update_required', 'replace_terminal_owner', 'restore_existing_owner'].includes(
     normalizeOptionalString(actionMode) ?? ''
   );
 }
@@ -2189,6 +2325,40 @@ function resolveRepoGateOwner(decision, ownerActionEvidence) {
         verification,
         actionMode,
         ownerIssueAction: action?.owner_issue_action
+      })
+    };
+  }
+
+  const candidateActionCohorts = (Array.isArray(decision?.candidate_cohorts) ? decision.candidate_cohorts : []).filter(
+    (cohort) => !isRepoGateOwnerActionUsable(cohort?.owner_issue_action?.mode)
+  );
+  const candidateActionIssues = uniqueSorted(
+    candidateActionCohorts
+      .map((cohort) => normalizeOptionalString(ownerActionIssueForCohort(cohort, decision)))
+      .filter(Boolean)
+  );
+  if (candidateActionIssues.length === 1) {
+    const issue = candidateActionIssues[0];
+    const cohort =
+      candidateActionCohorts.find(
+        (candidate) => normalizeOptionalString(ownerActionIssueForCohort(candidate, decision)) === issue
+      ) ?? null;
+    const actionMode = cohort?.owner_issue_action?.mode ?? decision?.owner_issue_action?.mode ?? null;
+    const canonicalOwnerKey = repoGateOwnerCanonicalKey(cohort, decision);
+    const verification = resolveRepoGateOwnerVerification(decision, issue, {
+      canonicalOwnerKey,
+      ownerSource: cohort
+    });
+    return {
+      issue,
+      canonical_owner_key: canonicalOwnerKey,
+      action: actionMode,
+      owner_issue_action: cohort?.owner_issue_action ?? null,
+      verification,
+      verified: isRepoGateOwnerVerified({
+        verification,
+        actionMode,
+        ownerIssueAction: cohort?.owner_issue_action
       })
     };
   }

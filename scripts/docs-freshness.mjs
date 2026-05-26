@@ -41,6 +41,7 @@ const STATUS_VALUES = EFFECTIVE_LIFECYCLE_STATUSES;
 const OWNER_REQUIRED_STATUSES = new Set(['active', 'deprecated', TERMINAL_PENDING_ARCHIVE_STATUS]);
 const STALE_ELIGIBLE_STATUSES = new Set(['active', 'deprecated', TERMINAL_PENDING_ARCHIVE_STATUS]);
 const OWNER_PLACEHOLDERS = new Set(['tbd', 'unassigned', 'owner']);
+const OWNER_LIFECYCLE_VALUES = new Set(['active_owner', 'retiring', 'retired_historical']);
 const STRICT_PRE_EXPIRY_DOC_CLASSES = new Set([
   'front_door',
   'public_guide',
@@ -53,6 +54,11 @@ const STRICT_PRE_EXPIRY_DOC_CLASSES = new Set([
 ]);
 const PRESERVED_HISTORICAL_STUB_PATH_PATTERNS = [/^tasks\/tasks-[^/]+\.md$/, /^\.agent\/task\/[^/]+\.md$/];
 const PRESERVED_HISTORICAL_STUB_HEADING_PATTERN = /^\s*#\s+Historical stub\b/i;
+
+function normalizeOwnerLifecycle(value) {
+  const normalized = normalizeOptionalString(value)?.toLowerCase() ?? null;
+  return normalized && OWNER_LIFECYCLE_VALUES.has(normalized) ? normalized : null;
+}
 
 function showUsage() {
   console.log(`Usage: node scripts/docs-freshness.mjs [options]
@@ -371,6 +377,7 @@ function normalizeCanonicalOwnerIssues(value) {
       owner_issue_state: normalizeOptionalString(item.owner_issue_state),
       owner_issue_state_type: normalizeOptionalString(item.owner_issue_state_type),
       owner_issue_is_terminal: normalizeOptionalBoolean(item.owner_issue_is_terminal),
+      owner_lifecycle: normalizeOwnerLifecycle(item.owner_lifecycle ?? item.owner_issue_lifecycle),
       require_live_owner_verification: normalizeOptionalBoolean(item.require_live_owner_verification)
     };
   });
@@ -396,6 +403,7 @@ function normalizeRollingFreshnessPolicy(rawPolicy) {
       owner_issue_state: null,
       owner_issue_state_type: null,
       owner_issue_is_terminal: null,
+      owner_lifecycle: null,
       require_live_owner_verification: false,
       policy_doc: null,
       window_days: 0,
@@ -437,6 +445,7 @@ function normalizeRollingFreshnessPolicy(rawPolicy) {
     owner_issue_state: normalizeOptionalString(rawPolicy.owner_issue_state),
     owner_issue_state_type: normalizeOptionalString(rawPolicy.owner_issue_state_type),
     owner_issue_is_terminal: normalizeOptionalBoolean(rawPolicy.owner_issue_is_terminal),
+    owner_lifecycle: normalizeOwnerLifecycle(rawPolicy.owner_lifecycle ?? rawPolicy.owner_issue_lifecycle),
     require_live_owner_verification: normalizeOptionalBoolean(rawPolicy.require_live_owner_verification) === true,
     policy_doc: policyDoc,
     window_days: normalizeNonNegativeInteger(rawPolicy.window_days, 0),
