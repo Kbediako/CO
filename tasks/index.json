@@ -1,6 +1,94 @@
 {
   "items": [
     {
+      "id": "20260524-linear-43b226d3-abcc-42e8-a873-a1372d0ac128",
+      "title": "CO-569 preserve CO-558 May 20 retained docs freshness cohort owner",
+      "relates_to": "tasks/tasks-linear-43b226d3-abcc-42e8-a873-a1372d0ac128.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "status": "in_progress",
+      "last_review": "2026-05-26",
+      "canonical_owner_key": "baseline_cohort_id:co-558-may-20-apr-19-task-report-maintenance",
+      "canonical_owner_marker": "codex-orchestrator:canonical-owner-key=baseline_cohort_id:co-558-may-20-apr-19-task-report-maintenance",
+      "evidence": [
+        "docs/PRD-linear-43b226d3-abcc-42e8-a873-a1372d0ac128.md",
+        "docs/TECH_SPEC-linear-43b226d3-abcc-42e8-a873-a1372d0ac128.md",
+        "docs/ACTION_PLAN-linear-43b226d3-abcc-42e8-a873-a1372d0ac128.md",
+        "tasks/specs/linear-43b226d3-abcc-42e8-a873-a1372d0ac128.md",
+        "tasks/tasks-linear-43b226d3-abcc-42e8-a873-a1372d0ac128.md",
+        ".agent/task/linear-43b226d3-abcc-42e8-a873-a1372d0ac128.md",
+        "tasks/index.json",
+        "docs/TASKS.md",
+        "docs/docs-freshness-registry.json"
+      ],
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue docs child lane",
+          "date": "2026-05-24",
+          "status": "created_for_parent_import",
+          "manifest": ".runs/linear-43b226d3-abcc-42e8-a873-a1372d0ac128/cli/2026-05-24T21-35-32-567Z-ea35fdc3/manifest.json",
+          "source_anchor": "ctx:sha256:c8af3976f2797b2c26a63723a434192feb3b3b84545710ef72467d2da74a98c7#chunk:c000001",
+          "summary": "Docs-first packet preserves the CO-569 exact-key retained May 20 / Apr 19 docs freshness cohort owner contract while keeping implementation and lifecycle parent-owned."
+        },
+        "resume_2026_05_26": {
+          "reviewer": "Codex parent lane",
+          "date": "2026-05-26",
+          "status": "accepted",
+          "evidence": "out/linear-43b226d3-abcc-42e8-a873-a1372d0ac128/co569-may20-terminal-classification.json",
+          "summary": "CO-569 resumed from Blocked to In Progress to resolve the May 20 retained docs freshness cohort; exact owner key remains scoped to baseline_cohort_id:co-558-may-20-apr-19-task-report-maintenance."
+        }
+      },
+      "validation": {
+        "status": "blocked_external_owner_debt_after_co569_reclassification",
+        "passed": [
+          "docs-first packet drafted",
+          "task registry and freshness mirrors updated",
+          "jq empty tasks/index.json docs/docs-freshness-registry.json co569 classification evidence",
+          "source payload hash matched c8af3976f2797b2c26a63723a434192feb3b3b84545710ef72467d2da74a98c7",
+          "parent source manifest resolved at .runs/linear-43b226d3-abcc-42e8-a873-a1372d0ac128/cli/2026-05-24T21-35-32-567Z-ea35fdc3/manifest.json",
+          "registry contains six active CO-569 packet rows",
+          "expired May 20 cohort rows reclassified as retained_terminal_packet",
+          "tasks 1299-1302 reviewed as done with zero local open checklist obligations",
+          "CO-260 and CO-254 live Linear state verified Done/completed with merged PR evidence for row-level retained history",
+          "spec-guard dry-run passed",
+          "git diff --check passed",
+          "docs:freshness post2 emitted terminal_lifecycle_entries=0",
+          "docs:freshness:maintain post2 emitted blocking_changed_paths=[] and no active CO-569 candidate",
+          "delegation guard recorded override for delegation MCP transport closure",
+          "diff-budget passed files=11/25 lines=920/1200",
+          "explicit elegance review kept the current minimal row-level classification shape"
+        ],
+        "pending": [
+          "review and PR lifecycle blocked until external CO-581/CO-579 docs freshness debt and Codex review quota are resolved"
+        ]
+      },
+      "paths": {
+        "agent_task": ".agent/task/linear-43b226d3-abcc-42e8-a873-a1372d0ac128.md",
+        "prd": "docs/PRD-linear-43b226d3-abcc-42e8-a873-a1372d0ac128.md",
+        "docs": "docs/TECH_SPEC-linear-43b226d3-abcc-42e8-a873-a1372d0ac128.md",
+        "tech_spec_mirror": "docs/TECH_SPEC-linear-43b226d3-abcc-42e8-a873-a1372d0ac128.md",
+        "action_plan": "docs/ACTION_PLAN-linear-43b226d3-abcc-42e8-a873-a1372d0ac128.md",
+        "spec": "tasks/specs/linear-43b226d3-abcc-42e8-a873-a1372d0ac128.md",
+        "task": "tasks/tasks-linear-43b226d3-abcc-42e8-a873-a1372d0ac128.md"
+      },
+      "source_issue": {
+        "id": "43b226d3-abcc-42e8-a873-a1372d0ac128",
+        "identifier": "CO-569",
+        "url": "https://linear.app/asabeko/issue/CO-569"
+      },
+      "notes": {
+        "cohort_id": "co-558-may-20-apr-19-task-report-maintenance",
+        "configured_historical_owner_evidence": "CO-558 terminal",
+        "source_breakdown": "{\"rolling_window\":68}",
+        "protected_terms": "docs:freshness:maintain; canonical owner key; terminal-owner replacement; completed-lane registry residue; rolling-debt cohort; co-430-terminal-owner-replacement; dry-run/no-token copyable body",
+        "sample_paths": ".agent/task/1299-coordinator-symphony-aligned-frontend-test-cli-remaining-boundary-freeze-reassessment.md; .agent/task/1300-coordinator-symphony-aligned-frontend-test-cli-help-surface-completion.md; .agent/task/1301-coordinator-symphony-aligned-frontend-test-cli-remaining-boundary-freeze-reassessment-revisit.md",
+        "parent_owned": "Parent owns authoritative issue source, live owner truth, implementation, validation, Linear/workpad state, docs catalog, cohort guide, validation logic, PR lifecycle, and review handoff.",
+        "resume_2026_05_26": "CO-569 resumed from Blocked to In Progress; parent owns the May 20 retained cohort reclassification and excludes CO-581 May 19, CO-579 global owner, and spec pre-expiry work."
+      }
+    },
+    {
       "id": "20260525-linear-6c71f385-db09-470b-84cb-61013987a2a1",
       "title": "CO-576 reconcile terminal promoted-PR intake residue",
       "relates_to": "tasks/tasks-linear-6c71f385-db09-470b-84cb-61013987a2a1.md",
@@ -18625,12 +18713,22 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-19",
+      "last_review": "2026-05-26",
       "paths": {
         "spec": "tasks/specs/1302-coordinator-linear-and-telegram-provider-setup-and-smoke-testing.md",
         "task": "tasks/tasks-1302-coordinator-linear-and-telegram-provider-setup-and-smoke-testing.md",
         "agent_task": ".agent/task/1302-coordinator-linear-and-telegram-provider-setup-and-smoke-testing.md",
         "docs": "docs/TECH_SPEC-coordinator-linear-and-telegram-provider-setup-and-smoke-testing.md"
+      },
+      "status": "done",
+      "approvals": {
+        "co569_expired_may20_retained_terminal_review": {
+          "reviewer": "Codex parent lane",
+          "date": "2026-05-26",
+          "status": "accepted",
+          "evidence": "out/linear-43b226d3-abcc-42e8-a873-a1372d0ac128/co569-may20-terminal-classification.json",
+          "summary": "Task 1302 spec is done with zero local open checklist obligations; packet/report rows are retained_terminal_packet for baseline_cohort_id:co-558-may-20-apr-19-task-report-maintenance."
+        }
       }
     },
     {
@@ -18641,12 +18739,22 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-19",
+      "last_review": "2026-05-26",
       "paths": {
         "spec": "tasks/specs/1301-coordinator-symphony-aligned-frontend-test-cli-remaining-boundary-freeze-reassessment-revisit.md",
         "task": "tasks/tasks-1301-coordinator-symphony-aligned-frontend-test-cli-remaining-boundary-freeze-reassessment-revisit.md",
         "agent_task": ".agent/task/1301-coordinator-symphony-aligned-frontend-test-cli-remaining-boundary-freeze-reassessment-revisit.md",
         "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-frontend-test-cli-remaining-boundary-freeze-reassessment-revisit.md"
+      },
+      "status": "done",
+      "approvals": {
+        "co569_expired_may20_retained_terminal_review": {
+          "reviewer": "Codex parent lane",
+          "date": "2026-05-26",
+          "status": "accepted",
+          "evidence": "out/linear-43b226d3-abcc-42e8-a873-a1372d0ac128/co569-may20-terminal-classification.json",
+          "summary": "Task 1301 spec is done with zero local open checklist obligations; packet/report rows are retained_terminal_packet for baseline_cohort_id:co-558-may-20-apr-19-task-report-maintenance."
+        }
       }
     },
     {
@@ -18657,12 +18765,22 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-19",
+      "last_review": "2026-05-26",
       "paths": {
         "spec": "tasks/specs/1300-coordinator-symphony-aligned-frontend-test-cli-help-surface-completion.md",
         "task": "tasks/tasks-1300-coordinator-symphony-aligned-frontend-test-cli-help-surface-completion.md",
         "agent_task": ".agent/task/1300-coordinator-symphony-aligned-frontend-test-cli-help-surface-completion.md",
         "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-frontend-test-cli-help-surface-completion.md"
+      },
+      "status": "done",
+      "approvals": {
+        "co569_expired_may20_retained_terminal_review": {
+          "reviewer": "Codex parent lane",
+          "date": "2026-05-26",
+          "status": "accepted",
+          "evidence": "out/linear-43b226d3-abcc-42e8-a873-a1372d0ac128/co569-may20-terminal-classification.json",
+          "summary": "Task 1300 spec is done with zero local open checklist obligations; packet/report rows are retained_terminal_packet for baseline_cohort_id:co-558-may-20-apr-19-task-report-maintenance."
+        }
       }
     },
     {
@@ -18673,12 +18791,22 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-18",
+      "last_review": "2026-05-26",
       "paths": {
         "spec": "tasks/specs/1299-coordinator-symphony-aligned-frontend-test-cli-remaining-boundary-freeze-reassessment.md",
         "task": "tasks/tasks-1299-coordinator-symphony-aligned-frontend-test-cli-remaining-boundary-freeze-reassessment.md",
         "agent_task": ".agent/task/1299-coordinator-symphony-aligned-frontend-test-cli-remaining-boundary-freeze-reassessment.md",
         "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-frontend-test-cli-remaining-boundary-freeze-reassessment.md"
+      },
+      "status": "done",
+      "approvals": {
+        "co569_expired_may20_retained_terminal_review": {
+          "reviewer": "Codex parent lane",
+          "date": "2026-05-26",
+          "status": "accepted",
+          "evidence": "out/linear-43b226d3-abcc-42e8-a873-a1372d0ac128/co569-may20-terminal-classification.json",
+          "summary": "Task 1299 spec is done with zero local open checklist obligations; packet/report rows are retained_terminal_packet for baseline_cohort_id:co-558-may-20-apr-19-task-report-maintenance."
+        }
       }
     },
     {
