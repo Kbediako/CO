@@ -36,11 +36,12 @@
 9. [x] Reclassify the residual CO-300 classification finding registry row as archived.
 10. [x] Reclassify the 21 pre-expiry task specs inactive `done` from live Linear `Done/completed` issue-context evidence, with matching task-index rows updated, and full packet registry rows retained as `retained_terminal_packet` instead of active date-refreshes or false archive stubs.
 11. [x] Reclassify the 2026-05-26 pre-expiry recurrence for CO-498, CO-442, CO-460, and CO-453 from live Linear `Done/completed` evidence instead of refreshing active spec debt; CO-498 packet rows are `retained_terminal_packet`, while CO-442, CO-460, and CO-453 packet rows stay active-reviewed because local checklist obligations remain open.
-12. [x] Prevent implementation-docs archive automation from stubbing evidence-backed `retained_terminal_packet` task candidates or stray candidates by retention age or line threshold, while letting status-only nonterminal stray rows archive when otherwise eligible.
-13. [x] Create/link CO-580 for the shared lifecycle resolver and owner-finalizer refactor.
-14. [x] Run packet and docs validation.
-15. [ ] Transition CO-579 out of In Progress only after packet validation and owner verification.
-16. [x] Re-evaluate CO-555 and CO-527 admission after the global owner blocker is no longer first failure.
+12. [x] Reclassify the CO-364 report-only elegance review from live Linear `Done/completed`, merged PR #643, and zero-open-checklist evidence instead of refreshing it as active report debt.
+13. [x] Prevent implementation-docs archive automation from stubbing evidence-backed `retained_terminal_packet` task candidates or stray candidates by retention age or line threshold, while letting status-only nonterminal stray rows archive when otherwise eligible.
+14. [x] Create/link CO-580 for the shared lifecycle resolver and owner-finalizer refactor.
+15. [x] Run packet and docs validation.
+16. [ ] Transition CO-579 out of In Progress only after packet validation and owner verification.
+17. [x] Re-evaluate CO-555 and CO-527 admission after the global owner blocker is no longer first failure.
 
 ## Validation
 - Checks / tests:

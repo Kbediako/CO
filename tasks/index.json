@@ -642,7 +642,8 @@
         "docs/docs-freshness-registry.json",
         "docs/docs-catalog.json",
         ".runs/linear-5634bf98-fe59-41f5-8623-60c9ef0b2993/cli/2026-05-23T23-47-35-355Z-d6ade73d/review/telemetry.json",
-        ".runs/linear-5634bf98-fe59-41f5-8623-60c9ef0b2993/cli/2026-05-23T23-47-35-355Z-d6ade73d/review/contract.json"
+        ".runs/linear-5634bf98-fe59-41f5-8623-60c9ef0b2993/cli/2026-05-23T23-47-35-355Z-d6ade73d/review/contract.json",
+        "docs/findings/linear-7f6b0776-51b8-4f54-b330-b4e359afe829-elegance-review.md"
       ],
       "approvals": {
         "parent_issue_quality_review": {
@@ -658,6 +659,17 @@
           "telemetry": ".runs/linear-5634bf98-fe59-41f5-8623-60c9ef0b2993/cli/2026-05-23T23-47-35-355Z-d6ade73d/review/telemetry.json",
           "contract": ".runs/linear-5634bf98-fe59-41f5-8623-60c9ef0b2993/cli/2026-05-23T23-47-35-355Z-d6ade73d/review/contract.json",
           "summary": "Final enforced gpt-5.5/xhigh standalone review completed clean after the retained_terminal_packet archive evidence gate: telemetry reports status=succeeded, review_outcome=clean-success, review_verdict=clean, contract_validation.status=valid, contract_overall_verdict=clean, and finding_count=0."
+        },
+        "report_only_terminal_review_20260526": {
+          "reviewer": "CO-579 report-only terminal review",
+          "date": "2026-05-26",
+          "status": "done",
+          "evidence": [
+            "node bin/codex-orchestrator.js linear issue-context --issue-id CO-364 --format json",
+            "gh pr view 643 --repo Kbediako/CO --json state,mergedAt,mergeCommit",
+            "docs/findings/linear-7f6b0776-51b8-4f54-b330-b4e359afe829-elegance-review.md"
+          ],
+          "summary": "Live Linear issue-context verified CO-364 is Done/completed, PR #643 is merged, and the archived task-index lifecycle audit had zero unchecked items; the report-only elegance review is retained as terminal history instead of active docs freshness debt."
         }
       },
       "validation": {
@@ -689,7 +701,8 @@
           "2026-05-26 pre-expiry recurrence source issues CO-498, CO-442, CO-460, and CO-453 verified Done/completed via live Linear issue-context; task specs reclassified done, CO-498 packet rows retained_terminal_packet, and CO-442/CO-460/CO-453 packet rows kept active-reviewed because local checklist obligations remain open",
           "2026-05-26 recurrence validation: node scripts/spec-guard.mjs --dry-run reported Spec guard: OK",
           "2026-05-26 recurrence validation: docs:freshness:maintain produced block_policy_expired with invalid_entries=0, spec_guard_pre_expiry_entries=0, and blocking_changed_paths=[]; remaining blockers are separately owned stale cohorts under CO-581/CO-569/CO-579",
-          "2026-05-26 recurrence validation: docs:check, implementation-docs-archive dry-run, git diff --check, JSON parse, and diff budget passed"
+          "2026-05-26 recurrence validation: docs:check, implementation-docs-archive dry-run, git diff --check, JSON parse, and diff budget passed",
+          "2026-05-26 report-only recurrence source issue CO-364 verified Done/completed via live Linear issue-context, PR #643 verified merged, and the stale elegance report row retained_terminal_packet with task_status=done"
         ],
         "pending": [
           "PR lifecycle",
@@ -717,7 +730,8 @@
         "review_rework": "First enforced standalone review previously found P2 malformed review_notes frontmatter in a proactive pre-expiry sweep; CO-579 now handles the cohort from live Linear truth instead of active date-refreshes by reclassifying the verified Done/completed source specs inactive done and marking full packet registry rows retained_terminal_packet instead of false archive stubs. Second enforced review hit bounded-success contract failure while repeatedly inspecting spec-guard; parent fixed the real gap so spec-guard rolling cohort summaries also resolve exact baseline cohort canonical owners instead of collapsing to CO-579. Third enforced review found P2 missing report-level audit data for task-index review overrides that clear stale registry drift; CO-579 now emits task_index_review_overrides and regression coverage. Fourth enforced review found P1 implementation-docs archive could still stub retained packets and P2 duplicate CO-445 review_notes; CO-579 now skips retained_terminal_packet rows in archive automation and preserves both review_notes under one key. Fifth enforced review found P3 docs-catalog declaration drift; scripts/lib/docs-catalog.d.ts now includes retained_terminal_packet_entries. Sixth enforced review found P2 stray retained_terminal_packet archive skips trusted status without terminal lifecycle evidence; implementation-docs archive now requires task-index or registry task-status terminal evidence and archives nonterminal stray rows when otherwise eligible.",
         "admission_recheck": "Shared-root co-status after owner verification reports running=0, retrying=1, issues=1, max_allowed=3, with only CO-555 active-like in Rework on PR #834; CO-527 is Backlog with no PR and is not consuming active WIP.",
         "quota_hygiene_20260524": "Zero-model quota hygiene initially found six unowned quota-burning codex exec audit processes under /Users/kbediako/Code/CO; parent terminated the stale process groups and reran hygiene with quota_burning_count=0 and unowned_quota_burning_count=0.",
-        "pre_expiry_recurrence_20260526": "Current-main docs:freshness:maintain reported block_spec_guard_pre_expiry for CO-498, CO-442, CO-460, and CO-453; live Linear issue-context verified all four Done/completed. CO-498 rows are retained terminal packet history; CO-442, CO-460, and CO-453 stay active-reviewed until open local checklist obligations are resolved."
+        "pre_expiry_recurrence_20260526": "Current-main docs:freshness:maintain reported block_spec_guard_pre_expiry for CO-498, CO-442, CO-460, and CO-453; live Linear issue-context verified all four Done/completed. CO-498 rows are retained terminal packet history; CO-442, CO-460, and CO-453 stay active-reviewed until open local checklist obligations are resolved.",
+        "report_only_recurrence_20260526": "Live CO-364 is Done/completed and PR #643 is merged; report-only elegance review row retained as terminal history with registry task_status=done."
       }
     },
     {
@@ -8685,7 +8699,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-05-18",
+      "last_review": "2026-05-26",
       "paths": {
         "spec": "tasks/specs/linear-7f6b0776-51b8-4f54-b330-b4e359afe829.md",
         "task": "tasks/tasks-linear-7f6b0776-51b8-4f54-b330-b4e359afe829.md",
@@ -8703,6 +8717,13 @@
           "unchecked_items": 0,
           "evidence": "out/linear-b642e879-ba50-45ef-b0d9-b059afa9e932-recovery/spec-preexpiry-local-classification.json",
           "summary": "Linked task checklist has zero unchecked items; mark terminal so spec-guard and implementation-docs archive no longer treat the packet as active work."
+        },
+        "co579_report_only_terminal_review_20260526": {
+          "reviewer": "CO-579 report-only terminal review",
+          "date": "2026-05-26",
+          "status": "done",
+          "evidence": "docs/findings/linear-7f6b0776-51b8-4f54-b330-b4e359afe829-elegance-review.md",
+          "summary": "Live Linear issue-context verified CO-364 is Done/completed and GitHub PR #643 is merged; the report-only elegance review row is retained as terminal history with registry task_status=done."
         }
       }
     },

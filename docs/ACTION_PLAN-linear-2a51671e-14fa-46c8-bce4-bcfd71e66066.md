@@ -13,7 +13,7 @@
 - Scope: cohort rows and source docs for `baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance`, plus required docs-first mirrors and registry/task metadata.
 - Non-goals: CO-569 Apr 19 cohort, CO-579 global owner lifecycle, new active spec pre-expiry batch, freshness policy caps/windows, and any gate weakening.
 - Parallelization: `stay_serial` / `overlapping_scope`; classification must be consistent across packet, mirror, report, registry, and task-index surfaces, and appserver/subagent review is quota-blocked until 2026-05-31 07:51.
-- Result: classify all 71 May 19 rows as `retained_terminal_packet` after terminal task and CO-239 evidence checks; post-change maintain output must name only CO-569/CO-579 as remaining blockers.
+- Result: classify all 71 May 19 rows as `retained_terminal_packet` after terminal task and CO-239 evidence checks; the immediate post-change maintain output named CO-569/CO-579, and the later CO-579 report-only cleanup leaves only CO-569 owned rolling debt in latest maintain output.
 
 ## Issue Readiness Gate
 - Intent checksum / protected terms carried forward:

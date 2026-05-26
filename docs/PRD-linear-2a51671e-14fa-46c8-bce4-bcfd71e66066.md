@@ -114,7 +114,7 @@
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | `docs freshness` exact-key owner override | May 19 retained rolling cohort remains owner-backed through `canonical_owner_issues[]` instead of blind `last_review` refresh or historical packet deletion. | expire fallback | CO-581 | Terminal `CO-568` could no longer serve as live owner while the May 19 rolling cohort was still inside its freshness window. | 2026-05-18 | 2026-05-24 | 2026-05-25 | Refresh, archive, reclassify, or let the May 19 cohort expire; if live owner verification fails before expiry, reuse or create the exact canonical owner and intentionally re-home `docs/docs-catalog.json`. | `node scripts/spec-guard.mjs --dry-run`, `npm run docs:freshness`, and `npm run docs:freshness:maintain -- --format json`. |
 
-2026-05-26 resolution: the expired owner-backed fallback is removed; `docs:freshness:maintain` no longer reports `co-558-may-19-apr-18-task-report-maintenance`, and the remaining blockers are owned by CO-569 and CO-579.
+2026-05-26 resolution: the expired owner-backed fallback is removed; `docs:freshness:maintain` no longer reports `co-558-may-19-apr-18-task-report-maintenance`. A later CO-579 report-only cleanup retained the CO-364 elegance review as terminal history, so latest maintain output names only CO-569 owned rolling debt.
 
 ## Open Questions
 - Parent lane must verify live owner truth in the authoritative workspace before any owner mutation, catalog update, or lifecycle transition.
