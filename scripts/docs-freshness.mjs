@@ -33,6 +33,7 @@ import {
   RETAINED_TERMINAL_PACKET_STATUS,
   TERMINAL_PENDING_ARCHIVE_STATUS
 } from './lib/docs-freshness-lifecycle.js';
+import { parseArchiveStubMetadata } from './lib/archive-stub.js';
 import { resolveEnvironmentPaths } from './lib/run-manifests.js';
 
 const DEFAULT_REGISTRY_PATH = 'docs/docs-freshness-registry.json';
@@ -141,6 +142,10 @@ function getClassLabel(docClass, catalog) {
 
 function classifyPathFamily(docPath) {
   return classifyTaskPacketPathFamily(docPath);
+}
+
+function isArchivedHistoricalReference(status, docClass, docPath) {
+  return status === ARCHIVED_LIFECYCLE_STATUS && docClass === 'report_only' && classifyPathFamily(docPath) === 'docs/findings';
 }
 
 function extractTaskNumber(docPath) {
@@ -881,6 +886,15 @@ export async function runDocsFreshness(
         Array.isArray(activeTerminalSourceLifecycle.local_open_checklist_obligations) &&
         activeTerminalSourceLifecycle.local_open_checklist_obligations.length > 0
     );
+
+    if (
+      status === ARCHIVED_LIFECYCLE_STATUS &&
+      isTaskPacketLifecyclePath(entryPath) &&
+      !isArchivedHistoricalReference(status, docClass, entryPath) &&
+      !parseArchiveStubMetadata(entryPath, entryContent ?? '').isValid
+    ) {
+      issues.push('archived registry row requires a valid archive stub or retained/historical lifecycle status');
+    }
 
     if (
       (status === ARCHIVED_LIFECYCLE_STATUS || lifecycleState === ARCHIVED_LIFECYCLE_STATUS) &&

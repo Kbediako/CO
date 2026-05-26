@@ -3,6 +3,7 @@ import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { renderDocsFreshnessMarkdown, runDocsFreshness } from '../scripts/docs-freshness.mjs';
+import { buildArchiveStubContent } from '../scripts/lib/archive-stub.js';
 import {
   extractOpenChecklistItems,
   readTaskPacketLifecycleContentMap
@@ -97,6 +98,17 @@ function rollingFreshnessPolicy(overrides: Record<string, unknown> = {}) {
     ],
     ...overrides
   };
+}
+
+function archiveStubFor(relativePath: string, headerLine = '# Archived Fixture') {
+  const archiveBranch = 'doc-archives';
+  return buildArchiveStubContent({
+    headerLine,
+    archiveUrl: `https://github.com/example/repo/blob/${archiveBranch}/${relativePath}`,
+    archivedAt: reviewDateDaysAgo(1),
+    archiveBranch,
+    relativePath
+  });
 }
 
 async function writeRollingDocsFixture(
@@ -2054,7 +2066,7 @@ describe('docs freshness reporting', () => {
       mkdir(join(repoRoot, 'tasks', 'specs'), { recursive: true })
     ]);
     for (const packetPath of packetPaths) {
-      await writeFile(join(repoRoot, packetPath), '# Archived historical packet\n', 'utf8');
+      await writeFile(join(repoRoot, packetPath), archiveStubFor(packetPath, '# Archived Historical Packet'), 'utf8');
     }
     await writeFile(
       join(repoRoot, 'tasks', 'index.json'),
@@ -2136,7 +2148,7 @@ describe('docs freshness reporting', () => {
       mkdir(join(repoRoot, 'tasks', 'specs'), { recursive: true })
     ]);
     for (const packetPath of packetPaths) {
-      await writeFile(join(repoRoot, packetPath), '# Archived Terminal Packet\n', 'utf8');
+      await writeFile(join(repoRoot, packetPath), archiveStubFor(packetPath, '# Archived Terminal Packet'), 'utf8');
     }
     await writeFile(
       join(repoRoot, 'tasks', 'index.json'),
@@ -2241,7 +2253,10 @@ describe('docs freshness reporting', () => {
     expect(report.invalid_entries).toEqual([
       {
         path: packetPath,
-        issues: ['archived task packet cannot contain open checklist obligations']
+        issues: expect.arrayContaining([
+          'archived registry row requires a valid archive stub or retained/historical lifecycle status',
+          'archived task packet cannot contain open checklist obligations'
+        ])
       }
     ]);
   });
@@ -2280,9 +2295,85 @@ describe('docs freshness reporting', () => {
     expect(report.invalid_entries).toEqual([
       {
         path: packetPath,
-        issues: ['archived registry status cannot declare active lifecycle_state']
+        issues: expect.arrayContaining([
+          'archived registry status cannot declare active lifecycle_state',
+          'archived registry row requires a valid archive stub or retained/historical lifecycle status'
+        ])
       }
     ]);
+  });
+
+  it('rejects archived registry rows that point at full docs without archive-stub proof', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docs-freshness-archived-full-doc-'));
+    createdDirs.push(repoRoot);
+    const packetPath = 'docs/TECH_SPEC-linear-full-doc-archive.md';
+
+    await mkdir(join(repoRoot, 'docs'), { recursive: true });
+    await writeFile(
+      join(repoRoot, packetPath),
+      '# Full implementation spec retained on disk\n\nThis is the original full document, not an archive stub.\n',
+      'utf8'
+    );
+    await writeDocsFreshnessFixture(repoRoot, {
+      registryEntries: [
+        {
+          path: packetPath,
+          owner: 'Codex',
+          status: 'archived',
+          last_review: reviewDateDaysAgo(31),
+          cadence_days: 365
+        }
+      ],
+      catalogPatterns: [{ glob: 'docs/*.md', doc_class: 'task_packet' }]
+    });
+
+    const { report, hasFailures } = await runDocsFreshness(repoRoot, {
+      outRoot: join(repoRoot, 'out'),
+      taskId: 'fixture'
+    });
+
+    expect(hasFailures).toBe(true);
+    expect(report.totals.invalid_entries).toBe(1);
+    expect(report.invalid_entries).toEqual([
+      {
+        path: packetPath,
+        issues: ['archived registry row requires a valid archive stub or retained/historical lifecycle status']
+      }
+    ]);
+  });
+
+  it('keeps archived report-only historical reference pages out of archive-stub debt', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docs-freshness-archived-historical-reference-'));
+    createdDirs.push(repoRoot);
+    const reportPath = 'docs/findings/1234-archive-reference.md';
+
+    await mkdir(join(repoRoot, 'docs', 'findings'), { recursive: true });
+    await writeFile(
+      join(repoRoot, reportPath),
+      '# Historical Finding\n\nThis retained report is historical reference material, not an implementation-doc archive stub.\n',
+      'utf8'
+    );
+    await writeDocsFreshnessFixture(repoRoot, {
+      registryEntries: [
+        {
+          path: reportPath,
+          owner: 'Codex',
+          status: 'archived',
+          last_review: reviewDateDaysAgo(31),
+          cadence_days: 365
+        }
+      ],
+      catalogPatterns: [{ glob: 'docs/findings/*.md', doc_class: 'report_only' }]
+    });
+
+    const { report, hasFailures } = await runDocsFreshness(repoRoot, {
+      outRoot: join(repoRoot, 'out'),
+      taskId: 'fixture'
+    });
+
+    expect(hasFailures).toBe(false);
+    expect(report.totals.invalid_entries).toBe(0);
+    expect(report.totals.stale_entries).toBe(0);
   });
 
   it('rejects archived task packets when linked packet paths still contain open checklist obligations', async () => {
@@ -2296,7 +2387,7 @@ describe('docs freshness reporting', () => {
       mkdir(join(repoRoot, 'docs'), { recursive: true }),
       mkdir(join(repoRoot, 'tasks'), { recursive: true })
     ]);
-    await writeFile(join(repoRoot, prdPath), '# Archived sibling packet\n', 'utf8');
+    await writeFile(join(repoRoot, prdPath), '# Archived sibling packet retained as a full doc\n', 'utf8');
     await writeFile(
       join(repoRoot, taskPath),
       [
@@ -2368,7 +2459,10 @@ describe('docs freshness reporting', () => {
     expect(report.invalid_entries).toEqual([
       {
         path: prdPath,
-        issues: ['archived task packet cannot contain open checklist obligations']
+        issues: expect.arrayContaining([
+          'archived registry row requires a valid archive stub or retained/historical lifecycle status',
+          'archived task packet cannot contain open checklist obligations'
+        ])
       }
     ]);
   });
@@ -2379,7 +2473,7 @@ describe('docs freshness reporting', () => {
     const packetPath = 'tasks/tasks-1234-closed.md';
 
     await mkdir(join(repoRoot, 'tasks'), { recursive: true });
-    await writeFile(join(repoRoot, packetPath), '# Closed Packet\n', 'utf8');
+    await writeFile(join(repoRoot, packetPath), archiveStubFor(packetPath, '# Closed Packet'), 'utf8');
     await writeDocsFreshnessFixture(repoRoot, {
       registryEntries: [
         {
@@ -2507,7 +2601,7 @@ describe('docs freshness reporting', () => {
     const packetPath = 'tasks/tasks-1234-nonterminal.md';
 
     await mkdir(join(repoRoot, 'tasks'), { recursive: true });
-    await writeFile(join(repoRoot, packetPath), '# Nonterminal Packet\n', 'utf8');
+    await writeFile(join(repoRoot, packetPath), archiveStubFor(packetPath, '# Nonterminal Packet'), 'utf8');
     await writeDocsFreshnessFixture(repoRoot, {
       registryEntries: [
         {
