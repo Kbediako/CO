@@ -1,6 +1,94 @@
 {
   "items": [
     {
+      "id": "20260524-linear-43b226d3-abcc-42e8-a873-a1372d0ac128",
+      "title": "CO-569 preserve CO-558 May 20 retained docs freshness cohort owner",
+      "relates_to": "tasks/tasks-linear-43b226d3-abcc-42e8-a873-a1372d0ac128.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "status": "in_progress",
+      "last_review": "2026-05-26",
+      "canonical_owner_key": "baseline_cohort_id:co-558-may-20-apr-19-task-report-maintenance",
+      "canonical_owner_marker": "codex-orchestrator:canonical-owner-key=baseline_cohort_id:co-558-may-20-apr-19-task-report-maintenance",
+      "evidence": [
+        "docs/PRD-linear-43b226d3-abcc-42e8-a873-a1372d0ac128.md",
+        "docs/TECH_SPEC-linear-43b226d3-abcc-42e8-a873-a1372d0ac128.md",
+        "docs/ACTION_PLAN-linear-43b226d3-abcc-42e8-a873-a1372d0ac128.md",
+        "tasks/specs/linear-43b226d3-abcc-42e8-a873-a1372d0ac128.md",
+        "tasks/tasks-linear-43b226d3-abcc-42e8-a873-a1372d0ac128.md",
+        ".agent/task/linear-43b226d3-abcc-42e8-a873-a1372d0ac128.md",
+        "tasks/index.json",
+        "docs/TASKS.md",
+        "docs/docs-freshness-registry.json"
+      ],
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue docs child lane",
+          "date": "2026-05-24",
+          "status": "created_for_parent_import",
+          "manifest": ".runs/linear-43b226d3-abcc-42e8-a873-a1372d0ac128/cli/2026-05-24T21-35-32-567Z-ea35fdc3/manifest.json",
+          "source_anchor": "ctx:sha256:c8af3976f2797b2c26a63723a434192feb3b3b84545710ef72467d2da74a98c7#chunk:c000001",
+          "summary": "Docs-first packet preserves the CO-569 exact-key retained May 20 / Apr 19 docs freshness cohort owner contract while keeping implementation and lifecycle parent-owned."
+        },
+        "resume_2026_05_26": {
+          "reviewer": "Codex parent lane",
+          "date": "2026-05-26",
+          "status": "accepted",
+          "evidence": "out/linear-43b226d3-abcc-42e8-a873-a1372d0ac128/co569-may20-terminal-classification.json",
+          "summary": "CO-569 resumed from Blocked to In Progress to resolve the May 20 retained docs freshness cohort; exact owner key remains scoped to baseline_cohort_id:co-558-may-20-apr-19-task-report-maintenance."
+        }
+      },
+      "validation": {
+        "status": "blocked_external_owner_debt_after_co569_reclassification",
+        "passed": [
+          "docs-first packet drafted",
+          "task registry and freshness mirrors updated",
+          "jq empty tasks/index.json docs/docs-freshness-registry.json co569 classification evidence",
+          "source payload hash matched c8af3976f2797b2c26a63723a434192feb3b3b84545710ef72467d2da74a98c7",
+          "parent source manifest resolved at .runs/linear-43b226d3-abcc-42e8-a873-a1372d0ac128/cli/2026-05-24T21-35-32-567Z-ea35fdc3/manifest.json",
+          "registry contains six active CO-569 packet rows",
+          "expired May 20 cohort rows reclassified as retained_terminal_packet",
+          "tasks 1299-1302 reviewed as done with zero local open checklist obligations",
+          "CO-260 and CO-254 live Linear state verified Done/completed with merged PR evidence for row-level retained history",
+          "spec-guard dry-run passed",
+          "git diff --check passed",
+          "docs:freshness post2 emitted terminal_lifecycle_entries=0",
+          "docs:freshness:maintain post2 emitted blocking_changed_paths=[] and no active CO-569 candidate",
+          "delegation guard recorded override for delegation MCP transport closure",
+          "diff-budget passed files=11/25 lines=920/1200",
+          "explicit elegance review kept the current minimal row-level classification shape"
+        ],
+        "pending": [
+          "review and PR lifecycle blocked until external CO-581/CO-579 docs freshness debt and Codex review quota are resolved"
+        ]
+      },
+      "paths": {
+        "agent_task": ".agent/task/linear-43b226d3-abcc-42e8-a873-a1372d0ac128.md",
+        "prd": "docs/PRD-linear-43b226d3-abcc-42e8-a873-a1372d0ac128.md",
+        "docs": "docs/TECH_SPEC-linear-43b226d3-abcc-42e8-a873-a1372d0ac128.md",
+        "tech_spec_mirror": "docs/TECH_SPEC-linear-43b226d3-abcc-42e8-a873-a1372d0ac128.md",
+        "action_plan": "docs/ACTION_PLAN-linear-43b226d3-abcc-42e8-a873-a1372d0ac128.md",
+        "spec": "tasks/specs/linear-43b226d3-abcc-42e8-a873-a1372d0ac128.md",
+        "task": "tasks/tasks-linear-43b226d3-abcc-42e8-a873-a1372d0ac128.md"
+      },
+      "source_issue": {
+        "id": "43b226d3-abcc-42e8-a873-a1372d0ac128",
+        "identifier": "CO-569",
+        "url": "https://linear.app/asabeko/issue/CO-569"
+      },
+      "notes": {
+        "cohort_id": "co-558-may-20-apr-19-task-report-maintenance",
+        "configured_historical_owner_evidence": "CO-558 terminal",
+        "source_breakdown": "{\"rolling_window\":68}",
+        "protected_terms": "docs:freshness:maintain; canonical owner key; terminal-owner replacement; completed-lane registry residue; rolling-debt cohort; co-430-terminal-owner-replacement; dry-run/no-token copyable body",
+        "sample_paths": ".agent/task/1299-coordinator-symphony-aligned-frontend-test-cli-remaining-boundary-freeze-reassessment.md; .agent/task/1300-coordinator-symphony-aligned-frontend-test-cli-help-surface-completion.md; .agent/task/1301-coordinator-symphony-aligned-frontend-test-cli-remaining-boundary-freeze-reassessment-revisit.md",
+        "parent_owned": "Parent owns authoritative issue source, live owner truth, implementation, validation, Linear/workpad state, docs catalog, cohort guide, validation logic, PR lifecycle, and review handoff.",
+        "resume_2026_05_26": "CO-569 resumed from Blocked to In Progress; parent owns the May 20 retained cohort reclassification and excludes CO-581 May 19, CO-579 global owner, and spec pre-expiry work."
+      }
+    },
+    {
       "id": "20260525-linear-6c71f385-db09-470b-84cb-61013987a2a1",
       "title": "CO-576 reconcile terminal promoted-PR intake residue",
       "relates_to": "tasks/tasks-linear-6c71f385-db09-470b-84cb-61013987a2a1.md",
@@ -410,7 +498,7 @@
         "Codex"
       ],
       "status": "in_progress",
-      "last_review": "2026-05-24",
+      "last_review": "2026-05-26",
       "canonical_owner_key": "baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance",
       "canonical_owner_marker": "codex-orchestrator:canonical-owner-key=baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance",
       "evidence": [
@@ -432,26 +520,35 @@
           "manifest": ".runs/linear-2a51671e-14fa-46c8-bce4-bcfd71e66066-docs-packet/cli/2026-05-24T22-14-44-538Z-a0cffa5b/manifest.json",
           "source_anchor": "ctx:sha256:8824b9aeafca297dd598861836955314d72ed9c6909cafd917eb485e571fa786#chunk:c000001",
           "summary": "Docs-first packet preserves the CO-581 exact-key retained May 19 docs freshness cohort owner contract; parent re-homed catalog/guide owner metadata from terminal CO-568 to live CO-581."
+        },
+        "expired_may19_retained_terminal_classification": {
+          "reviewer": "Codex parent lane",
+          "date": "2026-05-26",
+          "status": "accepted",
+          "evidence": "out/linear-2a51671e-14fa-46c8-bce4-bcfd71e66066/co581-may19-terminal-classification.json",
+          "summary": "All 71 May 19 retained cohort rows are retained_terminal_packet with task_status done after tasks 1289-1298 and CO-239 terminal evidence checks; post-change maintainer output no longer reports the CO-581 cohort."
         }
       },
       "validation": {
-        "status": "focused_parent_validation_passed_review_pending",
+        "status": "co581_may19_cohort_resolved_remaining_blockers_separately_owned",
         "passed": [
-          "docs-first packet drafted",
-          "task registry and freshness mirrors updated",
-          "source hash verified as 8824b9aeafca297dd598861836955314d72ed9c6909cafd917eb485e571fa786",
-          "jq empty tasks/index.json",
-          "jq empty docs/docs-freshness-registry.json",
-          "registry contains six active CO-581 rows",
-          "protected-term check found all required owner terms, source anchor, and sample paths",
-          "changed-file scope check listed only declared files",
-          "trailing-whitespace scan returned no matches",
-          "git diff --check for tracked modified files passed",
-          "parent docs:freshness:maintain reports CO-581 usable/In Progress for exact key",
-          "owner_finalizer.status=passed_exact_canonical_owner_precedence"
+          "baseline docs:freshness captured at out/linear-2a51671e-14fa-46c8-bce4-bcfd71e66066/baseline-after-co579-docs-freshness.json",
+          "baseline docs:freshness:maintain captured at out/linear-2a51671e-14fa-46c8-bce4-bcfd71e66066/baseline-after-co579-docs-freshness-maintain.json",
+          "71 May 19 cohort rows classified retained_terminal_packet with task_status done",
+          "tasks 1289-1298 specs are done and have zero local open checklist obligations",
+          "live Linear issue-context verified CO-239 Done/completed for the extra classification report",
+          "node JSON parse for tasks/index.json and docs/docs-freshness-registry.json passed",
+          "git diff --check passed",
+          "node scripts/spec-guard.mjs --dry-run passed",
+          "post-change docs:freshness no longer reports CO-581 May 19 stale cohort",
+          "post-change docs:freshness:maintain reports active owner issues CO-569 and CO-579, not CO-581",
+          "2026-05-26 draft PR #898 opened from linear/co-581-retained-cohort-refresh after local validation passed"
         ],
         "pending": [
-          "full repo validation and lifecycle handoff"
+          "CO-569 Apr 19 retained cohort cleanup remains separately owned",
+          "CO-579 Apr 25 report-only stale row remains separately owned",
+          "review and PR lifecycle after current stacked docs metadata is finalized",
+          "manifest-backed standalone review rerun or explicit quota waiver before ready-review/merge"
         ]
       },
       "paths": {
@@ -476,7 +573,11 @@
         "source_breakdown": "{\"rolling_window\":71}",
         "protected_terms": "docs:freshness:maintain; canonical owner key; terminal-owner replacement; completed-lane registry residue; rolling-debt cohort; co-430-terminal-owner-replacement; dry-run/no-token copyable body",
         "sample_paths": ".agent/task/1289-coordinator-symphony-aligned-start-cli-request-shell-extraction.md; .agent/task/1290-coordinator-symphony-aligned-start-cli-remaining-boundary-freeze-reassessment.md; .agent/task/1291-coordinator-symphony-aligned-flow-cli-boundary-reassessment-revisit.md",
-        "parent_owned": "Parent owns authoritative issue source, live owner truth, validation, Linear/workpad state, PR lifecycle, and review handoff. Parent re-homed exact-key catalog/guide owner metadata from CO-568 to CO-581."
+        "parent_owned": "Parent owns authoritative issue source, live owner truth, validation, Linear/workpad state, PR lifecycle, and review handoff. Parent re-homed exact-key catalog/guide owner metadata from CO-568 to CO-581.",
+        "resume_2026_05_26": "CO-581 resumed from Blocked to In Progress to resolve expired May 19 retained cohort; exact owner key remains scoped to baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance; no CO-569, CO-579, or spec pre-expiry absorption.",
+        "resume_2026_05_26_result": "Resolved expired May 19 retained cohort by reclassifying all 71 rows to retained_terminal_packet; remaining freshness blockers are CO-569 and CO-579.",
+        "pr_898": "Draft PR #898 opened for the CO-581/CO-579 terminal docs freshness history retention branch.",
+        "review_quota_20260526": "Manifest-backed standalone review rerun reached Codex review but failed before contract output because usage quota is exhausted until 2026-05-31 07:51 local; keep PR draft or record a waiver before ready-review/merge if quota remains unavailable."
       }
     },
     {
@@ -618,7 +719,7 @@
         "Codex"
       ],
       "status": "in_progress",
-      "last_review": "2026-05-24",
+      "last_review": "2026-05-26",
       "canonical_owner_key": "docs:freshness:maintain",
       "canonical_owner_marker": "codex-orchestrator:canonical-owner-key=docs:freshness:maintain",
       "evidence": [
@@ -633,7 +734,8 @@
         "docs/docs-freshness-registry.json",
         "docs/docs-catalog.json",
         ".runs/linear-5634bf98-fe59-41f5-8623-60c9ef0b2993/cli/2026-05-23T23-47-35-355Z-d6ade73d/review/telemetry.json",
-        ".runs/linear-5634bf98-fe59-41f5-8623-60c9ef0b2993/cli/2026-05-23T23-47-35-355Z-d6ade73d/review/contract.json"
+        ".runs/linear-5634bf98-fe59-41f5-8623-60c9ef0b2993/cli/2026-05-23T23-47-35-355Z-d6ade73d/review/contract.json",
+        "docs/findings/linear-7f6b0776-51b8-4f54-b330-b4e359afe829-elegance-review.md"
       ],
       "approvals": {
         "parent_issue_quality_review": {
@@ -649,6 +751,17 @@
           "telemetry": ".runs/linear-5634bf98-fe59-41f5-8623-60c9ef0b2993/cli/2026-05-23T23-47-35-355Z-d6ade73d/review/telemetry.json",
           "contract": ".runs/linear-5634bf98-fe59-41f5-8623-60c9ef0b2993/cli/2026-05-23T23-47-35-355Z-d6ade73d/review/contract.json",
           "summary": "Final enforced gpt-5.5/xhigh standalone review completed clean after the retained_terminal_packet archive evidence gate: telemetry reports status=succeeded, review_outcome=clean-success, review_verdict=clean, contract_validation.status=valid, contract_overall_verdict=clean, and finding_count=0."
+        },
+        "report_only_terminal_review_20260526": {
+          "reviewer": "CO-579 report-only terminal review",
+          "date": "2026-05-26",
+          "status": "done",
+          "evidence": [
+            "node bin/codex-orchestrator.js linear issue-context --issue-id CO-364 --format json",
+            "gh pr view 643 --repo Kbediako/CO --json state,mergedAt,mergeCommit",
+            "docs/findings/linear-7f6b0776-51b8-4f54-b330-b4e359afe829-elegance-review.md"
+          ],
+          "summary": "Live Linear issue-context verified CO-364 is Done/completed, PR #643 is merged, and the archived task-index lifecycle audit had zero unchecked items; the report-only elegance review is retained as terminal history instead of active docs freshness debt."
         }
       },
       "validation": {
@@ -676,7 +789,12 @@
           "node scripts/delegation-guard.mjs with explicit non-synthetic-child override after app-level gpt-5.5/GPT Pro review and quota hygiene cleanup",
           "codex-orchestrator hygiene quota --format json: latest zero-model audit observed model_calls=0, process_inventory.quota_burning_count=0, process_inventory.unowned_quota_burning_count=0; degraded findings are stale co-status/control-host endpoint state plus unconfirmed CO-555 provider-intake claim state",
           "sixth enforced standalone review rerun: findings P2 stray retained_terminal_packet archive skip lacked terminal lifecycle evidence, fixed in scripts/implementation-docs-archive.mjs and tests/implementation-docs-archive.spec.ts",
-          "final enforced gpt-5.5/xhigh standalone review: clean-success, valid contract, overall clean, finding_count=0"
+          "final enforced gpt-5.5/xhigh standalone review: clean-success, valid contract, overall clean, finding_count=0",
+          "2026-05-26 pre-expiry recurrence source issues CO-498, CO-442, CO-460, and CO-453 verified Done/completed via live Linear issue-context; task specs reclassified done, CO-498 packet rows retained_terminal_packet, and CO-442/CO-460/CO-453 packet rows kept active-reviewed because local checklist obligations remain open",
+          "2026-05-26 recurrence validation: node scripts/spec-guard.mjs --dry-run reported Spec guard: OK",
+          "2026-05-26 recurrence validation: docs:freshness:maintain produced block_policy_expired with invalid_entries=0, spec_guard_pre_expiry_entries=0, and blocking_changed_paths=[]; remaining blockers are separately owned stale cohorts under CO-581/CO-569/CO-579",
+          "2026-05-26 recurrence validation: docs:check, implementation-docs-archive dry-run, git diff --check, JSON parse, and diff budget passed",
+          "2026-05-26 report-only recurrence source issue CO-364 verified Done/completed via live Linear issue-context, PR #643 verified merged, and the stale elegance report row retained_terminal_packet with task_status=done"
         ],
         "pending": [
           "PR lifecycle",
@@ -703,7 +821,9 @@
         "docs_freshness_maintain": "latest validation passed after retained terminal packet lifecycle reclassification",
         "review_rework": "First enforced standalone review previously found P2 malformed review_notes frontmatter in a proactive pre-expiry sweep; CO-579 now handles the cohort from live Linear truth instead of active date-refreshes by reclassifying the verified Done/completed source specs inactive done and marking full packet registry rows retained_terminal_packet instead of false archive stubs. Second enforced review hit bounded-success contract failure while repeatedly inspecting spec-guard; parent fixed the real gap so spec-guard rolling cohort summaries also resolve exact baseline cohort canonical owners instead of collapsing to CO-579. Third enforced review found P2 missing report-level audit data for task-index review overrides that clear stale registry drift; CO-579 now emits task_index_review_overrides and regression coverage. Fourth enforced review found P1 implementation-docs archive could still stub retained packets and P2 duplicate CO-445 review_notes; CO-579 now skips retained_terminal_packet rows in archive automation and preserves both review_notes under one key. Fifth enforced review found P3 docs-catalog declaration drift; scripts/lib/docs-catalog.d.ts now includes retained_terminal_packet_entries. Sixth enforced review found P2 stray retained_terminal_packet archive skips trusted status without terminal lifecycle evidence; implementation-docs archive now requires task-index or registry task-status terminal evidence and archives nonterminal stray rows when otherwise eligible.",
         "admission_recheck": "Shared-root co-status after owner verification reports running=0, retrying=1, issues=1, max_allowed=3, with only CO-555 active-like in Rework on PR #834; CO-527 is Backlog with no PR and is not consuming active WIP.",
-        "quota_hygiene_20260524": "Zero-model quota hygiene initially found six unowned quota-burning codex exec audit processes under /Users/kbediako/Code/CO; parent terminated the stale process groups and reran hygiene with quota_burning_count=0 and unowned_quota_burning_count=0."
+        "quota_hygiene_20260524": "Zero-model quota hygiene initially found six unowned quota-burning codex exec audit processes under /Users/kbediako/Code/CO; parent terminated the stale process groups and reran hygiene with quota_burning_count=0 and unowned_quota_burning_count=0.",
+        "pre_expiry_recurrence_20260526": "Current-main docs:freshness:maintain reported block_spec_guard_pre_expiry for CO-498, CO-442, CO-460, and CO-453; live Linear issue-context verified all four Done/completed. CO-498 rows are retained terminal packet history; CO-442, CO-460, and CO-453 stay active-reviewed until open local checklist obligations are resolved.",
+        "report_only_recurrence_20260526": "Live CO-364 is Done/completed and PR #643 is merged; report-only elegance review row retained as terminal history with registry task_status=done."
       }
     },
     {
@@ -5378,7 +5498,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-05-03",
+      "last_review": "2026-05-26",
       "approvals": {
         "traceability_packet": {
           "reviewer": "CO-442 traceability packet branch",
@@ -5397,6 +5517,12 @@
           "date": "2026-05-03",
           "status": "blocked",
           "summary": "Forced appserver standalone review launched on gpt-5.5/xhigh but Codex hit the account usage limit before findings; final review must be rerun before handoff or merge unless an explicit quota waiver is recorded."
+        },
+        "co579_pre_expiry_terminal_review": {
+          "reviewer": "CO-579 pre-expiry terminal review",
+          "date": "2026-05-26",
+          "status": "terminal_verified",
+          "summary": "Live Linear issue-context verified CO-442 is Done/completed; CO-579 reclassified the task spec done and retains the full packet as terminal history rather than active docs freshness debt."
         }
       },
       "paths": {
@@ -5406,7 +5532,8 @@
         "prd": "docs/PRD-linear-8a453a7c-ba31-4604-a88e-2e4c6244ec51.md",
         "docs": "docs/TECH_SPEC-linear-8a453a7c-ba31-4604-a88e-2e4c6244ec51.md",
         "action_plan": "docs/ACTION_PLAN-linear-8a453a7c-ba31-4604-a88e-2e4c6244ec51.md"
-      }
+      },
+      "status": "done"
     },
     {
       "id": "20260501-linear-93785af4-9df9-4713-8a63-b0caddb5796f",
@@ -5416,8 +5543,8 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-05-03",
-      "status": "in_progress",
+      "last_review": "2026-05-26",
+      "status": "done",
       "evidence": [
         "docs/PRD-linear-93785af4-9df9-4713-8a63-b0caddb5796f.md",
         "docs/TECH_SPEC-linear-93785af4-9df9-4713-8a63-b0caddb5796f.md",
@@ -5466,6 +5593,12 @@
           "date": "2026-05-03",
           "status": "pending-current-post-merge-review",
           "summary": "Prior May 1 minimality pass found no simplification patch. A fresh post-merge elegance pass is still required after standalone review and before PR handoff."
+        },
+        "co579_pre_expiry_terminal_review": {
+          "reviewer": "CO-579 pre-expiry terminal review",
+          "date": "2026-05-26",
+          "status": "terminal_verified",
+          "summary": "Live Linear issue-context verified CO-460 is Done/completed; CO-579 reclassified the task spec done and retains the full packet as terminal history rather than active docs freshness debt."
         }
       },
       "paths": {
@@ -5483,8 +5616,8 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-05-03",
-      "status": "in_progress",
+      "last_review": "2026-05-26",
+      "status": "done",
       "evidence": [
         "docs/PRD-linear-dc136145-8df0-49f7-af80-21148dc37351.md",
         "docs/TECH_SPEC-linear-dc136145-8df0-49f7-af80-21148dc37351.md",
@@ -5505,6 +5638,12 @@
           "manifest": ".runs/linear-dc136145-8df0-49f7-af80-21148dc37351-docs-packet/cli/2026-05-03T12-07-21-112Z-a02619a1/manifest.json",
           "source_anchor": "ctx:sha256:10210d74b1aeda6ff0cb3656c91e02bc36497974d4817a4a180e3739db3aa5a9#chunk:c000001",
           "summary": "Created the CO-453 docs-first packet and declared mirrors only. The packet preserves provider-linear-worker-child-lanes.json, launching-*, real child run id/artifact paths, parent refresh/status logic, refresh request timeout, real child startup reconciliation, and CO-449 as related observed context only. It rejects CO-449 intake changes, broad recovery/freshness work, generic refresh-timeout remediation, dropping child-lane proof or decision evidence, and leaving placeholder paths as current authority after real startup."
+        },
+        "co579_pre_expiry_terminal_review": {
+          "reviewer": "CO-579 pre-expiry terminal review",
+          "date": "2026-05-26",
+          "status": "terminal_verified",
+          "summary": "Live Linear issue-context verified CO-453 is Done/completed; CO-579 reclassified the task spec done and retains the full packet as terminal history rather than active docs freshness debt."
         }
       },
       "paths": {
@@ -5645,8 +5784,8 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-05-03",
-      "status": "in_progress",
+      "last_review": "2026-05-26",
+      "status": "done",
       "evidence": [
         "docs/PRD-linear-46287ca7-10c3-4ad3-b8a5-9b3ba96059fe.md",
         "docs/TECH_SPEC-linear-46287ca7-10c3-4ad3-b8a5-9b3ba96059fe.md",
@@ -5696,6 +5835,12 @@
           "status": "no_simplification_patch_remaining",
           "evidence": "out/linear-46287ca7-10c3-4ad3-b8a5-9b3ba96059fe/manual/elegance-review.md",
           "summary": "Manual minimality pass found the broad metadata diff necessary for 15 verified terminal source issues plus the CO-498 packet; no source/script/validator behavior was added."
+        },
+        "co579_pre_expiry_terminal_review": {
+          "reviewer": "CO-579 pre-expiry terminal review",
+          "date": "2026-05-26",
+          "status": "terminal_verified",
+          "summary": "Live Linear issue-context verified CO-498 is Done/completed; CO-579 reclassified the task spec done and retains the full packet as terminal history rather than active docs freshness debt."
         }
       },
       "paths": {
@@ -8646,7 +8791,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-05-18",
+      "last_review": "2026-05-26",
       "paths": {
         "spec": "tasks/specs/linear-7f6b0776-51b8-4f54-b330-b4e359afe829.md",
         "task": "tasks/tasks-linear-7f6b0776-51b8-4f54-b330-b4e359afe829.md",
@@ -8664,6 +8809,13 @@
           "unchecked_items": 0,
           "evidence": "out/linear-b642e879-ba50-45ef-b0d9-b059afa9e932-recovery/spec-preexpiry-local-classification.json",
           "summary": "Linked task checklist has zero unchecked items; mark terminal so spec-guard and implementation-docs archive no longer treat the packet as active work."
+        },
+        "co579_report_only_terminal_review_20260526": {
+          "reviewer": "CO-579 report-only terminal review",
+          "date": "2026-05-26",
+          "status": "done",
+          "evidence": "docs/findings/linear-7f6b0776-51b8-4f54-b330-b4e359afe829-elegance-review.md",
+          "summary": "Live Linear issue-context verified CO-364 is Done/completed and GitHub PR #643 is merged; the report-only elegance review row is retained as terminal history with registry task_status=done."
         }
       }
     },
@@ -11991,7 +12143,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-05-18",
+      "last_review": "2026-05-26",
       "approvals": {
         "docs_packet_child_lane": {
           "reviewer": "bounded same-issue docs child lane",
@@ -12041,6 +12193,13 @@
           "unchecked_items": 0,
           "evidence": "out/linear-b642e879-ba50-45ef-b0d9-b059afa9e932-recovery/spec-preexpiry-local-classification.json",
           "summary": "Linked task checklist has zero unchecked items; mark terminal so spec-guard and implementation-docs archive no longer treat the packet as active work."
+        },
+        "co581_expired_may19_retained_terminal_review": {
+          "reviewer": "Codex parent lane",
+          "date": "2026-05-26",
+          "status": "accepted",
+          "evidence": "out/linear-2a51671e-14fa-46c8-bce4-bcfd71e66066/co581-may19-terminal-classification.json",
+          "summary": "CO-239 classification report is Done/completed live Linear evidence and remains terminal history for baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance."
         }
       },
       "paths": {
@@ -18554,12 +18713,22 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-19",
+      "last_review": "2026-05-26",
       "paths": {
         "spec": "tasks/specs/1302-coordinator-linear-and-telegram-provider-setup-and-smoke-testing.md",
         "task": "tasks/tasks-1302-coordinator-linear-and-telegram-provider-setup-and-smoke-testing.md",
         "agent_task": ".agent/task/1302-coordinator-linear-and-telegram-provider-setup-and-smoke-testing.md",
         "docs": "docs/TECH_SPEC-coordinator-linear-and-telegram-provider-setup-and-smoke-testing.md"
+      },
+      "status": "done",
+      "approvals": {
+        "co569_expired_may20_retained_terminal_review": {
+          "reviewer": "Codex parent lane",
+          "date": "2026-05-26",
+          "status": "accepted",
+          "evidence": "out/linear-43b226d3-abcc-42e8-a873-a1372d0ac128/co569-may20-terminal-classification.json",
+          "summary": "Task 1302 spec is done with zero local open checklist obligations; packet/report rows are retained_terminal_packet for baseline_cohort_id:co-558-may-20-apr-19-task-report-maintenance."
+        }
       }
     },
     {
@@ -18570,12 +18739,22 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-19",
+      "last_review": "2026-05-26",
       "paths": {
         "spec": "tasks/specs/1301-coordinator-symphony-aligned-frontend-test-cli-remaining-boundary-freeze-reassessment-revisit.md",
         "task": "tasks/tasks-1301-coordinator-symphony-aligned-frontend-test-cli-remaining-boundary-freeze-reassessment-revisit.md",
         "agent_task": ".agent/task/1301-coordinator-symphony-aligned-frontend-test-cli-remaining-boundary-freeze-reassessment-revisit.md",
         "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-frontend-test-cli-remaining-boundary-freeze-reassessment-revisit.md"
+      },
+      "status": "done",
+      "approvals": {
+        "co569_expired_may20_retained_terminal_review": {
+          "reviewer": "Codex parent lane",
+          "date": "2026-05-26",
+          "status": "accepted",
+          "evidence": "out/linear-43b226d3-abcc-42e8-a873-a1372d0ac128/co569-may20-terminal-classification.json",
+          "summary": "Task 1301 spec is done with zero local open checklist obligations; packet/report rows are retained_terminal_packet for baseline_cohort_id:co-558-may-20-apr-19-task-report-maintenance."
+        }
       }
     },
     {
@@ -18586,12 +18765,22 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-19",
+      "last_review": "2026-05-26",
       "paths": {
         "spec": "tasks/specs/1300-coordinator-symphony-aligned-frontend-test-cli-help-surface-completion.md",
         "task": "tasks/tasks-1300-coordinator-symphony-aligned-frontend-test-cli-help-surface-completion.md",
         "agent_task": ".agent/task/1300-coordinator-symphony-aligned-frontend-test-cli-help-surface-completion.md",
         "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-frontend-test-cli-help-surface-completion.md"
+      },
+      "status": "done",
+      "approvals": {
+        "co569_expired_may20_retained_terminal_review": {
+          "reviewer": "Codex parent lane",
+          "date": "2026-05-26",
+          "status": "accepted",
+          "evidence": "out/linear-43b226d3-abcc-42e8-a873-a1372d0ac128/co569-may20-terminal-classification.json",
+          "summary": "Task 1300 spec is done with zero local open checklist obligations; packet/report rows are retained_terminal_packet for baseline_cohort_id:co-558-may-20-apr-19-task-report-maintenance."
+        }
       }
     },
     {
@@ -18602,12 +18791,22 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-18",
+      "last_review": "2026-05-26",
       "paths": {
         "spec": "tasks/specs/1299-coordinator-symphony-aligned-frontend-test-cli-remaining-boundary-freeze-reassessment.md",
         "task": "tasks/tasks-1299-coordinator-symphony-aligned-frontend-test-cli-remaining-boundary-freeze-reassessment.md",
         "agent_task": ".agent/task/1299-coordinator-symphony-aligned-frontend-test-cli-remaining-boundary-freeze-reassessment.md",
         "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-frontend-test-cli-remaining-boundary-freeze-reassessment.md"
+      },
+      "status": "done",
+      "approvals": {
+        "co569_expired_may20_retained_terminal_review": {
+          "reviewer": "Codex parent lane",
+          "date": "2026-05-26",
+          "status": "accepted",
+          "evidence": "out/linear-43b226d3-abcc-42e8-a873-a1372d0ac128/co569-may20-terminal-classification.json",
+          "summary": "Task 1299 spec is done with zero local open checklist obligations; packet/report rows are retained_terminal_packet for baseline_cohort_id:co-558-may-20-apr-19-task-report-maintenance."
+        }
       }
     },
     {
@@ -18618,12 +18817,22 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-18",
+      "last_review": "2026-05-26",
       "paths": {
         "spec": "tasks/specs/1298-coordinator-symphony-aligned-frontend-test-cli-request-shell-extraction.md",
         "task": "tasks/tasks-1298-coordinator-symphony-aligned-frontend-test-cli-request-shell-extraction.md",
         "agent_task": ".agent/task/1298-coordinator-symphony-aligned-frontend-test-cli-request-shell-extraction.md",
         "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-frontend-test-cli-request-shell-extraction.md"
+      },
+      "status": "done",
+      "approvals": {
+        "co581_expired_may19_retained_terminal_review": {
+          "reviewer": "Codex parent lane",
+          "date": "2026-05-26",
+          "status": "accepted",
+          "evidence": "out/linear-2a51671e-14fa-46c8-bce4-bcfd71e66066/co581-may19-terminal-classification.json",
+          "summary": "Task 1298 spec is done with zero local open checklist obligations; packet/report rows are retained_terminal_packet for baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance."
+        }
       }
     },
     {
@@ -18634,12 +18843,22 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-18",
+      "last_review": "2026-05-26",
       "paths": {
         "spec": "tasks/specs/1297-coordinator-symphony-aligned-frontend-test-cli-boundary-reassessment-revisit.md",
         "task": "tasks/tasks-1297-coordinator-symphony-aligned-frontend-test-cli-boundary-reassessment-revisit.md",
         "agent_task": ".agent/task/1297-coordinator-symphony-aligned-frontend-test-cli-boundary-reassessment-revisit.md",
         "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-frontend-test-cli-boundary-reassessment-revisit.md"
+      },
+      "status": "done",
+      "approvals": {
+        "co581_expired_may19_retained_terminal_review": {
+          "reviewer": "Codex parent lane",
+          "date": "2026-05-26",
+          "status": "accepted",
+          "evidence": "out/linear-2a51671e-14fa-46c8-bce4-bcfd71e66066/co581-may19-terminal-classification.json",
+          "summary": "Task 1297 spec is done with zero local open checklist obligations; packet/report rows are retained_terminal_packet for baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance."
+        }
       }
     },
     {
@@ -18650,12 +18869,22 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-18",
+      "last_review": "2026-05-26",
       "paths": {
         "spec": "tasks/specs/1296-coordinator-symphony-aligned-rlm-cli-remaining-boundary-freeze-reassessment-revisit.md",
         "task": "tasks/tasks-1296-coordinator-symphony-aligned-rlm-cli-remaining-boundary-freeze-reassessment-revisit.md",
         "agent_task": ".agent/task/1296-coordinator-symphony-aligned-rlm-cli-remaining-boundary-freeze-reassessment-revisit.md",
         "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-rlm-cli-remaining-boundary-freeze-reassessment-revisit.md"
+      },
+      "status": "done",
+      "approvals": {
+        "co581_expired_may19_retained_terminal_review": {
+          "reviewer": "Codex parent lane",
+          "date": "2026-05-26",
+          "status": "accepted",
+          "evidence": "out/linear-2a51671e-14fa-46c8-bce4-bcfd71e66066/co581-may19-terminal-classification.json",
+          "summary": "Task 1296 spec is done with zero local open checklist obligations; packet/report rows are retained_terminal_packet for baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance."
+        }
       }
     },
     {
@@ -18666,12 +18895,22 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-18",
+      "last_review": "2026-05-26",
       "paths": {
         "spec": "tasks/specs/1295-coordinator-symphony-aligned-rlm-cli-request-shell-extraction.md",
         "task": "tasks/tasks-1295-coordinator-symphony-aligned-rlm-cli-request-shell-extraction.md",
         "agent_task": ".agent/task/1295-coordinator-symphony-aligned-rlm-cli-request-shell-extraction.md",
         "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-rlm-cli-request-shell-extraction.md"
+      },
+      "status": "done",
+      "approvals": {
+        "co581_expired_may19_retained_terminal_review": {
+          "reviewer": "Codex parent lane",
+          "date": "2026-05-26",
+          "status": "accepted",
+          "evidence": "out/linear-2a51671e-14fa-46c8-bce4-bcfd71e66066/co581-may19-terminal-classification.json",
+          "summary": "Task 1295 spec is done with zero local open checklist obligations; packet/report rows are retained_terminal_packet for baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance."
+        }
       }
     },
     {
@@ -18682,12 +18921,22 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-18",
+      "last_review": "2026-05-26",
       "paths": {
         "spec": "tasks/specs/1294-coordinator-symphony-aligned-rlm-cli-boundary-reassessment-revisit.md",
         "task": "tasks/tasks-1294-coordinator-symphony-aligned-rlm-cli-boundary-reassessment-revisit.md",
         "agent_task": ".agent/task/1294-coordinator-symphony-aligned-rlm-cli-boundary-reassessment-revisit.md",
         "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-rlm-cli-boundary-reassessment-revisit.md"
+      },
+      "status": "done",
+      "approvals": {
+        "co581_expired_may19_retained_terminal_review": {
+          "reviewer": "Codex parent lane",
+          "date": "2026-05-26",
+          "status": "accepted",
+          "evidence": "out/linear-2a51671e-14fa-46c8-bce4-bcfd71e66066/co581-may19-terminal-classification.json",
+          "summary": "Task 1294 spec is done with zero local open checklist obligations; packet/report rows are retained_terminal_packet for baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance."
+        }
       }
     },
     {
@@ -18698,12 +18947,22 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-18",
+      "last_review": "2026-05-26",
       "paths": {
         "spec": "tasks/specs/1293-coordinator-symphony-aligned-flow-cli-remaining-boundary-freeze-reassessment.md",
         "task": "tasks/tasks-1293-coordinator-symphony-aligned-flow-cli-remaining-boundary-freeze-reassessment.md",
         "agent_task": ".agent/task/1293-coordinator-symphony-aligned-flow-cli-remaining-boundary-freeze-reassessment.md",
-        "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-flow-cli-remaining-boundary-freeze-reassessment-revisit.md"
+        "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-flow-cli-remaining-boundary-freeze-reassessment.md"
+      },
+      "status": "done",
+      "approvals": {
+        "co581_expired_may19_retained_terminal_review": {
+          "reviewer": "Codex parent lane",
+          "date": "2026-05-26",
+          "status": "accepted",
+          "evidence": "out/linear-2a51671e-14fa-46c8-bce4-bcfd71e66066/co581-may19-terminal-classification.json",
+          "summary": "Task 1293 spec is done with zero local open checklist obligations; packet/report rows are retained_terminal_packet for baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance."
+        }
       }
     },
     {
@@ -18714,12 +18973,22 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-18",
+      "last_review": "2026-05-26",
       "paths": {
         "spec": "tasks/specs/1292-coordinator-symphony-aligned-flow-cli-request-shell-extraction.md",
         "task": "tasks/tasks-1292-coordinator-symphony-aligned-flow-cli-request-shell-extraction.md",
         "agent_task": ".agent/task/1292-coordinator-symphony-aligned-flow-cli-request-shell-extraction.md",
         "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-flow-cli-request-shell-extraction.md"
+      },
+      "status": "done",
+      "approvals": {
+        "co581_expired_may19_retained_terminal_review": {
+          "reviewer": "Codex parent lane",
+          "date": "2026-05-26",
+          "status": "accepted",
+          "evidence": "out/linear-2a51671e-14fa-46c8-bce4-bcfd71e66066/co581-may19-terminal-classification.json",
+          "summary": "Task 1292 spec is done with zero local open checklist obligations; packet/report rows are retained_terminal_packet for baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance."
+        }
       }
     },
     {
@@ -18730,12 +18999,22 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-18",
+      "last_review": "2026-05-26",
       "paths": {
         "spec": "tasks/specs/1291-coordinator-symphony-aligned-flow-cli-boundary-reassessment-revisit.md",
         "task": "tasks/tasks-1291-coordinator-symphony-aligned-flow-cli-boundary-reassessment-revisit.md",
         "agent_task": ".agent/task/1291-coordinator-symphony-aligned-flow-cli-boundary-reassessment-revisit.md",
         "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-flow-cli-boundary-reassessment-revisit.md"
+      },
+      "status": "done",
+      "approvals": {
+        "co581_expired_may19_retained_terminal_review": {
+          "reviewer": "Codex parent lane",
+          "date": "2026-05-26",
+          "status": "accepted",
+          "evidence": "out/linear-2a51671e-14fa-46c8-bce4-bcfd71e66066/co581-may19-terminal-classification.json",
+          "summary": "Task 1291 spec is done with zero local open checklist obligations; packet/report rows are retained_terminal_packet for baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance."
+        }
       }
     },
     {
@@ -18746,12 +19025,22 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-18",
+      "last_review": "2026-05-26",
       "paths": {
         "spec": "tasks/specs/1290-coordinator-symphony-aligned-start-cli-remaining-boundary-freeze-reassessment.md",
         "task": "tasks/tasks-1290-coordinator-symphony-aligned-start-cli-remaining-boundary-freeze-reassessment.md",
         "agent_task": ".agent/task/1290-coordinator-symphony-aligned-start-cli-remaining-boundary-freeze-reassessment.md",
         "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-start-cli-remaining-boundary-freeze-reassessment.md"
+      },
+      "status": "done",
+      "approvals": {
+        "co581_expired_may19_retained_terminal_review": {
+          "reviewer": "Codex parent lane",
+          "date": "2026-05-26",
+          "status": "accepted",
+          "evidence": "out/linear-2a51671e-14fa-46c8-bce4-bcfd71e66066/co581-may19-terminal-classification.json",
+          "summary": "Task 1290 spec is done with zero local open checklist obligations; packet/report rows are retained_terminal_packet for baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance."
+        }
       }
     },
     {
@@ -18762,12 +19051,22 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-18",
+      "last_review": "2026-05-26",
       "paths": {
         "spec": "tasks/specs/1289-coordinator-symphony-aligned-start-cli-request-shell-extraction.md",
         "task": "tasks/tasks-1289-coordinator-symphony-aligned-start-cli-request-shell-extraction.md",
         "agent_task": ".agent/task/1289-coordinator-symphony-aligned-start-cli-request-shell-extraction.md",
         "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-start-cli-request-shell-extraction.md"
+      },
+      "status": "done",
+      "approvals": {
+        "co581_expired_may19_retained_terminal_review": {
+          "reviewer": "Codex parent lane",
+          "date": "2026-05-26",
+          "status": "accepted",
+          "evidence": "out/linear-2a51671e-14fa-46c8-bce4-bcfd71e66066/co581-may19-terminal-classification.json",
+          "summary": "Task 1289 spec is done with zero local open checklist obligations; packet/report rows are retained_terminal_packet for baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance."
+        }
       }
     },
     {

@@ -8,6 +8,13 @@
   - `CO-568 terminal`, `co-558-may-19-apr-18-task-report-maintenance`, and sample paths remain historical/retained-cohort evidence
   - this child lane should leave a patch artifact only, with no commit
 
+## 2026-05-26 Resume Plan
+- Goal: resolve the expired May 19 retained docs-freshness cohort now that CO-581 is the live exact owner and the fallback expiry date `2026-05-25` has passed.
+- Scope: cohort rows and source docs for `baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance`, plus required docs-first mirrors and registry/task metadata.
+- Non-goals: CO-569 Apr 19 cohort, CO-579 global owner lifecycle, new active spec pre-expiry batch, freshness policy caps/windows, and any gate weakening.
+- Parallelization: `stay_serial` / `overlapping_scope`; classification must be consistent across packet, mirror, report, registry, and task-index surfaces, and appserver/subagent review is quota-blocked until 2026-05-31 07:51.
+- Result: classify all 71 May 19 rows as `retained_terminal_packet` after terminal task and CO-239 evidence checks; the immediate post-change maintain output named CO-569/CO-579, and the later CO-579 report-only cleanup leaves only CO-569 owned rolling debt in latest maintain output.
+
 ## Issue Readiness Gate
 - Intent checksum / protected terms carried forward:
   - `docs:freshness:maintain`
@@ -42,6 +49,8 @@
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | `docs freshness` exact-key owner override | May 19 retained rolling cohort remains owner-backed through `canonical_owner_issues[]` instead of blind `last_review` refresh or historical packet deletion. | expire fallback | CO-581 | Terminal `CO-568` could no longer serve as live owner while the May 19 rolling cohort was still inside its freshness window. | 2026-05-18 | 2026-05-24 | 2026-05-25 | Refresh, archive, reclassify, or let the May 19 cohort expire; if live owner verification fails before expiry, reuse or create the exact canonical owner and intentionally re-home `docs/docs-catalog.json`. | `node scripts/spec-guard.mjs --dry-run`, `npm run docs:freshness`, and `npm run docs:freshness:maintain -- --format json`. |
 
+2026-05-26 resolution: this fallback is closed by terminal retained-history reclassification; no new fallback, cap/window change, or gate weakening is introduced.
+
 ## Milestones & Sequencing
 1. Create the docs-first packet:
    - `docs/PRD-linear-2a51671e-14fa-46c8-bce4-bcfd71e66066.md`
@@ -66,6 +75,14 @@
    - run `docs:freshness:maintain -- --format json`
    - run parent-required docs freshness, spec guard, and review gates
    - update workpad, PR, or Linear only if needed
+
+## 2026-05-26 Resume Milestones
+1. Capture fresh baseline `docs:freshness` and `docs:freshness:maintain` reports for CO-581.
+2. Extract all May 19 cohort paths and classify them by document class, source issue lineage, and current lifecycle.
+3. Inspect representative packet/mirror/report docs before deciding refresh, archival, or reclassification.
+4. Patch only truthful metadata/content for the May 19 cohort and update registry/task mirrors consistently. Completed with retained terminal packet metadata.
+5. Re-run `jq`, `spec-guard --dry-run`, `docs:freshness`, and `docs:freshness:maintain -- --format json`. Completed for JSON parse, spec guard, docs freshness, and maintainer output; remaining blockers are separately owned.
+6. Update CO-581 workpad with terminal evidence and either hand off to review/PR or return to `Blocked` with the next external blocker named.
 
 ## Dependencies
 - Parent source anchor: `ctx:sha256:8824b9aeafca297dd598861836955314d72ed9c6909cafd917eb485e571fa786#chunk:c000001`
