@@ -86,8 +86,10 @@ last_review: 2026-05-26
   - `npm run docs:freshness`.
   - `node scripts/docs-freshness-maintain.mjs --check`.
 - Rework baseline reports:
-  - `npm run docs:freshness -- --report out/linear-bb7589e8-b79d-405a-8408-5842a75d8b5d/rework-baseline-docs-freshness.json`
-  - `npm run docs:freshness:maintain -- --format json --dry-run-linear-actions --warn --report out/linear-bb7589e8-b79d-405a-8408-5842a75d8b5d/rework-baseline-docs-freshness-maintain.json`
+  - `npm run docs:freshness -- --report out/linear-bb7589e8-b79d-405a-8408-5842a75d8b5d/co584-rework-baseline-origin-main-docs-freshness.json`
+  - `npm run docs:freshness:maintain -- --format json --dry-run-linear-actions --warn --report out/linear-bb7589e8-b79d-405a-8408-5842a75d8b5d/co584-rework-baseline-origin-main-docs-freshness-maintain.json`
+  - `npm run docs:freshness -- --report out/linear-bb7589e8-b79d-405a-8408-5842a75d8b5d/co584-rework-docs-freshness.json`
+  - `npm run docs:freshness:maintain -- --check --format json --dry-run-linear-actions --report out/linear-bb7589e8-b79d-405a-8408-5842a75d8b5d/co584-rework-docs-freshness-maintain-check.json`
 - Rollout verification: The maintain report should no longer choose `block_missing_or_invalid_registry` for the repaired rows.
 - Monitoring / alerts: If capacity remains over budget, record the next explicit owner route in the workpad and PR body.
 

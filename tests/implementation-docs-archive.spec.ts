@@ -2507,7 +2507,28 @@ describe('implementation-docs-archive script', () => {
     ).rejects.toMatchObject({ code: 'ENOENT' });
   });
 
-  it('does not repair already-stubbed rows whose registry lifecycle is still active', async () => {
+  it.each([
+    {
+      guardName: 'terminal source lifecycle',
+      registryGuard: {
+        terminal_source_lifecycle_state: 'terminal_pending_archive'
+      },
+      expectedGuard: {
+        terminal_source_lifecycle_state: 'terminal_pending_archive'
+      }
+    },
+    {
+      guardName: 'recommended action',
+      registryGuard: {
+        recommended_action: 'resolve_local_checklist_obligations_before_archive'
+      },
+      expectedGuard: {
+        recommended_action: 'resolve_local_checklist_obligations_before_archive'
+      }
+    }
+  ])(
+    'does not repair already-stubbed rows whose registry lifecycle is still active via $guardName',
+    async ({ registryGuard, expectedGuard }) => {
     const repo = await initRepository({
       policyOverrides: {
         doc_patterns: ['tasks/tasks-*.md'],
@@ -2524,8 +2545,7 @@ describe('implementation-docs-archive script', () => {
             last_review: '2026-05-25',
             cadence_days: 365,
             lifecycle_state: 'active',
-            terminal_source_lifecycle_state: 'terminal_pending_archive',
-            recommended_action: 'resolve_local_checklist_obligations_before_archive',
+            ...registryGuard,
             notes:
               'CO-584 registry integrity repair: status restored to active because local open checklist obligations prevent archive readiness.'
           }
@@ -2588,8 +2608,7 @@ describe('implementation-docs-archive script', () => {
       status: 'active',
       last_review: '2026-05-25',
       lifecycle_state: 'active',
-      terminal_source_lifecycle_state: 'terminal_pending_archive',
-      recommended_action: 'resolve_local_checklist_obligations_before_archive'
+      ...expectedGuard
     });
     expect(await readFile(taskPath, 'utf8')).toBe(alreadyStubbed);
   });

@@ -45,6 +45,8 @@ const ALREADY_ARCHIVED_PRESERVED_FINDINGS_REASON = 'already_archived_preserved_f
 const PRESERVED_HISTORICAL_STUB_PATH_PATTERNS = [/^tasks\/tasks-[^/]+\.md$/, /^\.agent\/task\/[^/]+\.md$/];
 const PRESERVED_HISTORICAL_STUB_HEADING_PATTERN = /^\s*#\s+Historical stub\b/i;
 const REGISTRY_TASK_STATUS_FIELDS = ['task_status', 'task_lifecycle_status', 'lifecycle_status'];
+const RECOMMENDED_ACTION_RESOLVE_LOCAL_CHECKLIST_OBLIGATIONS_BEFORE_ARCHIVE =
+  'resolve_local_checklist_obligations_before_archive';
 
 function showUsage() {
   console.log(`Usage: node scripts/implementation-docs-archive.mjs [options]
@@ -113,7 +115,8 @@ function isActiveLifecycleNotArchiveReady(entry) {
   }
   return (
     normalizeRegistryString(entry, 'terminal_source_lifecycle_state') === TERMINAL_PENDING_ARCHIVE_STATUS ||
-    normalizeRegistryString(entry, 'recommended_action') === 'resolve_local_checklist_obligations_before_archive'
+    normalizeRegistryString(entry, 'recommended_action') ===
+      RECOMMENDED_ACTION_RESOLVE_LOCAL_CHECKLIST_OBLIGATIONS_BEFORE_ARCHIVE
   );
 }
 
