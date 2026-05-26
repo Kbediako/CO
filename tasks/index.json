@@ -237,11 +237,11 @@
       "validation": {
         "status": "registry_hard_block_cleared_review_quota_blocked",
         "evidence": [
-          "regenerate: MCP_RUNNER_TASK_ID=linear-bb7589e8-b79d-405a-8408-5842a75d8b5d npm run docs:archive-implementation -- --dry-run",
-          "regenerate baseline: run npm run docs:freshness from a clean origin/main worktree with the report path documented in tasks/specs/linear-bb7589e8-b79d-405a-8408-5842a75d8b5d.md",
-          "regenerate baseline: run npm run docs:freshness:maintain from a clean origin/main worktree with --format json --dry-run-linear-actions --warn and the report path documented in tasks/specs/linear-bb7589e8-b79d-405a-8408-5842a75d8b5d.md",
-          "regenerate repaired state: run npm run docs:freshness with the report path documented in tasks/specs/linear-bb7589e8-b79d-405a-8408-5842a75d8b5d.md",
-          "regenerate repaired state: run npm run docs:freshness:maintain -- --check --format json --dry-run-linear-actions with the report path documented in tasks/specs/linear-bb7589e8-b79d-405a-8408-5842a75d8b5d.md"
+          "regenerate archive dry-run report: MCP_RUNNER_TASK_ID=linear-bb7589e8-b79d-405a-8408-5842a75d8b5d npm run docs:archive-implementation -- --dry-run",
+          "regenerate baseline freshness report from clean origin/main: npm run docs:freshness -- --report out/linear-bb7589e8-b79d-405a-8408-5842a75d8b5d/co584-rework-baseline-origin-main-docs-freshness.json",
+          "regenerate baseline maintain report from clean origin/main: npm run docs:freshness:maintain -- --format json --dry-run-linear-actions --warn --report out/linear-bb7589e8-b79d-405a-8408-5842a75d8b5d/co584-rework-baseline-origin-main-docs-freshness-maintain.json",
+          "regenerate repaired freshness report: npm run docs:freshness -- --report out/linear-bb7589e8-b79d-405a-8408-5842a75d8b5d/co584-rework-docs-freshness.json",
+          "regenerate repaired maintain report: npm run docs:freshness:maintain -- --check --format json --dry-run-linear-actions --report out/linear-bb7589e8-b79d-405a-8408-5842a75d8b5d/co584-rework-docs-freshness-maintain-check.json"
         ],
         "completed": [
           "current-main recurrence registry repair",
