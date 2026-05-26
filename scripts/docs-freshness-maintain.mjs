@@ -1320,19 +1320,24 @@ function buildCopyableOwnerCommand(body, sourceIssue = '<source-linear-issue-id>
     const issue = body.owner_issue ?? body.configured_owner_issue ?? sourceIssue;
     const expectedState =
       normalizeOptionalString(body.verified_terminal_state ?? body.verified_state ?? body.owner_issue_state) ?? 'Done';
-    const expectedStateType =
-      normalizeOptionalString(body.verified_state_type ?? body.verified_stateType ?? body.owner_issue_state_type) ??
-      'completed';
-    return [
+    const expectedStateType = normalizeOptionalString(
+      body.verified_state_type ?? body.verified_stateType ?? body.owner_issue_state_type
+    );
+    const command = [
       'codex-orchestrator linear transition',
       `--issue-id ${issue}`,
-      `--expected-state ${JSON.stringify(expectedState)}`,
-      `--expected-state-type ${JSON.stringify(expectedStateType)}`,
+      `--expected-state ${JSON.stringify(expectedState)}`
+    ];
+    if (expectedStateType !== null) {
+      command.push(`--expected-state-type ${JSON.stringify(expectedStateType)}`);
+    }
+    command.push(
       '--state "Backlog"',
       '--force',
       '--force-reason "restore active docs freshness owner; move_to_backlog_not_done"',
       '--format json'
-    ].join(' ');
+    );
+    return command.join(' ');
   }
   if (!shouldEmitCreateOwnerCommand(actionMode)) {
     return null;

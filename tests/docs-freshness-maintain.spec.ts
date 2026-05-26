@@ -1504,7 +1504,7 @@ last_review: ${lastReview}
           issue: 'CO-175',
           issue_id: 'owner-id',
           state: 'Canceled',
-          state_type: 'canceled',
+          state_type: null,
           is_terminal: true,
           usable: false,
           workspace_id: 'workspace-1',
@@ -1554,12 +1554,13 @@ last_review: ${lastReview}
             mode: 'restore_existing_owner',
             owner_issue: 'CO-175',
             copyable_command: expect.stringContaining(
-              'codex-orchestrator linear transition --issue-id CO-175 --expected-state "Canceled" --expected-state-type "canceled"'
+              'codex-orchestrator linear transition --issue-id CO-175 --expected-state "Canceled" --state "Backlog"'
             )
           })
         ]
       })
     );
+    expect(ownerActionEvidence.actions[0].copyable_command).not.toContain('--expected-state-type');
   });
 
   it('fails closed when required live owner verification is unavailable', () => {
