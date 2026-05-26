@@ -3735,7 +3735,7 @@ function sameFollowUpDescriptionExceptSourceIssueTraceability(left: string, righ
   );
 }
 
-function sameFollowUpDescriptionAfterLinearMarkdownNormalization(left: string | null | undefined, right: string | null | undefined): boolean {
+export function sameFollowUpDescriptionAfterLinearMarkdownNormalization(left: string | null | undefined, right: string | null | undefined): boolean {
   const normalizedLeft = normalizeLinearPersistedMarkdownForComparison(left ?? '');
   const normalizedRight = normalizeLinearPersistedMarkdownForComparison(right ?? '');
   return normalizedLeft === normalizedRight;
@@ -9436,7 +9436,7 @@ function normalizeOptionalBoolean(value: unknown): boolean | null {
   return typeof value === 'boolean' ? value : null;
 }
 
-function buildFollowUpIssueDescription(input: {
+export function buildFollowUpIssueDescription(input: {
   description: string;
   intentChecksum: string;
   nonGoals: string;
@@ -9516,9 +9516,9 @@ function renderMarkdownSection(title: string, body: string): string {
   return `## ${title}\n${normalizedBody}`;
 }
 
-function buildFollowUpTraceabilitySection(input: {
-  sourceIssue: ProviderLinearIssueSummary;
-  followUpIssue: ProviderLinearCreatedIssue;
+export function buildFollowUpTraceabilitySection(input: {
+  sourceIssue: Pick<ProviderLinearIssueContext, 'id' | 'identifier' | 'url'>;
+  followUpIssue: Pick<ProviderLinearCreatedIssue, 'id' | 'identifier' | 'url'>;
 }): string {
   const followUpTaskId = buildFollowUpTaskId(input.followUpIssue);
   const repoPacketPaths = buildFollowUpPacketPaths(followUpTaskId);

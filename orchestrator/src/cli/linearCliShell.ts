@@ -10,7 +10,9 @@ import {
 } from './control/linearDispatchSource.js';
 import {
   attachProviderLinearIssuePr,
+  buildFollowUpIssueDescription,
   buildFollowUpPacketTraceabilityEvidence,
+  buildFollowUpTraceabilitySection,
   createProviderLinearFollowUpIssue,
   deleteProviderLinearWorkpadComment,
   descriptionHasExactCanonicalOwnerMarker,
@@ -18,6 +20,7 @@ import {
   getProviderLinearIssueContext,
   reconcileProviderLinearFollowUpRelations,
   resolveFollowUpLabelsFromSourceIssue,
+  sameFollowUpDescriptionAfterLinearMarkdownNormalization,
   type ProviderLinearAttachPrResult,
   type ProviderLinearCreateFollowUpResult,
   type ProviderLinearDeleteWorkpadResult,
@@ -42,6 +45,7 @@ import {
 } from './control/providerLinearWorkflowAudit.js';
 import {
   findDeterministicProviderMutationSuppression,
+  isFollowUpDescriptionUpdateSuppressionCode,
   isFollowUpLabelResolutionSuppressionCode,
   isFollowUpParityMatrixSuppressionCode,
   isFollowUpPacketTraceabilitySuppressionCode,
@@ -489,7 +493,11 @@ export async function runLinearCliShell(
         const retrySuppressed = await resolveCreateFollowUpRetrySuppression({
           issueId,
           title,
+          description,
           intentChecksum,
+          nonGoals,
+          notDoneIf,
+          acceptanceCriteria,
           canonicalOwnerKey,
           blockedBySource,
           parityLane,
@@ -778,7 +786,11 @@ async function resolveProviderLinearWorkerAttemptStartedAtForIssue(
 async function resolveCreateFollowUpRetrySuppression(input: {
   issueId: string;
   title: string;
+  description: string;
   intentChecksum: string;
+  nonGoals: string;
+  notDoneIf: string;
+  acceptanceCriteria: string;
   canonicalOwnerKey: string | null;
   blockedBySource: boolean;
   parityLane: boolean;
@@ -906,6 +918,65 @@ async function resolveCreateFollowUpRetrySuppression(input: {
       }
     };
   }
+  if (isFollowUpDescriptionUpdateSuppressionCode(suppression.error_code)) {
+    const suppressionEntry = findLatestCreateFollowUpSuppressionAuditEntry({
+      audit,
+      issueId: input.issueId,
+      recordedAtNotBefore: attemptStartedAt,
+      followUpIntentKey,
+      matchesErrorCode: isFollowUpDescriptionUpdateIncompleteCode
+    });
+    const reconciledRetry = suppressionEntry
+      ? await buildLocallyReconciledFollowUpPacketRetryResult({
+          entry: suppressionEntry,
+          title: input.title,
+          expectedDescription: {
+            description: input.description,
+            intentChecksum: input.intentChecksum,
+            nonGoals: input.nonGoals,
+            notDoneIf: input.notDoneIf,
+            acceptanceCriteria: input.acceptanceCriteria,
+            parityMatrix: input.parityMatrix
+          },
+          canonicalOwnerKey: input.canonicalOwnerKey,
+          blockedBySource: input.blockedBySource,
+          repoRoot: input.repoRoot,
+          sourceSetup: input.sourceSetup,
+          env: input.env,
+          dependencies: input.dependencies
+        })
+      : null;
+    if (reconciledRetry) {
+      return reconciledRetry;
+    }
+    return {
+      ok: false,
+      operation: 'create-follow-up',
+      error: {
+        code: 'linear_follow_up_description_update_retry_suppressed',
+        message: `Same-attempt retry suppressed: ${suppression.instruction}`,
+        status: 409,
+        details: {
+          follow_up_issue: suppressionEntry
+            ? {
+                id: suppressionEntry.follow_up_issue_id,
+                identifier: suppressionEntry.follow_up_issue_identifier
+              }
+            : null,
+          audit_entry: suppressionEntry
+            ? {
+                recorded_at: suppressionEntry.recorded_at,
+                action: suppressionEntry.action,
+                via: suppressionEntry.via,
+                state: suppressionEntry.state,
+                follow_up_intent_key: suppressionEntry.follow_up_intent_key ?? null,
+                error_code: suppressionEntry.error_code
+              }
+            : null
+        }
+      }
+    };
+  }
   return null;
 }
 
@@ -955,6 +1026,14 @@ function findLatestCreateFollowUpSuppressionAuditEntry(input: {
 async function buildLocallyReconciledFollowUpPacketRetryResult(input: {
   entry: ProviderLinearAuditEntry;
   title: string;
+  expectedDescription?: {
+    description: string;
+    intentChecksum: string;
+    nonGoals: string;
+    notDoneIf: string;
+    acceptanceCriteria: string;
+    parityMatrix: string | null;
+  } | null;
   canonicalOwnerKey: string | null;
   blockedBySource: boolean;
   repoRoot: string;
@@ -1050,6 +1129,32 @@ async function buildLocallyReconciledFollowUpPacketRetryResult(input: {
   });
   if (!sourceContext.ok) {
     return null;
+  }
+  if (input.expectedDescription) {
+    if (followUpContext.issue.title.trim() !== input.title.trim()) {
+      return null;
+    }
+    const expectedDescription = buildFollowUpIssueDescription({
+      description: input.expectedDescription.description,
+      intentChecksum: input.expectedDescription.intentChecksum,
+      nonGoals: input.expectedDescription.nonGoals,
+      notDoneIf: input.expectedDescription.notDoneIf,
+      acceptanceCriteria: input.expectedDescription.acceptanceCriteria,
+      parityMatrix: input.expectedDescription.parityMatrix,
+      canonicalOwner: canonicalOwnerKey && canonicalOwnerMarker
+        ? {
+            key: canonicalOwnerKey,
+            marker: canonicalOwnerMarker
+          }
+        : null,
+      traceability: buildFollowUpTraceabilitySection({
+        sourceIssue: sourceContext.issue,
+        followUpIssue: followUpContext.issue
+      })
+    });
+    if (!sameFollowUpDescriptionAfterLinearMarkdownNormalization(followUpContext.issue.description, expectedDescription)) {
+      return null;
+    }
   }
   const requestedLabels = resolveFollowUpLabelsFromSourceIssue(sourceContext.issue);
   if (!requestedLabels.ok) {
@@ -2215,6 +2320,10 @@ function normalizeOptionalString(value: unknown): string | null {
 
 function isFollowUpPacketTraceabilityPendingCode(errorCode: string | null | undefined): boolean {
   return normalizeOptionalString(errorCode) === 'linear_follow_up_packet_traceability_pending';
+}
+
+function isFollowUpDescriptionUpdateIncompleteCode(errorCode: string | null | undefined): boolean {
+  return normalizeOptionalString(errorCode) === 'linear_follow_up_description_update_incomplete';
 }
 
 function readUnknownInteger(value: unknown): number | null {

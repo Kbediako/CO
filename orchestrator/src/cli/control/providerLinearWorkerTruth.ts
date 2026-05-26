@@ -15,6 +15,10 @@ const FOLLOW_UP_PACKET_TRACEABILITY_SUPPRESSION_CODES = new Set([
   'linear_follow_up_packet_traceability_pending',
   'linear_follow_up_packet_traceability_retry_suppressed'
 ]);
+const FOLLOW_UP_DESCRIPTION_UPDATE_SUPPRESSION_CODES = new Set([
+  'linear_follow_up_description_update_incomplete',
+  'linear_follow_up_description_update_retry_suppressed'
+]);
 const FOLLOW_UP_LABEL_RESOLUTION_SUPPRESSION_CODES = new Set([
   'linear_follow_up_label_resolution_failed',
   'linear_follow_up_label_resolution_retry_suppressed'
@@ -272,6 +276,13 @@ export function isFollowUpPacketTraceabilitySuppressionCode(
   return normalized ? FOLLOW_UP_PACKET_TRACEABILITY_SUPPRESSION_CODES.has(normalized) : false;
 }
 
+export function isFollowUpDescriptionUpdateSuppressionCode(
+  errorCode: string | null | undefined
+): boolean {
+  const normalized = normalizeOptionalString(errorCode);
+  return normalized ? FOLLOW_UP_DESCRIPTION_UPDATE_SUPPRESSION_CODES.has(normalized) : false;
+}
+
 export function isFollowUpLabelResolutionSuppressionCode(
   errorCode: string | null | undefined
 ): boolean {
@@ -319,6 +330,8 @@ function buildDeterministicProviderMutationSuppression(
             ? 'Do not retry `create-follow-up` in this attempt until you first source-label the Linear issue with the required lifecycle, priority, area, and type labels, then reread issue-context before retrying. Preserve the fail-closed label requirements instead of creating an under-labeled follow-up.'
             : isFollowUpPacketTraceabilitySuppressionCode(errorCode)
             ? 'Do not retry `create-follow-up` in this attempt until you reconcile the existing follow-up issue from the error details and prove its packet prefix, packet files, docs/TASKS.md mirror, tasks/index.json entry, and docs-freshness registry entries are ready.'
+            : isFollowUpDescriptionUpdateSuppressionCode(errorCode)
+            ? 'Do not retry `create-follow-up` in this attempt until you reconcile the existing follow-up issue from the error details and prove its description, packet prefix, packet files, docs/TASKS.md mirror, tasks/index.json entry, docs-freshness registry entries, labels, and relations are ready.'
             : isFollowUpParityMatrixSuppressionCode(errorCode)
             ? 'Do not retry `create-follow-up` in this attempt unless you first add the required parity matrix or explicitly reclassify the follow-up as non-parity/alignment and omit `--parity-lane`.'
             : buildGenericSuppressionInstruction(entry.operation, errorCode, errorMessage),
@@ -327,6 +340,8 @@ function buildDeterministicProviderMutationSuppression(
             ? 'deterministic provider mutation suppressed: create-follow-up retry is blocked until the source issue has the required live labels'
             : isFollowUpPacketTraceabilitySuppressionCode(errorCode)
             ? 'deterministic provider mutation suppressed: create-follow-up retry is blocked until the existing follow-up packet and registry mirrors are ready'
+            : isFollowUpDescriptionUpdateSuppressionCode(errorCode)
+            ? 'deterministic provider mutation suppressed: create-follow-up retry is blocked until the existing follow-up description, packet, labels, and relations are reconciled'
             : isFollowUpParityMatrixSuppressionCode(errorCode)
             ? 'deterministic provider mutation suppressed: create-follow-up retry is blocked until a parity matrix is added or the follow-up is reclassified as non-parity/alignment with --parity-lane omitted'
             : buildGenericSuppressionSummary(entry.operation, errorCode, errorMessage)
@@ -458,6 +473,9 @@ function isDeterministicProviderMutationFailure(entry: ProviderLinearAuditEntry)
     return true;
   }
   if (isFollowUpPacketTraceabilitySuppressionCode(errorCode)) {
+    return true;
+  }
+  if (isFollowUpDescriptionUpdateSuppressionCode(errorCode)) {
     return true;
   }
   if (isFollowUpLabelResolutionSuppressionCode(errorCode)) {
