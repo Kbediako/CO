@@ -453,12 +453,14 @@
           "git diff --check passed",
           "node scripts/spec-guard.mjs --dry-run passed",
           "post-change docs:freshness no longer reports CO-581 May 19 stale cohort",
-          "post-change docs:freshness:maintain reports active owner issues CO-569 and CO-579, not CO-581"
+          "post-change docs:freshness:maintain reports active owner issues CO-569 and CO-579, not CO-581",
+          "2026-05-26 draft PR #898 opened from linear/co-581-retained-cohort-refresh after local validation passed"
         ],
         "pending": [
           "CO-569 Apr 19 retained cohort cleanup remains separately owned",
           "CO-579 Apr 25 report-only stale row remains separately owned",
-          "review and PR lifecycle after current stacked docs metadata is finalized"
+          "review and PR lifecycle after current stacked docs metadata is finalized",
+          "manifest-backed standalone review rerun or explicit quota waiver before ready-review/merge"
         ]
       },
       "paths": {
@@ -485,7 +487,9 @@
         "sample_paths": ".agent/task/1289-coordinator-symphony-aligned-start-cli-request-shell-extraction.md; .agent/task/1290-coordinator-symphony-aligned-start-cli-remaining-boundary-freeze-reassessment.md; .agent/task/1291-coordinator-symphony-aligned-flow-cli-boundary-reassessment-revisit.md",
         "parent_owned": "Parent owns authoritative issue source, live owner truth, validation, Linear/workpad state, PR lifecycle, and review handoff. Parent re-homed exact-key catalog/guide owner metadata from CO-568 to CO-581.",
         "resume_2026_05_26": "CO-581 resumed from Blocked to In Progress to resolve expired May 19 retained cohort; exact owner key remains scoped to baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance; no CO-569, CO-579, or spec pre-expiry absorption.",
-        "resume_2026_05_26_result": "Resolved expired May 19 retained cohort by reclassifying all 71 rows to retained_terminal_packet; remaining freshness blockers are CO-569 and CO-579."
+        "resume_2026_05_26_result": "Resolved expired May 19 retained cohort by reclassifying all 71 rows to retained_terminal_packet; remaining freshness blockers are CO-569 and CO-579.",
+        "pr_898": "Draft PR #898 opened for the CO-581/CO-579 terminal docs freshness history retention branch.",
+        "review_quota_20260526": "Manifest-backed standalone review rerun reached Codex review but failed before contract output because usage quota is exhausted until 2026-05-31 07:51 local; keep PR draft or record a waiver before ready-review/merge if quota remains unavailable."
       }
     },
     {
