@@ -17893,11 +17893,11 @@
         "agent_task": ".agent/task/linear-964ca955-cf9b-4d1b-887b-4d3bb49069d8.md",
         "docs": "docs/TECH_SPEC-linear-964ca955-cf9b-4d1b-887b-4d3bb49069d8.md"
       },
+      "status": "done",
+      "completed_at": "2026-03-26",
       "notes": {
         "archive_headroom_terminal_evidence": "Live Linear CO-5 Done verified 2026-05-26 before docs/TASKS headroom archive."
-      },
-      "status": "done",
-      "completed_at": "2026-03-26"
+      }
     },
     {
       "id": "20260326-linear-df2bd49b-2dd6-413f-8d90-af40d033dace",
