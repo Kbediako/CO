@@ -2507,6 +2507,324 @@ describe('implementation-docs-archive script', () => {
     ).rejects.toMatchObject({ code: 'ENOENT' });
   });
 
+  it.each([
+    {
+      guardName: 'terminal source lifecycle',
+      registryGuard: {
+        terminal_source_lifecycle_state: 'terminal_pending_archive'
+      },
+      expectedGuard: {
+        terminal_source_lifecycle_state: 'terminal_pending_archive'
+      }
+    },
+    {
+      guardName: 'recommended action',
+      registryGuard: {
+        recommended_action: 'resolve_local_checklist_obligations_before_archive'
+      },
+      expectedGuard: {
+        recommended_action: 'resolve_local_checklist_obligations_before_archive'
+      }
+    }
+  ])(
+    'does not repair already-stubbed rows whose registry lifecycle is still active via $guardName',
+    async ({ registryGuard, expectedGuard }) => {
+      const repo = await initRepository({
+        policyOverrides: {
+          doc_patterns: ['tasks/tasks-*.md'],
+          exclude_paths: ['tasks/specs/9999-archive-test.md'],
+          retain_days: 0,
+          max_lines: 1
+        },
+        registry: {
+          generated_at: '2025-01-01',
+          entries: [
+            {
+              path: 'tasks/tasks-9999-archive-test.md',
+              owner: 'Codex',
+              status: 'active',
+              last_review: '2026-05-25',
+              cadence_days: 365,
+              lifecycle_state: 'active',
+              ...registryGuard,
+              notes:
+                'CO-584 registry integrity repair: status restored to active because local open checklist obligations prevent archive readiness.'
+            }
+          ]
+        },
+        taskOverrides: {
+          status: 'completed',
+          paths: {
+            task: 'tasks/tasks-9999-archive-test.md',
+            spec: 'tasks/specs/9999-archive-test.md'
+          }
+        }
+      });
+
+      const taskPath = join(repo, 'tasks', 'tasks-9999-archive-test.md');
+      const specPath = join(repo, 'tasks', 'specs', '9999-archive-test.md');
+      const alreadyStubbed = [
+        '# Archived Task Packet',
+        '',
+        '<!-- docs-archive:stub -->',
+        '> Archived on 2026-05-01. Full content: https://github.com/example/repo/blob/doc-archives/tasks/tasks-9999-archive-test.md',
+        '',
+        '- Archive branch: doc-archives',
+        '- Archive path: tasks/tasks-9999-archive-test.md',
+        ''
+      ].join('\n');
+      await writeFile(taskPath, alreadyStubbed);
+      await writeFile(specPath, '# Task Spec\n\n- [ ] Finish review handoff before archive repair.\n');
+
+      await execFileAsync('node', [scriptPath], {
+        cwd: repo,
+        env: {
+          ...process.env,
+          MCP_RUNNER_TASK_ID: 'implementation-docs-archive-automation',
+          CODEX_ORCHESTRATOR_ROOT: repo,
+          CODEX_ORCHESTRATOR_OUT_DIR: 'out'
+        }
+      });
+
+      const report = JSON.parse(
+        await readFile(
+          join(repo, 'out', 'implementation-docs-archive-automation', 'docs-archive-report.json'),
+          'utf8'
+        )
+      );
+      const registry = JSON.parse(await readFile(join(repo, 'docs', 'docs-freshness-registry.json'), 'utf8'));
+      const retainedEntry = registry.entries.find(
+        (entry: { path?: string }) => entry.path === 'tasks/tasks-9999-archive-test.md'
+      );
+
+      expect(report.totals.archived).toBe(0);
+      expect(report.totals.registry_repairs).toBe(0);
+      expect(report.skipped).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            path: 'tasks/tasks-9999-archive-test.md',
+            reason: 'active_lifecycle_not_archive_ready',
+            registry_repaired: false,
+            context: expect.objectContaining({
+              active_lifecycle_source: 'task_index_open_checklist',
+              local_open_checklist_obligations: [
+                expect.objectContaining({
+                  path: 'tasks/specs/9999-archive-test.md',
+                  open_items: ['- [ ] Finish review handoff before archive repair.']
+                })
+              ]
+            })
+          })
+        ])
+      );
+      expect(retainedEntry).toMatchObject({
+        path: 'tasks/tasks-9999-archive-test.md',
+        status: 'active',
+        last_review: '2026-05-25',
+        lifecycle_state: 'active',
+        ...expectedGuard
+      });
+      expect(await readFile(taskPath, 'utf8')).toBe(alreadyStubbed);
+    }
+  );
+
+  it('repairs already-stubbed active lifecycle rows when live checklist evidence is gone', async () => {
+    const repo = await initRepository({
+      policyOverrides: {
+        doc_patterns: ['tasks/tasks-*.md'],
+        exclude_paths: ['tasks/specs/9999-archive-test.md'],
+        retain_days: 0,
+        max_lines: 1
+      },
+      registry: {
+        generated_at: '2025-01-01',
+        entries: [
+          {
+            path: 'tasks/tasks-9999-archive-test.md',
+            owner: 'Codex',
+            status: 'active',
+            last_review: '2026-05-25',
+            cadence_days: 365,
+            lifecycle_state: 'active',
+            terminal_source_lifecycle_state: 'terminal_pending_archive',
+            recommended_action: 'resolve_local_checklist_obligations_before_archive'
+          }
+        ]
+      },
+      taskOverrides: {
+        status: 'completed',
+        paths: {
+          task: 'tasks/tasks-9999-archive-test.md',
+          spec: 'tasks/specs/9999-archive-test.md'
+        }
+      }
+    });
+
+    const taskPath = join(repo, 'tasks', 'tasks-9999-archive-test.md');
+    const specPath = join(repo, 'tasks', 'specs', '9999-archive-test.md');
+    const alreadyStubbed = [
+      '# Archived Task Packet',
+      '',
+      '<!-- docs-archive:stub -->',
+      '> Archived on 2026-05-01. Full content: https://github.com/example/repo/blob/doc-archives/tasks/tasks-9999-archive-test.md',
+      '',
+      '- Archive branch: doc-archives',
+      '- Archive path: tasks/tasks-9999-archive-test.md',
+      ''
+    ].join('\n');
+    await writeFile(taskPath, alreadyStubbed);
+    await writeFile(specPath, '# Task Spec\n\n- [x] Review handoff completed.\n');
+
+    await execFileAsync('node', [scriptPath], {
+      cwd: repo,
+      env: {
+        ...process.env,
+        MCP_RUNNER_TASK_ID: 'implementation-docs-archive-automation',
+        CODEX_ORCHESTRATOR_ROOT: repo,
+        CODEX_ORCHESTRATOR_OUT_DIR: 'out'
+      }
+    });
+
+    const report = JSON.parse(
+      await readFile(
+        join(repo, 'out', 'implementation-docs-archive-automation', 'docs-archive-report.json'),
+        'utf8'
+      )
+    );
+    const registry = JSON.parse(await readFile(join(repo, 'docs', 'docs-freshness-registry.json'), 'utf8'));
+    const repairedEntry = registry.entries.find(
+      (entry: { path?: string }) => entry.path === 'tasks/tasks-9999-archive-test.md'
+    );
+
+    expect(report.totals.archived).toBe(0);
+    expect(report.totals.registry_repairs).toBe(1);
+    expect(report.registry_repairs).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          path: 'tasks/tasks-9999-archive-test.md',
+          reason: 'already_stubbed_active_registry'
+        })
+      ])
+    );
+    expect(report.skipped).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          path: 'tasks/tasks-9999-archive-test.md',
+          reason: 'already_stubbed',
+          registry_repaired: true
+        })
+      ])
+    );
+    expect(report.skipped).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          path: 'tasks/tasks-9999-archive-test.md',
+          reason: 'active_lifecycle_not_archive_ready'
+        })
+      ])
+    );
+    expect(repairedEntry).toMatchObject({
+      path: 'tasks/tasks-9999-archive-test.md',
+      status: 'archived',
+      cadence_days: 365
+    });
+    expect(await readFile(taskPath, 'utf8')).toBe(alreadyStubbed);
+  });
+
+  it('reports invalid stub metadata before active lifecycle skip', async () => {
+    const repo = await initRepository({
+      policyOverrides: {
+        doc_patterns: ['tasks/tasks-*.md'],
+        retain_days: 0,
+        max_lines: 1
+      },
+      registry: {
+        generated_at: '2025-01-01',
+        entries: [
+          {
+            path: 'tasks/tasks-9999-archive-test.md',
+            owner: 'Codex',
+            status: 'active',
+            last_review: '2026-05-25',
+            cadence_days: 365,
+            lifecycle_state: 'active',
+            terminal_source_lifecycle_state: 'terminal_pending_archive',
+            notes:
+              'CO-584 registry integrity repair: status restored to active because local open checklist obligations prevent archive readiness.'
+          }
+        ]
+      },
+      taskOverrides: {
+        paths: {
+          task: 'tasks/tasks-9999-archive-test.md'
+        }
+      }
+    });
+
+    const taskPath = join(repo, 'tasks', 'tasks-9999-archive-test.md');
+    const malformedStub = [
+      '# Archived Task Packet',
+      '',
+      '<!-- docs-archive:stub -->',
+      '> Archived on 2026-05-01. Full content: https://github.com/example/repo/blob/doc-archives/tasks/tasks-9999-archive-test.md',
+      '',
+      '- Archive branch: doc-archives',
+      ''
+    ].join('\n');
+    await writeFile(taskPath, malformedStub);
+
+    await execFileAsync('node', [scriptPath], {
+      cwd: repo,
+      env: {
+        ...process.env,
+        MCP_RUNNER_TASK_ID: 'implementation-docs-archive-automation',
+        CODEX_ORCHESTRATOR_ROOT: repo,
+        CODEX_ORCHESTRATOR_OUT_DIR: 'out'
+      }
+    });
+
+    const report = JSON.parse(
+      await readFile(
+        join(repo, 'out', 'implementation-docs-archive-automation', 'docs-archive-report.json'),
+        'utf8'
+      )
+    );
+    const registry = JSON.parse(await readFile(join(repo, 'docs', 'docs-freshness-registry.json'), 'utf8'));
+    const retainedEntry = registry.entries.find(
+      (entry: { path?: string }) => entry.path === 'tasks/tasks-9999-archive-test.md'
+    );
+
+    expect(report.totals.archived).toBe(0);
+    expect(report.totals.registry_repairs).toBe(0);
+    expect(report.skipped).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          path: 'tasks/tasks-9999-archive-test.md',
+          reason: 'invalid_archive_stub_metadata',
+          context: expect.objectContaining({
+            archive_stub_errors: expect.arrayContaining([expect.stringContaining('Archive path')])
+          })
+        })
+      ])
+    );
+    expect(report.skipped).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          path: 'tasks/tasks-9999-archive-test.md',
+          reason: 'active_lifecycle_not_archive_ready'
+        })
+      ])
+    );
+    expect(retainedEntry).toMatchObject({
+      path: 'tasks/tasks-9999-archive-test.md',
+      status: 'active',
+      last_review: '2026-05-25',
+      lifecycle_state: 'active',
+      terminal_source_lifecycle_state: 'terminal_pending_archive'
+    });
+    expect(await readFile(taskPath, 'utf8')).toBe(malformedStub);
+  });
+
   it('does not auto-archive preserved historical stubs for completed task packets', async () => {
     const repo = await initRepository({
       policyOverrides: {

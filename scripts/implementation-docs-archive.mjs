@@ -15,7 +15,7 @@ import {
   toPosixPath
 } from './lib/docs-helpers.js';
 import {
-  buildTaskPacketLifecycleIndex,
+  buildTaskPacketLifecycleIndexForRepo,
   collectIndexedTaskPacketPaths,
   isTaskPacketLifecyclePath,
   isTerminalTaskStatus,
@@ -45,6 +45,8 @@ const ALREADY_ARCHIVED_PRESERVED_FINDINGS_REASON = 'already_archived_preserved_f
 const PRESERVED_HISTORICAL_STUB_PATH_PATTERNS = [/^tasks\/tasks-[^/]+\.md$/, /^\.agent\/task\/[^/]+\.md$/];
 const PRESERVED_HISTORICAL_STUB_HEADING_PATTERN = /^\s*#\s+Historical stub\b/i;
 const REGISTRY_TASK_STATUS_FIELDS = ['task_status', 'task_lifecycle_status', 'lifecycle_status'];
+const RECOMMENDED_ACTION_RESOLVE_LOCAL_CHECKLIST_OBLIGATIONS_BEFORE_ARCHIVE =
+  'resolve_local_checklist_obligations_before_archive';
 
 function showUsage() {
   console.log(`Usage: node scripts/implementation-docs-archive.mjs [options]
@@ -94,6 +96,28 @@ function normalizeRegistryTaskStatus(entry) {
     }
   }
   return null;
+}
+
+function normalizeRegistryString(entry, field) {
+  const value = entry?.[field];
+  return typeof value === 'string' ? value.trim().toLowerCase() : '';
+}
+
+function isActiveLifecycleNotArchiveReady(entry) {
+  if (!entry || typeof entry !== 'object') {
+    return false;
+  }
+  if (normalizeRegistryString(entry, 'status') !== 'active') {
+    return false;
+  }
+  if (normalizeRegistryString(entry, 'lifecycle_state') !== 'active') {
+    return false;
+  }
+  return (
+    normalizeRegistryString(entry, 'terminal_source_lifecycle_state') === TERMINAL_PENDING_ARCHIVE_STATUS ||
+    normalizeRegistryString(entry, 'recommended_action') ===
+      RECOMMENDED_ACTION_RESOLVE_LOCAL_CHECKLIST_OBLIGATIONS_BEFORE_ARCHIVE
+  );
 }
 
 function retainedTerminalPacketEvidence(registryEntry, relativePath, terminalLifecycleByPath) {
@@ -593,7 +617,9 @@ async function main() {
 
   const tasksIndex = JSON.parse(tasksRaw);
   const items = Array.isArray(tasksIndex?.items) ? tasksIndex.items : [];
-  const taskLifecycleIndex = buildTaskPacketLifecycleIndex(items);
+  const taskLifecycleIndex = await buildTaskPacketLifecycleIndexForRepo(repoRoot, items, {
+    ignoreNonFileContent: true
+  });
 
   const docRegexes = policy.docPatterns.map((pattern) => globToRegExp(pattern));
   const excludeSet = new Set(policy.excludePaths);
@@ -808,7 +834,9 @@ async function main() {
 
     const ageDays = computeAgeInDays(fallbackTerminalDate, today);
     for (const pathValue of indexedDocPaths) {
-      const terminalLifecycle = taskLifecycleIndex.byPath.get(pathValue);
+      const terminalLifecycle =
+        taskLifecycleIndex.byPath.get(pathValue) ??
+        taskLifecycleIndex.activeTerminalSourceItemsByPath.get(pathValue);
       if (!terminalLifecycle || terminalLifecycle.task_key !== taskKey) {
         continue;
       }
@@ -1030,8 +1058,8 @@ async function main() {
       return;
     }
 
-    if (hasArchiveStubMarker(content)) {
-      const parsedStub = parseArchiveStubMetadata(archiveRelativePath, content);
+    const parsedStub = hasArchiveStubMarker(content) ? parseArchiveStubMetadata(archiveRelativePath, content) : null;
+    if (parsedStub) {
       if (!parsedStub.isValid) {
         report.skipped.push({
           path: relativePath,
@@ -1044,6 +1072,28 @@ async function main() {
         report.totals.skipped += 1;
         return;
       }
+    }
+
+    const activeLifecycleEntry = registryMap.get(relativePath);
+    const activeTerminalSourceEvidence =
+      taskLifecycleIndex.activeTerminalSourceItemsByPath.get(relativePath);
+    if (isActiveLifecycleNotArchiveReady(activeLifecycleEntry) && activeTerminalSourceEvidence) {
+      report.skipped.push({
+        path: relativePath,
+        reason: 'active_lifecycle_not_archive_ready',
+        context: {
+          ...context,
+          active_lifecycle_source: 'task_index_open_checklist',
+          local_open_checklist_obligations:
+            activeTerminalSourceEvidence.local_open_checklist_obligations ?? []
+        },
+        registry_repaired: false
+      });
+      report.totals.skipped += 1;
+      return;
+    }
+
+    if (parsedStub) {
       const registryRepaired = markArchivedRegistryEntry(relativePath, {
         reason: 'already_stubbed_active_registry',
         context,

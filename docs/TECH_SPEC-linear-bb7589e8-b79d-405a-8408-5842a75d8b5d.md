@@ -5,15 +5,25 @@ relates_to: docs/PRD-linear-bb7589e8-b79d-405a-8408-5842a75d8b5d.md
 risk: high
 owners:
   - Codex
-last_review: 2026-05-25
+last_review: 2026-05-26
 ---
 
 ## Added by Bootstrap 2026-05-25
+
+## Rework Update 2026-05-26
+- Current `origin/main` after PR #896 has 35 invalid registry rows where `status: archived` was restored by implementation-docs archive automation while `lifecycle_state: active` and `terminal_source_lifecycle_state: terminal_pending_archive` remained.
+- Root cause: the already-stubbed archive repair branch updates active registry rows to archived without checking whether lifecycle metadata explicitly says the row is still active and not archive-ready.
+- Rework requirement: `scripts/implementation-docs-archive.mjs` must skip archive repair for already-stubbed rows that have active lifecycle plus terminal-pending/source-obligation metadata, and the registry repair must restore the 35 rows without a blind review-date bump.
 
 ## Summary
 - Objective: Make docs-freshness registry lifecycle integrity deterministic and repair the current archived/active contradiction.
 - Scope: Registry rows, registry validation, maintenance blocker priority, focused regressions, and exact-owner preservation.
 - Constraints: No blind date bumps, no deletion of historical packets, no gate weakening, no cap expansion.
+
+## 2026-05-26 Rework Scope
+- Objective extension: fix the current-main recurrence where 35 registry rows again combine `status: archived` with `lifecycle_state: active`.
+- Scope extension: harden the archive automation/generator path that reintroduced the contradiction after PR #887.
+- Non-goals: do not absorb CO-581 expired retained cohort cleanup, CO-569 retained cohort cleanup, CO-579 owner lifecycle, active spec pre-expiry review, cap/window changes, or gate weakening.
 
 ## Issue-Shaping Contract
 - User-request translation carried forward: Recurring docs freshness failures should be fixed by removing the root contradiction in lifecycle data.
@@ -35,10 +45,13 @@ last_review: 2026-05-25
 ## Technical Requirements
 - Functional requirements:
   - Add RED coverage for `status: archived` plus `lifecycle_state: active`.
+  - Add RED coverage for implementation-docs archive automation re-archiving an already-stubbed row whose registry lifecycle is still active and terminal-pending.
   - Repair current registry entries into a consistent active/local-obligation representation.
   - Keep registry blockers ahead of capacity decisions until registry integrity is clean.
   - Preserve owner finalizer exact-key behavior for CO-581 and CO-569.
   - Emit evidence that capacity/pre-expiry debt remains secondary if still present.
+  - Prevent archive automation from emitting archived rows with active lifecycle state.
+  - Add or update recurrence coverage for the 35-row current-main shape.
 - Non-functional requirements (performance, reliability, security):
   - Validation remains deterministic and local.
   - JSON registry order remains stable enough for review.
@@ -72,6 +85,11 @@ last_review: 2026-05-25
   - `npm run docs:check`.
   - `npm run docs:freshness`.
   - `node scripts/docs-freshness-maintain.mjs --check`.
+- Rework baseline reports:
+  - `npm run docs:freshness -- --report out/linear-bb7589e8-b79d-405a-8408-5842a75d8b5d/co584-rework-baseline-origin-main-docs-freshness.json`
+  - `npm run docs:freshness:maintain -- --format json --dry-run-linear-actions --warn --report out/linear-bb7589e8-b79d-405a-8408-5842a75d8b5d/co584-rework-baseline-origin-main-docs-freshness-maintain.json`
+  - `npm run docs:freshness -- --report out/linear-bb7589e8-b79d-405a-8408-5842a75d8b5d/co584-rework-docs-freshness.json`
+  - `npm run docs:freshness:maintain -- --check --format json --dry-run-linear-actions --report out/linear-bb7589e8-b79d-405a-8408-5842a75d8b5d/co584-rework-docs-freshness-maintain-check.json`
 - Rollout verification: The maintain report should no longer choose `block_missing_or_invalid_registry` for the repaired rows.
 - Monitoring / alerts: If capacity remains over budget, record the next explicit owner route in the workpad and PR body.
 

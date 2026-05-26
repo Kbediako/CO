@@ -602,10 +602,14 @@ function shouldReplaceTaskIndexEntry(existing, candidate) {
   return candidateReviewDate > existingReviewDate;
 }
 
-export async function readTaskPacketLifecycleContentMap(repoRoot, items) {
+export async function readTaskPacketLifecycleContentMap(repoRoot, items, options = {}) {
   const contentByPath = new Map();
   const resolvedRepoRoot = path.resolve(repoRoot);
   const sourceItems = Array.isArray(items) ? items : [];
+  const ignoredReadErrorCodes = new Set(['ENOENT']);
+  if (options.ignoreNonFileContent === true) {
+    ignoredReadErrorCodes.add('EISDIR');
+  }
   const indexedPaths = new Set();
   for (const item of sourceItems) {
     for (const docPath of collectIndexedTaskPacketPaths(item)) {
@@ -622,18 +626,18 @@ export async function readTaskPacketLifecycleContentMap(repoRoot, items) {
       try {
         contentByPath.set(docPath, await readFile(resolvedPath, 'utf8'));
       } catch (error) {
-        if (error?.code !== 'ENOENT') {
+        if (!ignoredReadErrorCodes.has(error?.code)) {
           throw error;
         }
-        // Missing linked packet paths are handled by the command-level registry checks.
+        // Missing linked packet paths are handled by command-level registry checks.
       }
     })
   );
   return contentByPath;
 }
 
-export async function buildTaskPacketLifecycleIndexForRepo(repoRoot, items) {
-  const contentByPath = await readTaskPacketLifecycleContentMap(repoRoot, items);
+export async function buildTaskPacketLifecycleIndexForRepo(repoRoot, items, options = {}) {
+  const contentByPath = await readTaskPacketLifecycleContentMap(repoRoot, items, options);
   return buildTaskPacketLifecycleIndex(items, { contentByPath });
 }
 
