@@ -2507,6 +2507,93 @@ describe('implementation-docs-archive script', () => {
     ).rejects.toMatchObject({ code: 'ENOENT' });
   });
 
+  it('does not repair already-stubbed rows whose registry lifecycle is still active', async () => {
+    const repo = await initRepository({
+      policyOverrides: {
+        doc_patterns: ['tasks/tasks-*.md'],
+        retain_days: 0,
+        max_lines: 1
+      },
+      registry: {
+        generated_at: '2025-01-01',
+        entries: [
+          {
+            path: 'tasks/tasks-9999-archive-test.md',
+            owner: 'Codex',
+            status: 'active',
+            last_review: '2026-05-25',
+            cadence_days: 365,
+            lifecycle_state: 'active',
+            terminal_source_lifecycle_state: 'terminal_pending_archive',
+            recommended_action: 'resolve_local_checklist_obligations_before_archive',
+            notes:
+              'CO-584 registry integrity repair: status restored to active because local open checklist obligations prevent archive readiness.'
+          }
+        ]
+      },
+      taskOverrides: {
+        paths: {
+          task: 'tasks/tasks-9999-archive-test.md'
+        }
+      }
+    });
+
+    const taskPath = join(repo, 'tasks', 'tasks-9999-archive-test.md');
+    const alreadyStubbed = [
+      '# Archived Task Packet',
+      '',
+      '<!-- docs-archive:stub -->',
+      '> Archived on 2026-05-01. Full content: https://github.com/example/repo/blob/doc-archives/tasks/tasks-9999-archive-test.md',
+      '',
+      '- Archive branch: doc-archives',
+      '- Archive path: tasks/tasks-9999-archive-test.md',
+      ''
+    ].join('\n');
+    await writeFile(taskPath, alreadyStubbed);
+
+    await execFileAsync('node', [scriptPath], {
+      cwd: repo,
+      env: {
+        ...process.env,
+        MCP_RUNNER_TASK_ID: 'implementation-docs-archive-automation',
+        CODEX_ORCHESTRATOR_ROOT: repo,
+        CODEX_ORCHESTRATOR_OUT_DIR: 'out'
+      }
+    });
+
+    const report = JSON.parse(
+      await readFile(
+        join(repo, 'out', 'implementation-docs-archive-automation', 'docs-archive-report.json'),
+        'utf8'
+      )
+    );
+    const registry = JSON.parse(await readFile(join(repo, 'docs', 'docs-freshness-registry.json'), 'utf8'));
+    const retainedEntry = registry.entries.find(
+      (entry: { path?: string }) => entry.path === 'tasks/tasks-9999-archive-test.md'
+    );
+
+    expect(report.totals.archived).toBe(0);
+    expect(report.totals.registry_repairs).toBe(0);
+    expect(report.skipped).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          path: 'tasks/tasks-9999-archive-test.md',
+          reason: 'active_lifecycle_not_archive_ready',
+          registry_repaired: false
+        })
+      ])
+    );
+    expect(retainedEntry).toMatchObject({
+      path: 'tasks/tasks-9999-archive-test.md',
+      status: 'active',
+      last_review: '2026-05-25',
+      lifecycle_state: 'active',
+      terminal_source_lifecycle_state: 'terminal_pending_archive',
+      recommended_action: 'resolve_local_checklist_obligations_before_archive'
+    });
+    expect(await readFile(taskPath, 'utf8')).toBe(alreadyStubbed);
+  });
+
   it('does not auto-archive preserved historical stubs for completed task packets', async () => {
     const repo = await initRepository({
       policyOverrides: {

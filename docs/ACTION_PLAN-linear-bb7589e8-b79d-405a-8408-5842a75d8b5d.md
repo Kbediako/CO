@@ -2,10 +2,20 @@
 
 ## Added by Bootstrap 2026-05-25
 
+## Rework Update 2026-05-26
+- Baseline recurrence: current `origin/main` after PR #896 fails `docs:freshness` and `docs:freshness:maintain -- --format json` on 35 archived/active registry rows.
+- Sequence adjustment: add a failing implementation-docs archive automation regression, update the archive repair path to respect active lifecycle metadata, restore the 35 registry rows without accepting the archive automation date bump, then rerun freshness/maintain gates to verify the registry hard block is gone.
+
 ## Summary
 - Goal: Repair the current docs-freshness registry lifecycle contradiction and prevent recurrence.
 - Scope: Docs-first packet, registry integrity fixture, implementation repair, validation, PR review, and Linear handoff.
 - Assumptions: CO-583 continues to own the degraded control-host status plane; CO-584 can proceed manually in an isolated worktree.
+
+## 2026-05-26 Rework Plan
+- Goal: repair the current-main recurrence of 35 archived/active registry contradictions and harden the automation path that reintroduced them.
+- Scope: `docs/docs-freshness-registry.json`, the archive/freshness generator path if needed, focused docs-freshness tests, and CO-584 task/workpad evidence.
+- Non-goals: CO-581 expired May 19 cohort, CO-569 Apr 19 cohort, CO-579 active-owner lifecycle, active spec pre-expiry review, cap/window changes, or gate weakening.
+- Parallelization: `stay_serial` / `overlapping_scope`; data repair and generator hardening are the same invariant.
 
 ## Issue Readiness Gate
 - Intent checksum / protected terms carried forward: `docs:freshness`, `docs:freshness:maintain`, `block_missing_or_invalid_registry`, `docs/docs-freshness-registry.json`, `status: archived`, `lifecycle_state: active`, `terminal_pending_archive`, `preserved_historical_stub`, `canonical_owner_key`, `CO-579`, `CO-580`, `CO-581`, `CO-569`, `CO-429`.
@@ -19,8 +29,17 @@
 1. Register docs-first packet and freshness registry rows for CO-584.
 2. Add focused RED tests that capture the archived/active contradiction and maintain decision priority.
 3. Repair the lifecycle data and implementation path that allowed contradictory rows.
-4. Validate with focused tests, JSON checks, spec guard, docs checks, freshness commands, and maintain check.
-5. Run standalone review/elegance, open PR, confirm Codex and CodeRabbit review, and complete Linear handoff only after review drain.
+4. Rework: add focused RED coverage for the implementation-docs archive automation recurrence and fix the already-stubbed registry repair path.
+5. Validate with focused tests, JSON checks, spec guard, docs checks, freshness commands, and maintain check.
+6. Run standalone review/elegance, open PR, confirm Codex and CodeRabbit review, and complete Linear handoff only after review drain.
+
+## 2026-05-26 Rework Sequencing
+1. Capture baseline `docs:freshness` and `docs:freshness:maintain` reports on current `origin/main`.
+2. Identify the 35 invalid rows and the automation/generator path that wrote `status=archived` with `lifecycle_state=active`.
+3. Add or adjust focused regression coverage for the recurrence.
+4. Repair the rows and writer behavior without changing `last_review` absent review evidence.
+5. Re-run focused tests, `jq`, `spec-guard`, `docs:check`, `docs:freshness`, and `docs:freshness:maintain`.
+6. Update workpad and either proceed to PR/review or leave CO-584 in Rework with the next named blocker.
 
 ## Dependencies
 - CO-583 status-plane degradation affects provider-worker admission only; it does not block local isolated implementation.

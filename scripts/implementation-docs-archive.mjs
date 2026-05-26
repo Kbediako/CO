@@ -96,6 +96,27 @@ function normalizeRegistryTaskStatus(entry) {
   return null;
 }
 
+function normalizeRegistryString(entry, field) {
+  const value = entry?.[field];
+  return typeof value === 'string' ? value.trim().toLowerCase() : '';
+}
+
+function isActiveLifecycleNotArchiveReady(entry) {
+  if (!entry || typeof entry !== 'object') {
+    return false;
+  }
+  if (normalizeRegistryString(entry, 'status') !== 'active') {
+    return false;
+  }
+  if (normalizeRegistryString(entry, 'lifecycle_state') !== 'active') {
+    return false;
+  }
+  return (
+    normalizeRegistryString(entry, 'terminal_source_lifecycle_state') === TERMINAL_PENDING_ARCHIVE_STATUS ||
+    normalizeRegistryString(entry, 'recommended_action') === 'resolve_local_checklist_obligations_before_archive'
+  );
+}
+
 function retainedTerminalPacketEvidence(registryEntry, relativePath, terminalLifecycleByPath) {
   const taskStatus = normalizeRegistryTaskStatus(registryEntry);
   if (taskStatus && isTerminalTaskStatus(taskStatus) && isTaskPacketLifecyclePath(relativePath)) {
@@ -1025,6 +1046,18 @@ async function main() {
           ...context,
           linked_unchecked_checklists: linkedOpenChecklistItems
         }
+      });
+      report.totals.skipped += 1;
+      return;
+    }
+
+    const activeLifecycleEntry = registryMap.get(relativePath);
+    if (isActiveLifecycleNotArchiveReady(activeLifecycleEntry)) {
+      report.skipped.push({
+        path: relativePath,
+        reason: 'active_lifecycle_not_archive_ready',
+        context,
+        registry_repaired: false
       });
       report.totals.skipped += 1;
       return;

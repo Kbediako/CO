@@ -200,8 +200,8 @@
       "owners": [
         "Codex"
       ],
-      "status": "in_progress",
-      "last_review": "2026-05-25",
+      "status": "rework",
+      "last_review": "2026-05-26",
       "canonical_owner_key": "docs:freshness:registry-integrity",
       "canonical_owner_marker": "codex-orchestrator:canonical-owner-key=docs:freshness:registry-integrity",
       "evidence": [
@@ -231,7 +231,24 @@
       },
       "notes": {
         "source_issue": "CO-584 registry integrity repair for docs freshness archived/active lifecycle contradiction.",
-        "gpt_pro_consult": "GPT Pro agreed registry integrity must precede owner/capacity routing and warned against blind last_review bumps."
+        "gpt_pro_consult": "GPT Pro agreed registry integrity must precede owner/capacity routing and warned against blind last_review bumps.",
+        "rework_2026_05_26": "Current origin/main reintroduced 35 status=archived plus lifecycle_state=active registry contradictions after archive automation; CO-584 owns the recurrence, while CO-581/CO-569/CO-579 and spec pre-expiry remain out of scope."
+      },
+      "validation": {
+        "status": "registry_hard_block_cleared_rework_validation_in_progress",
+        "evidence": [
+          "out/linear-bb7589e8-b79d-405a-8408-5842a75d8b5d/docs-archive-report.json",
+          "out/linear-bb7589e8-b79d-405a-8408-5842a75d8b5d/docs-freshness-maintenance.json"
+        ],
+        "completed": [
+          "current-main recurrence registry repair",
+          "archive automation/generator hardening",
+          "focused regression for recurrence",
+          "freshness and maintain validation"
+        ],
+        "pending": [
+          "review and PR lifecycle after validation"
+        ]
       }
     },
     {
