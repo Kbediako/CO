@@ -235,7 +235,7 @@
         "rework_2026_05_26": "Current origin/main reintroduced 35 status=archived plus lifecycle_state=active registry contradictions after archive automation; CO-584 owns the recurrence, while CO-581/CO-569/CO-579 and spec pre-expiry remain out of scope."
       },
       "validation": {
-        "status": "registry_hard_block_cleared_review_quota_blocked",
+        "status": "pr_green_quota_waived_in_review",
         "evidence": [
           "regenerate archive dry-run report: MCP_RUNNER_TASK_ID=linear-bb7589e8-b79d-405a-8408-5842a75d8b5d npm run docs:archive-implementation -- --dry-run",
           "regenerate baseline freshness report from clean origin/main: npm run docs:freshness -- --report out/linear-bb7589e8-b79d-405a-8408-5842a75d8b5d/co584-rework-baseline-origin-main-docs-freshness.json",
@@ -249,11 +249,15 @@
           "focused regression for recurrence",
           "freshness and maintain validation",
           "build lint test docs check stewardship diff budget",
-          "manual standalone and elegance review after Codex quota block"
+          "manual standalone and elegance review after Codex quota block",
+          "CodeRabbit approved PR #897 on head 945cdda808",
+          "Cloud Canary and Core Lane passed on head 945cdda808",
+          "unresolved GitHub review threads verified at 0",
+          "Codex review quota waiver recorded for merge gate"
         ],
         "pending": [
-          "Codex review retry after quota reset or explicit quota waiver",
-          "PR lifecycle"
+          "quiet-window monitor",
+          "merge PR #897"
         ]
       }
     },
