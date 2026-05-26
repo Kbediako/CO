@@ -15,7 +15,7 @@ import {
   toPosixPath
 } from './lib/docs-helpers.js';
 import {
-  buildTaskPacketLifecycleIndex,
+  buildTaskPacketLifecycleIndexForRepo,
   collectIndexedTaskPacketPaths,
   isTaskPacketLifecyclePath,
   isTerminalTaskStatus,
@@ -617,7 +617,9 @@ async function main() {
 
   const tasksIndex = JSON.parse(tasksRaw);
   const items = Array.isArray(tasksIndex?.items) ? tasksIndex.items : [];
-  const taskLifecycleIndex = buildTaskPacketLifecycleIndex(items);
+  const taskLifecycleIndex = await buildTaskPacketLifecycleIndexForRepo(repoRoot, items, {
+    ignoreNonFileContent: true
+  });
 
   const docRegexes = policy.docPatterns.map((pattern) => globToRegExp(pattern));
   const excludeSet = new Set(policy.excludePaths);
@@ -832,7 +834,9 @@ async function main() {
 
     const ageDays = computeAgeInDays(fallbackTerminalDate, today);
     for (const pathValue of indexedDocPaths) {
-      const terminalLifecycle = taskLifecycleIndex.byPath.get(pathValue);
+      const terminalLifecycle =
+        taskLifecycleIndex.byPath.get(pathValue) ??
+        taskLifecycleIndex.activeTerminalSourceItemsByPath.get(pathValue);
       if (!terminalLifecycle || terminalLifecycle.task_key !== taskKey) {
         continue;
       }
@@ -1054,20 +1058,8 @@ async function main() {
       return;
     }
 
-    const activeLifecycleEntry = registryMap.get(relativePath);
-    if (isActiveLifecycleNotArchiveReady(activeLifecycleEntry)) {
-      report.skipped.push({
-        path: relativePath,
-        reason: 'active_lifecycle_not_archive_ready',
-        context,
-        registry_repaired: false
-      });
-      report.totals.skipped += 1;
-      return;
-    }
-
-    if (hasArchiveStubMarker(content)) {
-      const parsedStub = parseArchiveStubMetadata(archiveRelativePath, content);
+    const parsedStub = hasArchiveStubMarker(content) ? parseArchiveStubMetadata(archiveRelativePath, content) : null;
+    if (parsedStub) {
       if (!parsedStub.isValid) {
         report.skipped.push({
           path: relativePath,
@@ -1080,6 +1072,28 @@ async function main() {
         report.totals.skipped += 1;
         return;
       }
+    }
+
+    const activeLifecycleEntry = registryMap.get(relativePath);
+    const activeTerminalSourceEvidence =
+      taskLifecycleIndex.activeTerminalSourceItemsByPath.get(relativePath);
+    if (isActiveLifecycleNotArchiveReady(activeLifecycleEntry) && activeTerminalSourceEvidence) {
+      report.skipped.push({
+        path: relativePath,
+        reason: 'active_lifecycle_not_archive_ready',
+        context: {
+          ...context,
+          active_lifecycle_source: 'task_index_open_checklist',
+          local_open_checklist_obligations:
+            activeTerminalSourceEvidence.local_open_checklist_obligations ?? []
+        },
+        registry_repaired: false
+      });
+      report.totals.skipped += 1;
+      return;
+    }
+
+    if (parsedStub) {
       const registryRepaired = markArchivedRegistryEntry(relativePath, {
         reason: 'already_stubbed_active_registry',
         context,

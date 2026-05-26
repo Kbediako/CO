@@ -253,9 +253,11 @@
           "CodeRabbit approved PR #897 on head 945cdda808",
           "Cloud Canary and Core Lane passed on head 945cdda808",
           "unresolved GitHub review threads verified at 0",
-          "Codex review quota waiver recorded for merge gate"
+          "Codex review quota waiver recorded for merge gate",
+          "Codex P2 review threads addressed with live-checklist evidence gating and stub metadata precedence"
         ],
         "pending": [
+          "current-head checks after Codex P2 fix",
           "quiet-window monitor",
           "merge PR #897"
         ]
