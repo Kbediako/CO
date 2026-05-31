@@ -1,6 +1,71 @@
 {
   "items": [
     {
+      "id": "20260531-linear-617541e3-39f0-4926-8105-9b2a5c053a5b",
+      "title": "CO-520 provider-worker Codex goals",
+      "relates_to": "tasks/tasks-linear-617541e3-39f0-4926-8105-9b2a5c053a5b.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "status": "in_progress",
+      "last_review": "2026-05-31",
+      "canonical_owner_key": "provider-worker-goals:linear-spec-derived-status-tracking",
+      "canonical_owner_marker": "codex-orchestrator:canonical-owner-key=provider-worker-goals:linear-spec-derived-status-tracking",
+      "evidence": [
+        "docs/PRD-linear-617541e3-39f0-4926-8105-9b2a5c053a5b.md",
+        "docs/TECH_SPEC-linear-617541e3-39f0-4926-8105-9b2a5c053a5b.md",
+        "docs/ACTION_PLAN-linear-617541e3-39f0-4926-8105-9b2a5c053a5b.md",
+        "tasks/specs/linear-617541e3-39f0-4926-8105-9b2a5c053a5b.md",
+        "tasks/tasks-linear-617541e3-39f0-4926-8105-9b2a5c053a5b.md",
+        ".agent/task/linear-617541e3-39f0-4926-8105-9b2a5c053a5b.md",
+        "tasks/index.json",
+        "docs/TASKS.md"
+      ],
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue docs child lane",
+          "date": "2026-05-31",
+          "status": "created_for_parent_import",
+          "source_anchor": "ctx:sha256:e74800d66d2870c9a53eaf8e9d23ba1d868a5a3988366523e82b2f6af7ddfe69#chunk:c000001",
+          "summary": "Docs-first packet frames CO-520 as the full provider-worker Codex goals workflow, preserving one-goal-per-issue/spec-checksum identity, advisory-only goal evidence, explicit status states, and older goal compatibility."
+        }
+      },
+      "validation": {
+        "status": "docs_packet_ready_for_parent_import",
+        "passed": [
+          "docs-first packet drafted in scoped child lane",
+          "pre-implementation issue-quality note captured",
+          "fallback and compatibility decision captured",
+          "task registry and docs task snapshot updated in scoped files"
+        ],
+        "pending": [
+          "parent docs-review",
+          "implementation",
+          "focused duplicate-prevention, objective-shaping, status-rendering, stale/mismatched, resume, and idempotency tests",
+          "parent final validation floor"
+        ]
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-617541e3-39f0-4926-8105-9b2a5c053a5b.md",
+        "task": "tasks/tasks-linear-617541e3-39f0-4926-8105-9b2a5c053a5b.md",
+        "agent_task": ".agent/task/linear-617541e3-39f0-4926-8105-9b2a5c053a5b.md",
+        "prd": "docs/PRD-linear-617541e3-39f0-4926-8105-9b2a5c053a5b.md",
+        "docs": "docs/TECH_SPEC-linear-617541e3-39f0-4926-8105-9b2a5c053a5b.md",
+        "action_plan": "docs/ACTION_PLAN-linear-617541e3-39f0-4926-8105-9b2a5c053a5b.md"
+      },
+      "source_issue": {
+        "id": "617541e3-39f0-4926-8105-9b2a5c053a5b",
+        "identifier": "CO-520",
+        "url": "https://linear.app/asabeko/issue/CO-520"
+      },
+      "notes": {
+        "provider_issue_task_key": "linear-617541e3-39f0-4926-8105-9b2a5c053a5b",
+        "protected_terms": "CO-520; provider-worker goals; Codex goals; Linear specs; goal_evidence; advisory_only; provider-worker-goals:linear-spec-derived-status-tracking; co-status --format json; ## Codex Workpad; linear parallelization; goals stable true; Codex CLI 0.135.0+; older 0.130.0 compatibility.",
+        "parent_owned": "Parent owns authoritative issue workspace, Linear state, workpad mutation, docs-review, implementation, validation, PR lifecycle, and final handoff."
+      }
+    },
+    {
       "id": "20260531-linear-a146d642-3c07-4c89-8263-2a316d952ba3",
       "title": "CO-590 Codex CLI 0.135.0 release-intake",
       "relates_to": "tasks/tasks-linear-a146d642-3c07-4c89-8263-2a316d952ba3.md",

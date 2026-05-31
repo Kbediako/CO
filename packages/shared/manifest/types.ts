@@ -545,6 +545,9 @@ export interface ProviderLinearGoalEvidence {
   elapsed_seconds: number | null;
   created_at: string | null;
   updated_at: string | null;
+  provider_issue_task_key?: string | null;
+  spec_checksum?: string | null;
+  goal_key?: string | null;
   authority: "advisory_only";
   linear_authority_preserved: true;
   /**

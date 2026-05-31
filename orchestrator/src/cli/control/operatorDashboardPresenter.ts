@@ -52,6 +52,7 @@ export interface OperatorDashboardSessionPayload {
   worker_host?: string | null;
   worker_control?: NonNullable<ControlIssuePayload['provider_linear_worker_proof']>['worker_control'] | null;
   resolved_model_provenance?: ControlRunningPayload['resolved_model_provenance'];
+  goal_summary?: OperatorDashboardGoalSummary | null;
   last_event: string | null;
   last_message: string | null;
   display_event?: string | null;
@@ -108,6 +109,7 @@ export interface OperatorDashboardIssuePayload {
   };
   worker_host?: string | null;
   worker_control?: NonNullable<ControlIssuePayload['provider_linear_worker_proof']>['worker_control'] | null;
+  goal_summary?: OperatorDashboardGoalSummary | null;
   session: {
     session_id: string | null;
     thread_id: string | null;
@@ -132,6 +134,31 @@ export interface OperatorDashboardIssuePayload {
   provider_debug_snapshot?: ControlIssuePayload['provider_debug_snapshot'] | null;
   fallback_expiry?: ControlStatusFallbackExpiryMetadata[];
   is_selected: boolean;
+}
+
+export type OperatorDashboardGoalSummaryState =
+  | 'missing'
+  | 'unavailable'
+  | 'stale'
+  | 'mismatched_thread'
+  | 'active'
+  | 'complete';
+
+export interface OperatorDashboardGoalSummary {
+  state: OperatorDashboardGoalSummaryState;
+  authority: 'advisory_only';
+  issue_id: string | null;
+  task_key: string | null;
+  checksum: string | null;
+  checksum_short: string | null;
+  goal_key: string | null;
+  capture_mode: string | null;
+  status: string | null;
+  thread_id: string | null;
+  turn_id: string | null;
+  objective_preview: string | null;
+  reason: string | null;
+  updated_at: string | null;
 }
 
 export interface OperatorDashboardDegradedPayload {
@@ -321,6 +348,7 @@ function buildIssuePayload(
     stageStartedAt,
     issue.provider_debug_snapshot ?? null
   );
+  const goalSummary = buildProviderGoalSummary(proof, issue.issue_id, issue.task_id);
 
   return {
     issue_identifier: issue.issue_identifier,
@@ -339,6 +367,7 @@ function buildIssuePayload(
     },
     ...(workerHost !== null ? { worker_host: workerHost } : {}),
     worker_control: proof?.worker_control ?? null,
+    ...(goalSummary ? { goal_summary: goalSummary } : {}),
     session: {
       session_id: proof?.latest_session_id ?? running?.session_id ?? issue.retry?.session_id ?? null,
       thread_id: proof?.thread_id ?? null,
@@ -396,6 +425,7 @@ function buildRunningSessionPayload(
     issue?.running?.resolved_model_provenance ??
     proof?.resolved_model_provenance ??
     null;
+  const goalSummary = buildProviderGoalSummary(proof, entry.issue_id, issue?.task_id ?? entry.issue_identifier);
   return {
     issue_identifier: entry.issue_identifier,
     issue_id: entry.issue_id,
@@ -423,6 +453,7 @@ function buildRunningSessionPayload(
     host: LOCAL_HOSTNAME,
     ...(workerHost !== null ? { worker_host: workerHost } : {}),
     ...(resolvedModelProvenance ? { resolved_model_provenance: resolvedModelProvenance } : {}),
+    ...(goalSummary ? { goal_summary: goalSummary } : {}),
     worker_control: proof?.worker_control ?? null,
     last_event: entry.last_event,
     last_message: entry.last_message,
@@ -432,6 +463,158 @@ function buildRunningSessionPayload(
     tokens: proof?.tokens ?? entry.tokens,
     ...(entry.fallback_expiry ? { fallback_expiry: entry.fallback_expiry } : {})
   };
+}
+
+function buildProviderGoalSummary(
+  proof: ControlIssuePayload['provider_linear_worker_proof'] | null | undefined,
+  issueId: string | null | undefined,
+  taskId: string | null | undefined
+): OperatorDashboardGoalSummary | null {
+  if (!proof) {
+    return null;
+  }
+  const evidence = proof.goal_evidence ?? null;
+  const intent = proof.goal_intent ?? null;
+  if (!evidence && !intent) {
+    return null;
+  }
+  const captureMode = normalizeDashboardGoalString(evidence?.capture_mode);
+  const intentStatus = normalizeDashboardGoalString(intent?.status);
+  const intentMissingPrerequisite = intentStatus === 'missing_prerequisite';
+  const intentSpecChecksum = normalizeDashboardGoalString(intent?.spec_checksum);
+  const intentGoalKey = normalizeDashboardGoalString(intent?.goal_key);
+  const evidenceSpecChecksum = normalizeDashboardGoalString(evidence?.spec_checksum);
+  const evidenceGoalKey = normalizeDashboardGoalString(evidence?.goal_key);
+  const evidenceObjective = normalizeDashboardGoalString(evidence?.objective);
+  const evidenceMismatchesIntent =
+    intentStatus === 'ready' &&
+    (
+      (evidenceSpecChecksum !== null && intentSpecChecksum !== null && evidenceSpecChecksum !== intentSpecChecksum) ||
+      (evidenceGoalKey !== null && intentGoalKey !== null && evidenceGoalKey !== intentGoalKey)
+    );
+  const evidenceMatchesIntent =
+    intentStatus === 'ready' &&
+    (
+      (evidenceSpecChecksum !== null && evidenceSpecChecksum === intentSpecChecksum) ||
+      (evidenceGoalKey !== null && evidenceGoalKey === intentGoalKey) ||
+      (intentGoalKey !== null &&
+        intentSpecChecksum !== null &&
+        evidenceObjective?.includes(intentGoalKey) === true &&
+        evidenceObjective.includes(intentSpecChecksum))
+    );
+  const evidenceIdentityUnverified =
+    captureMode === 'captured' &&
+    !evidenceMatchesIntent &&
+    !evidenceMismatchesIntent;
+  const evidenceIdentityIsBlocked =
+    captureMode === 'stale' ||
+    captureMode === 'thread_mismatch' ||
+    evidenceMismatchesIntent ||
+    evidenceIdentityUnverified;
+  const status = intentMissingPrerequisite
+    ? intentStatus
+    : evidenceIdentityIsBlocked
+      ? null
+      : normalizeDashboardGoalString(evidence?.status) ?? intentStatus;
+  const checksum = intentMissingPrerequisite
+    ? normalizeDashboardGoalString(intent?.spec_checksum)
+    : evidenceIdentityIsBlocked
+      ? evidenceSpecChecksum
+      : evidenceSpecChecksum ?? intentSpecChecksum;
+  const goalKey = intentMissingPrerequisite
+    ? normalizeDashboardGoalString(intent?.goal_key)
+    : evidenceIdentityIsBlocked
+      ? evidenceGoalKey
+      : evidenceGoalKey ?? intentGoalKey;
+  const taskKey = intentMissingPrerequisite
+    ? normalizeDashboardGoalString(intent?.provider_issue_task_key) ?? normalizeDashboardGoalString(taskId)
+    : normalizeDashboardGoalString(evidence?.provider_issue_task_key) ??
+      normalizeDashboardGoalString(intent?.provider_issue_task_key) ??
+      normalizeDashboardGoalString(taskId);
+  const objective = intentMissingPrerequisite
+    ? normalizeDashboardGoalString(intent?.objective)
+    : evidenceIdentityIsBlocked
+      ? evidenceObjective
+      : evidenceObjective ??
+      normalizeDashboardGoalString(intent?.objective);
+  return {
+    state: intentMissingPrerequisite
+      ? 'missing'
+      : evidenceMismatchesIntent || evidenceIdentityUnverified
+        ? 'stale'
+        : resolveProviderGoalSummaryState(captureMode, status, evidence === null),
+    authority: 'advisory_only',
+    issue_id: proof.issue_id ?? issueId ?? null,
+    task_key: taskKey,
+    checksum,
+    checksum_short: checksum ? checksum.slice(0, 16) : null,
+    goal_key: goalKey,
+    capture_mode: captureMode,
+    status,
+    thread_id: normalizeDashboardGoalString(evidence?.thread_id) ?? proof.thread_id ?? null,
+    turn_id: normalizeDashboardGoalString(evidence?.turn_id) ?? proof.latest_turn_id ?? null,
+    objective_preview: objective ? truncateDashboardGoalText(objective, 160) : null,
+    reason: intentMissingPrerequisite
+      ? normalizeDashboardGoalString(intent?.reason) ?? normalizeDashboardGoalString(evidence?.reason)
+      : evidenceMismatchesIntent
+        ? evidenceSpecChecksum !== null && intentSpecChecksum !== null && evidenceSpecChecksum !== intentSpecChecksum
+          ? `goal_spec_checksum_mismatch:${evidenceSpecChecksum}->${intentSpecChecksum}`
+          : `goal_key_mismatch:${evidenceGoalKey}->${intentGoalKey}`
+        : evidenceIdentityUnverified
+          ? 'goal_identity_unverified'
+          : normalizeDashboardGoalString(evidence?.reason) ??
+            normalizeDashboardGoalString(intent?.reason),
+    updated_at:
+      normalizeDashboardGoalString(evidence?.updated_at) ??
+      normalizeDashboardGoalString(evidence?.capture_timestamp) ??
+      proof.updated_at ??
+      null
+  };
+}
+
+function resolveProviderGoalSummaryState(
+  captureMode: string | null,
+  status: string | null,
+  evidenceMissing: boolean
+): OperatorDashboardGoalSummaryState {
+  if (evidenceMissing || captureMode === null || captureMode === 'cleared') {
+    return 'missing';
+  }
+  switch (captureMode) {
+    case 'disabled':
+    case 'unavailable':
+      return 'unavailable';
+    case 'stale':
+      return 'stale';
+    case 'thread_mismatch':
+      return 'mismatched_thread';
+    case 'captured': {
+      const normalizedStatus = status?.toLowerCase() ?? '';
+      return ['complete', 'completed', 'done', 'succeeded'].includes(normalizedStatus)
+        ? 'complete'
+        : 'active';
+    }
+    default:
+      return 'unavailable';
+  }
+}
+
+function normalizeDashboardGoalString(value: unknown): string | null {
+  if (typeof value !== 'string') {
+    return null;
+  }
+  const normalized = value.replace(/\r\n|\n|\r/g, ' ').replace(/\s+/g, ' ').trim();
+  return normalized.length > 0 ? normalized : null;
+}
+
+function truncateDashboardGoalText(value: string, maxLength: number): string {
+  if (value.length <= maxLength) {
+    return value;
+  }
+  if (maxLength <= 3) {
+    return value.slice(0, maxLength);
+  }
+  return `${value.slice(0, maxLength - 3).trimEnd()}...`;
 }
 
 function buildRetryQueuePayload(
