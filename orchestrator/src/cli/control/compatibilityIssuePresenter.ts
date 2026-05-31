@@ -339,6 +339,7 @@ function shouldPruneTerminalSelectedCompatibilityIssue(
   }
   return (
     isTerminalReleasedCompletedProviderSource(issue.selectedSource) ||
+    isTerminalReleasedInactiveReconciledProviderSource(issue.selectedSource) ||
     isStaleInProgressTerminalReleasedProviderSource(issue.selectedSource) ||
     isTerminalHandoffFailedProviderSource(issue.selectedSource)
   );
@@ -359,8 +360,19 @@ function isTerminalReleasedCompletedProviderSource(
 
 function shouldSuppressInactiveSelectedPayload(source: ControlCompatibilitySourceContext): boolean {
   return (
+    isTerminalReleasedInactiveReconciledProviderSource(source) ||
     isStaleInProgressTerminalReleasedProviderSource(source) ||
     isTerminalHandoffFailedProviderSource(source)
+  );
+}
+
+function isTerminalReleasedInactiveReconciledProviderSource(
+  source: ControlCompatibilitySourceContext
+): boolean {
+  return (
+    source.statusReason === 'provider_claim_released' &&
+    isTerminalReleasedInactiveProviderSource(source) &&
+    isReconciledInactiveCompatibilityRunStatus(source.rawStatus)
   );
 }
 
@@ -409,6 +421,18 @@ function isCompletedCompatibilityRunStatus(status: string | null | undefined): b
     normalized === 'success' ||
     normalized === 'completed' ||
     normalized === 'done'
+  );
+}
+
+function isReconciledInactiveCompatibilityRunStatus(status: string | null | undefined): boolean {
+  const normalized = normalizeProviderLinearWorkflowState(status);
+  return (
+    normalized === 'succeeded' ||
+    normalized === 'success' ||
+    normalized === 'completed' ||
+    normalized === 'done' ||
+    normalized === 'cancelled' ||
+    normalized === 'canceled'
   );
 }
 

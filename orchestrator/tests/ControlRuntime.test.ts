@@ -2943,6 +2943,64 @@ describe('ControlRuntime', () => {
     }
   });
 
+  it('prunes terminal released failed proof rows after selected-run reconciliation', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-05-31T09:50:00.000Z'));
+    try {
+      const providerIntakeState = createProviderIntakeState([
+        {
+          ...createReleasedTerminalClaim('CO-582', 'issue-co-582'),
+          task_id: 'linear-issue-co-582',
+          run_id: 'run-1',
+          issue_title: 'Split docs freshness owner binding lifecycle from PR completion',
+          issue_updated_at: '2026-05-26T06:50:02.050Z',
+          updated_at: '2026-05-26T06:50:02.050Z'
+        }
+      ]);
+      const fixture = await createFixture({
+        taskId: 'linear-issue-co-582',
+        providerIntakeState
+      });
+      await seedManifest(fixture.paths, {
+        task_id: 'linear-issue-co-582',
+        issue_provider: 'linear',
+        issue_id: 'issue-co-582',
+        issue_identifier: 'CO-582',
+        pipeline_id: 'provider-linear-worker',
+        pipeline_title: 'Provider Linear Worker',
+        status: 'failed',
+        started_at: '2026-05-26T00:46:25.447Z',
+        updated_at: '2026-05-26T00:52:30.190Z',
+        completed_at: '2026-05-26T00:52:30.190Z',
+        summary: "Stage 'Run provider linear worker' failed with exit code 1."
+      });
+      await seedProviderLinearWorkerProof(fixture.paths, {
+        issue_id: 'issue-co-582',
+        issue_identifier: 'CO-582',
+        owner_phase: 'ended',
+        owner_status: 'failed',
+        end_reason: 'implementation_failed',
+        updated_at: '2026-05-26T00:52:30.190Z'
+      });
+
+      const compatibilityProjection = await fixture.runtime.snapshot().readCompatibilityProjection();
+      const uiDataset = buildUiDataset({
+        projection: compatibilityProjection,
+        generatedAt: '2026-05-31T09:50:00.000Z'
+      });
+
+      expect(compatibilityProjection.selected).toBeNull();
+      expect(compatibilityProjection.running).toEqual([]);
+      expect(compatibilityProjection.retrying).toEqual([]);
+      expect(compatibilityProjection.issues).toEqual([]);
+      expect(uiDataset.counts.issues).toBe(0);
+      expect(uiDataset.selected).toBeNull();
+      expect(uiDataset.issues).toEqual([]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('prunes terminal handoff-failed provider rows from active dashboard issues', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-04-26T07:34:37.478Z'));
