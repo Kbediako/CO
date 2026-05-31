@@ -64,15 +64,23 @@
 - Shared root remains clean/latest; work occurs in the CO-589 isolated worktree.
 - WIP stays under 4 active/running issues.
 
-## Fallback / Refactor Decision
+## CO-382 Fallback Decision Table
 - Applies to fallback, compatibility, legacy, stale, cached, break-glass, or minor-seam behavior? Yes.
 - Decision: remove the expired compatibility projection behavior that lets historical failed proof become current status authority; justify retaining source-labeled audit proof visibility as a durable operator evidence contract.
-- Large-refactor check: a focused change is acceptable because the bug is in current status projection authority ordering and can be fixed without introducing another authority source. If selected, issue, and API/UI projections cannot share one predicate safely, escalate before adding another minor seam.
+- Large-refactor decision: a focused change is acceptable because the bug is in current status projection authority ordering and can be fixed without introducing another authority source. If selected, issue, and API/UI projections cannot share one predicate safely, escalate before adding another minor seam.
+- Minor-seam decision: do not add another minor seam; retained proof/debug payloads stay source-labeled and subordinate to the existing current-status authority boundary.
 
 | Surface | Fallback / seam | Decision | Owner | Trigger | Introduced date | Review date | Maximum lifetime | Removal condition | Validation |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | Control-host status surfaces | Compatibility projection lets retained failed proof drive current selected/active status after terminal released same-issue truth. | remove fallback | CO-589 / CO-398 | Released/not-active claim with terminal Done/completed issue truth and no active running/retry authority is still projected as failed current work. | CO-398 lineage, recurrence observed 2026-05-31 | 2026-05-31 | N/A after removal | Current status projections suppress this passive historical shape while active failures still appear. | Focused compatibility/control-runtime/status tests plus live `co-status` proof. |
 | Control-host status surfaces | Source-labeled retained proof/debug data remains visible for audit after current authority suppresses active status. | justify retaining fallback | CO-589 / CO-398 | Operators need historical run/proof evidence to understand why a row was suppressed. | CO-398 lineage | 2026-05-31 | Non-expiring durable audit contract while source-labeled | Remove only with replacement schema preserving current authority, retained proof, source labels, and degraded reason. | Projection tests assert proof is retained as audit evidence without driving current selected/active status. |
+
+- Durable retention evidence:
+  - contract name: control-host source-labeled retained proof audit evidence
+  - owning surface: `control-host status surfaces`
+  - steady-state proof: terminal released failed proof is reconciled and suppressed from current selected/issues while retained `provider_linear_worker_proof` and `provider_debug_snapshot` remain source-labeled audit evidence.
+  - tests/docs: `tests/selected-run-projection.spec.ts`, `orchestrator/tests/ControlRuntime.test.ts`, and the CO-589 PRD/TECH_SPEC/task packet.
+  - non-expiring rationale: this is a durable operator audit contract, not temporary compatibility debt; removal requires a replacement schema preserving current authority, retained proof, source labels, and degraded reason.
 
 ## Open Questions
 - Should suppressed terminal failed proof appear in a dedicated historical/debug-only section, or is retaining it inside source-labeled debug payload sufficient for this lane?

@@ -51,7 +51,7 @@ last_review: 2026-05-31
 - Non-functional requirements: local, deterministic, backward-compatible JSON except corrected status; no broad refactor unless focused seam is unsafe.
 - Interfaces / contracts: selected-run projection, `buildCompatibilityProjectionSnapshot`, `co-status --format json`, `/ui/data.json`, `fallback_expiry`.
 
-## Fallback Expiry / Refactor Decision
+## CO-382 Fallback Decision Table
 - Applies to fallback, compatibility, legacy, stale, cached, break-glass, or minor-seam behavior? Yes.
 
 | Surface | Fallback / seam | Decision | Owner | Trigger | Introduced date | Review date | Maximum lifetime | Removal condition | Validation |
@@ -59,8 +59,14 @@ last_review: 2026-05-31
 | `control-host status surfaces` | Retained failed proof projects as current failed status despite released terminal same-issue truth. | remove fallback | CO-589 / CO-398 | CO-582-shaped stale failed proof appears in selected/active status. | CO-398 lineage, recurrence observed 2026-05-31 | 2026-05-31 | N/A after removal | CO-582 shape is suppressed from current status while non-terminal failed rows remain. | Focused projection tests and live `co-status` proof. |
 | `control-host status surfaces` | Source-labeled retained proof/debug history remains visible as audit evidence. | justify retaining fallback | CO-589 / CO-398 | Operator diagnosis needs historical failed proof after current-status suppression. | CO-398 lineage | 2026-05-31 | Non-expiring durable audit contract while source-labeled | Equivalent audit-history schema replaces it. | Tests/proof show retained proof cannot drive current authority. |
 
-- Durable retention evidence: retained proof and debug payloads are durable operator audit evidence only with source labels and subordinate current authority.
-- Large-refactor check: a focused fix is acceptable if it reuses one predicate or authority order shared across selected and active issue projections; otherwise escalate before adding another seam.
+- Durable retention evidence:
+  - contract name: control-host source-labeled retained proof audit evidence
+  - owning surface: `control-host status surfaces`
+  - steady-state proof: terminal released failed proof is reconciled and suppressed from current selected/issues while retained `provider_linear_worker_proof` and `provider_debug_snapshot` remain source-labeled audit evidence.
+  - tests/docs: `tests/selected-run-projection.spec.ts`, `orchestrator/tests/ControlRuntime.test.ts`, and the CO-589 PRD/TECH_SPEC/task packet.
+  - non-expiring rationale: this is a durable operator audit contract, not temporary compatibility debt; removal requires a replacement schema preserving current authority, retained proof, source labels, and degraded reason.
+- Large-refactor decision: a focused fix is acceptable because it reuses one predicate/authority order shared across selected and active issue projections; otherwise escalate before adding another authority source.
+- Minor-seam decision: do not add another minor seam; retained proof/debug payloads stay source-labeled and subordinate to the existing current-status authority boundary.
 
 ## Architecture & Data
 - Architecture / design adjustments: locate the fix in selected-run reconciliation before compatibility/dashboard presenters consume the run context, preferably adjacent to terminal released inactive classification.
