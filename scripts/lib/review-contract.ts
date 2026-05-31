@@ -32,6 +32,12 @@ export type ReviewContractAxisName =
   | 'code_changes'
   | 'agent_loop';
 export type ReviewContractAxisVerdict = 'clean' | 'findings' | 'blocked' | 'unknown';
+export type ReviewIntentMatrixAxisName =
+  | 'original_spec'
+  | 'coding_standards'
+  | 'code_change_proposals'
+  | 'agent_loop_change_proposals';
+export type ReviewIntentMatrixVerdict = 'clean' | 'findings' | 'unknown';
 
 export interface ReviewContractEvidenceRef {
   path: string;
@@ -60,6 +66,15 @@ export interface ReviewContractProposalCounts {
   agent_loop: number;
 }
 
+export interface ReviewIntentMatrixAxis {
+  required: boolean;
+  verdict: ReviewIntentMatrixVerdict;
+  evidence: string[];
+  proposed_fixes: string[];
+}
+
+export type ReviewIntentMatrix = Record<ReviewIntentMatrixAxisName, ReviewIntentMatrixAxis>;
+
 export interface ReviewContractTelemetry {
   contract_path: string | null;
   contract_mode: ReviewContractMode;
@@ -71,6 +86,7 @@ export interface ReviewContractTelemetry {
   axis_verdicts: Record<ReviewContractAxisName, ReviewContractAxisVerdict | null>;
   axis_finding_counts: Record<ReviewContractAxisName, number>;
   proposal_counts: ReviewContractProposalCounts;
+  review_intent_matrix: ReviewIntentMatrix | null;
   review_verdict: ReviewSemanticVerdict;
   highest_finding_priority: ReviewFindingPriority | null;
   finding_count: number;
@@ -88,6 +104,7 @@ export interface ReviewContractInputBundleResult {
 export interface ReviewContractValidationOptions {
   repoRoot: string;
   trustedEvidenceRoots?: readonly string[];
+  currentSpecBundlePath?: string | null;
 }
 
 export interface ReviewContractCodeChangeProposalRoute {
@@ -139,6 +156,7 @@ interface ReviewContractCandidate {
   schema_version?: unknown;
   overall_verdict?: unknown;
   axes?: unknown;
+  review_intent_matrix?: unknown;
   code_change_proposals?: unknown;
   agent_loop_proposals?: unknown;
 }
@@ -152,6 +170,18 @@ const CONTRACT_AXES: ReviewContractAxisName[] = [
   'code_changes',
   'agent_loop'
 ];
+const REVIEW_INTENT_MATRIX_AXES: ReviewIntentMatrixAxisName[] = [
+  'original_spec',
+  'coding_standards',
+  'code_change_proposals',
+  'agent_loop_change_proposals'
+];
+const INTENT_MATRIX_TO_CONTRACT_AXIS: Record<ReviewIntentMatrixAxisName, ReviewContractAxisName> = {
+  original_spec: 'spec_conformance',
+  coding_standards: 'coding_standards',
+  code_change_proposals: 'code_changes',
+  agent_loop_change_proposals: 'agent_loop'
+};
 const REVIEW_FINDING_PRIORITY_RANKS: Record<ReviewFindingPriority, number> = {
   P0: 0,
   P1: 1,
@@ -302,7 +332,8 @@ export async function buildReviewContractTelemetry(options: {
   const contractEvidenceRoot = dirname(resolve(options.repoRoot, options.contractPath));
   const validation = await validateReviewContract(normalizedContract, {
     repoRoot: options.repoRoot,
-    trustedEvidenceRoots: [contractEvidenceRoot]
+    trustedEvidenceRoots: [contractEvidenceRoot],
+    currentSpecBundlePath: join(contractEvidenceRoot, 'inputs', 'spec-bundle.json')
   });
   if (!validation.valid) {
     return buildEmptyContractTelemetry(
@@ -412,6 +443,8 @@ export function buildReviewContractPromptLines(options: {
       (ref) => `  - \`${ref.path}\` sha256=${ref.sha256}`
     ),
     '- Required axes: `spec_conformance`, `coding_standards`, `code_changes`, and `agent_loop`.',
+    '- Also populate `review_intent_matrix` with required axes `original_spec`, `coding_standards`, `code_change_proposals`, and `agent_loop_change_proposals`; every axis must include `required: true`, `verdict: clean|findings|unknown`, non-empty `evidence[]`, and concise `proposed_fixes[]`.',
+    '- `original_spec` may be clean only when the spec bundle shows canonical PRD, TECH_SPEC, and ACTION_PLAN evidence reached the reviewer; when unavailable, set `original_spec.verdict` to `unknown`.',
     '- Every axis must set `verdict` to `clean`, `findings`, `blocked`, or `unknown`; `clean` requires a non-empty `clean_signal` and zero findings.',
     '- Put patchable code suggestions only in `code_change_proposals[]`; do not apply reviewer changes directly.',
     '- Put producer-loop feedback only in `agent_loop_proposals[]`; default routing must be `linear_follow_up` with `follow_up_kind: agent_loop`.',
@@ -450,6 +483,7 @@ function buildEmptyContractTelemetry(
       code_change: 0,
       agent_loop: 0
     },
+    review_intent_matrix: null,
     review_verdict: 'unknown',
     highest_finding_priority: null,
     finding_count: 0
@@ -473,6 +507,7 @@ function buildTelemetryFromValidContract(
     .map((finding) => finding.priority)
     .filter((priority): priority is ReviewFindingPriority => isReviewFindingPriority(priority));
   const overallVerdict = coerceAxisVerdict(contract.overall_verdict) ?? deriveOverallVerdict(axisVerdicts);
+  const reviewIntentMatrix = normalizeReviewIntentMatrix(contract.review_intent_matrix);
   return {
     contract_path: contractPath,
     contract_mode: mode,
@@ -491,6 +526,7 @@ function buildTelemetryFromValidContract(
         ? contract.agent_loop_proposals.length
         : 0
     },
+    review_intent_matrix: reviewIntentMatrix,
     review_verdict: semanticVerdictFromOverall(overallVerdict),
     highest_finding_priority: priorities.sort(compareReviewFindingPriority)[0] ?? null,
     finding_count: findings.length
@@ -514,6 +550,9 @@ async function buildSpecBundle(options: {
   const skippedTaskDocPaths = taskDocPathCandidates.filter(
     (entry) => normalizeRepoRelativePath(options.repoRoot, entry) === null
   );
+  const canonicalOriginalSpec = shouldAssessCanonicalOriginalSpec(options.taskKey ?? null)
+    ? await assessCanonicalOriginalSpec(options.repoRoot, taskEntry, taskDocPaths)
+    : null;
   const sourceRefs = await buildEvidenceRefsForPaths(options.repoRoot, [
     taskIndexPath,
     ...taskDocPaths.map((entry) => resolve(options.repoRoot, entry))
@@ -528,6 +567,7 @@ async function buildSpecBundle(options: {
     notes: options.notes ?? null,
     source_refs: sourceRefs,
     task_index_entry: taskEntry ?? null,
+    ...(canonicalOriginalSpec ? { canonical_original_spec: canonicalOriginalSpec } : {}),
     skipped_task_document_paths: skippedTaskDocPaths,
     task_documents: await readTextDocuments(options.repoRoot, taskDocPaths)
   };
@@ -699,14 +739,31 @@ function findTaskIndexEntry(
     return null;
   }
   const keyed = items
-    .map((item) => ({ item, key: normalizeTaskKey(item) }))
-    .filter((entry): entry is { item: Record<string, unknown>; key: string } => Boolean(entry.key))
+    .flatMap((item) => collectTaskIndexEntryKeys(item).map((key) => ({ item, key })))
     .sort((left, right) => right.key.length - left.key.length);
   return (
     keyed.find((entry) => entry.key === taskKey)?.item ??
     keyed.find((entry) => taskKey.startsWith(`${entry.key}-`))?.item ??
     null
   );
+}
+
+function collectTaskIndexEntryKeys(item: Record<string, unknown>): string[] {
+  const keys = new Set<string>();
+  const normalized = normalizeTaskKey(item);
+  if (normalized) {
+    keys.add(normalized);
+  }
+  const id = normalizeOptionalString(item.id);
+  if (id) {
+    keys.add(id);
+  }
+  const notes = isRecord(item.notes) ? item.notes : {};
+  const providerIssueTaskKey = normalizeOptionalString(notes.provider_issue_task_key);
+  if (providerIssueTaskKey) {
+    keys.add(providerIssueTaskKey);
+  }
+  return [...keys].sort((left, right) => right.length - left.length);
 }
 
 function collectTaskDocPaths(taskEntry: Record<string, unknown> | null): string[] {
@@ -722,7 +779,7 @@ function collectTaskDocPaths(taskEntry: Record<string, unknown> | null): string[
   }
   const paths = taskEntry.paths;
   if (isRecord(paths)) {
-    for (const key of ['task', 'spec', 'agent_task', 'prd', 'docs', 'action_plan', 'findings']) {
+    for (const key of ['task', 'spec', 'agent_task', 'prd', 'docs', 'tech_spec', 'action_plan', 'findings']) {
       const value = paths[key];
       if (typeof value === 'string' && value.trim()) {
         candidates.add(value.trim());
@@ -730,6 +787,49 @@ function collectTaskDocPaths(taskEntry: Record<string, unknown> | null): string[
     }
   }
   return [...candidates].sort();
+}
+
+function shouldAssessCanonicalOriginalSpec(taskKey: string | null): boolean {
+  return isLinearProviderTaskKey(taskKey);
+}
+
+function isLinearProviderTaskKey(taskKey: string | null): boolean {
+  return Boolean(taskKey?.startsWith('linear-') || /^\d{8}-linear-/u.test(taskKey ?? ''));
+}
+
+async function assessCanonicalOriginalSpec(
+  repoRoot: string,
+  taskEntry: Record<string, unknown> | null,
+  taskDocPaths: string[]
+): Promise<Record<string, unknown>> {
+  const paths = isRecord(taskEntry?.paths) ? taskEntry.paths : {};
+  const requiredPaths = {
+    prd: normalizeTaskEntryPath(repoRoot, paths.prd),
+    tech_spec: normalizeTaskEntryPath(repoRoot, paths.tech_spec) ?? normalizeTaskEntryPath(repoRoot, paths.docs),
+    action_plan: normalizeTaskEntryPath(repoRoot, paths.action_plan)
+  };
+  const taskDocPathSet = new Set(taskDocPaths);
+  const missingPaths: string[] = [];
+  for (const [label, repoPath] of Object.entries(requiredPaths)) {
+    if (!repoPath) {
+      missingPaths.push(label);
+      continue;
+    }
+    if (!taskDocPathSet.has(repoPath) || !(await pathExists(resolve(repoRoot, repoPath)))) {
+      missingPaths.push(repoPath);
+    }
+  }
+  return {
+    available: missingPaths.length === 0,
+    required_paths: requiredPaths,
+    missing_paths: missingPaths
+  };
+}
+
+function normalizeTaskEntryPath(repoRoot: string, value: unknown): string | null {
+  return typeof value === 'string' && value.trim()
+    ? normalizeRepoRelativePath(repoRoot, value.trim())
+    : null;
 }
 
 function normalizeRepoRelativePaths(repoRoot: string, repoPaths: string[]): string[] {
@@ -1397,6 +1497,7 @@ function validateContractSchemaShape(candidate: unknown): string[] {
     'generated_at',
     'overall_verdict',
     'axes',
+    'review_intent_matrix',
     'code_change_proposals',
     'agent_loop_proposals'
   ], '', errors);
@@ -1404,6 +1505,7 @@ function validateContractSchemaShape(candidate: unknown): string[] {
   validateNonEmptyString(candidate.generated_at, '/generated_at', errors);
   validateVerdict(candidate.overall_verdict, '/overall_verdict', errors);
   validateAxes(candidate.axes, errors);
+  validateReviewIntentMatrixShape(candidate.review_intent_matrix, errors);
   validateArray(candidate.code_change_proposals, '/code_change_proposals', errors)
     ?.forEach((proposal, index) => validateCodeChangeProposalShape(proposal, `/code_change_proposals/${index}`, errors));
   validateArray(candidate.agent_loop_proposals, '/agent_loop_proposals', errors)
@@ -1424,6 +1526,44 @@ function validateAxes(value: unknown, errors: string[]): void {
     }
     validateAxisShape(value[axisName], `/axes/${axisName}`, errors);
   }
+}
+
+function validateReviewIntentMatrixShape(value: unknown, errors: string[]): void {
+  if (value === undefined) {
+    errors.push("/: must have required property 'review_intent_matrix'");
+    return;
+  }
+  if (!isRecord(value)) {
+    errors.push('/review_intent_matrix: must be object');
+    return;
+  }
+  validateNoAdditionalProperties(value, REVIEW_INTENT_MATRIX_AXES, '/review_intent_matrix', errors);
+  for (const axisName of REVIEW_INTENT_MATRIX_AXES) {
+    if (!Object.prototype.hasOwnProperty.call(value, axisName)) {
+      errors.push(`/review_intent_matrix: must have required property '${axisName}'`);
+      continue;
+    }
+    validateReviewIntentMatrixAxisShape(value[axisName], `/review_intent_matrix/${axisName}`, errors);
+  }
+}
+
+function validateReviewIntentMatrixAxisShape(value: unknown, path: string, errors: string[]): void {
+  if (!isRecord(value)) {
+    errors.push(`${path}: must be object`);
+    return;
+  }
+  validateNoAdditionalProperties(value, ['required', 'verdict', 'evidence', 'proposed_fixes'], path, errors);
+  for (const property of ['required', 'verdict', 'evidence', 'proposed_fixes']) {
+    if (!Object.prototype.hasOwnProperty.call(value, property)) {
+      errors.push(`${path}: must have required property '${property}'`);
+    }
+  }
+  if (value.required !== true) {
+    errors.push(`${path}/required: must be true`);
+  }
+  validateIntentVerdict(value.verdict, `${path}/verdict`, errors);
+  validateStringArray(value.evidence, `${path}/evidence`, errors);
+  validateStringArray(value.proposed_fixes, `${path}/proposed_fixes`, errors);
 }
 
 function validateAxisShape(value: unknown, path: string, errors: string[]): void {
@@ -1679,6 +1819,12 @@ function validateVerdict(value: unknown, path: string, errors: string[]): void {
   }
 }
 
+function validateIntentVerdict(value: unknown, path: string, errors: string[]): void {
+  if (!coerceIntentMatrixVerdict(value)) {
+    errors.push(`${path}: must be equal to one of the allowed values`);
+  }
+}
+
 function validatePriority(value: unknown, path: string, errors: string[]): void {
   if (!isReviewFindingPriority(value)) {
     errors.push(`${path}: must be equal to one of the allowed values`);
@@ -1736,9 +1882,45 @@ async function validateContractSemantics(
       `/overall_verdict: expected ${expectedOverall} from axis verdicts, observed ${observedOverall}.`
     );
   }
+  errors.push(...(await validateReviewIntentMatrixSemantics(contract, options)));
   errors.push(...validateBlockingAgentLoopProposals(contract, axisVerdicts.agent_loop ?? null));
   errors.push(...(await validateEvidenceRefs(contract, options)));
   errors.push(...validateCodeChangeProposals(contract));
+  errors.push(...validateAgentLoopProposals(contract));
+  return errors;
+}
+
+async function validateReviewIntentMatrixSemantics(
+  contract: ReviewContractRecord,
+  options: ReviewContractValidationOptions
+): Promise<string[]> {
+  const errors: string[] = [];
+  const matrix = normalizeReviewIntentMatrix(contract.review_intent_matrix);
+  const axes = isRecord(contract.axes) ? contract.axes : {};
+  if (!matrix) {
+    return errors;
+  }
+  const originalSpecAvailability = await resolveOriginalSpecAvailability(contract, options);
+  for (const intentAxis of REVIEW_INTENT_MATRIX_AXES) {
+    const contractAxisName = INTENT_MATRIX_TO_CONTRACT_AXIS[intentAxis];
+    const contractAxis = isRecord(axes[contractAxisName]) ? axes[contractAxisName] : null;
+    const contractVerdict = contractAxis ? coerceAxisVerdict(contractAxis.verdict) : null;
+    const expectedIntentVerdict = contractVerdict ? intentVerdictFromContractAxis(contractVerdict) : null;
+    const observedIntentVerdict = matrix[intentAxis].verdict;
+    if (intentAxis === 'original_spec' && originalSpecAvailability?.available !== true) {
+      if (observedIntentVerdict !== 'unknown') {
+        errors.push(
+          `/review_intent_matrix/original_spec/verdict: expected unknown when canonical PRD/TECH_SPEC/ACTION_PLAN evidence is unavailable (${originalSpecAvailability?.missingPaths.join(', ') || 'missing_paths unavailable'}), observed ${observedIntentVerdict}.`
+        );
+      }
+      continue;
+    }
+    if (expectedIntentVerdict && observedIntentVerdict !== expectedIntentVerdict) {
+      errors.push(
+        `/review_intent_matrix/${intentAxis}/verdict: expected ${expectedIntentVerdict} from ${contractAxisName}, observed ${observedIntentVerdict}.`
+      );
+    }
+  }
   return errors;
 }
 
@@ -1862,6 +2044,20 @@ function validateCodeChangeProposals(contract: ReviewContractRecord): string[] {
   return errors;
 }
 
+function validateAgentLoopProposals(contract: ReviewContractRecord): string[] {
+  const errors: string[] = [];
+  const proposals = Array.isArray(contract.agent_loop_proposals) ? contract.agent_loop_proposals : [];
+  const axes = isRecord(contract.axes) ? contract.axes : {};
+  const agentLoopAxis = isRecord(axes.agent_loop) ? axes.agent_loop : null;
+  const agentLoopVerdict = agentLoopAxis ? coerceAxisVerdict(agentLoopAxis.verdict) : null;
+  if (proposals.length > 0 && agentLoopVerdict !== 'findings' && agentLoopVerdict !== 'blocked') {
+    errors.push(
+      '/agent_loop_proposals: agent-loop proposals require the agent_loop axis to be findings or blocked.'
+    );
+  }
+  return errors;
+}
+
 function buildCodeChangeProposalRoute(
   proposal: ReviewContractRecord
 ): ReviewContractCodeChangeProposalRoute {
@@ -1980,6 +2176,107 @@ function formatList(values: string[]): string {
   return values.map((value) => `- ${value}`).join('\n');
 }
 
+function normalizeReviewIntentMatrix(value: unknown): ReviewIntentMatrix | null {
+  if (!isRecord(value)) {
+    return null;
+  }
+  const entries = {} as Partial<ReviewIntentMatrix>;
+  for (const axisName of REVIEW_INTENT_MATRIX_AXES) {
+    const axis = value[axisName];
+    if (!isRecord(axis)) {
+      return null;
+    }
+    const verdict = coerceIntentMatrixVerdict(axis.verdict);
+    if (!verdict) {
+      return null;
+    }
+    entries[axisName] = {
+      required: axis.required === true,
+      verdict,
+      evidence: normalizeStringArray(axis.evidence),
+      proposed_fixes: normalizeStringArray(axis.proposed_fixes)
+    };
+  }
+  return entries as ReviewIntentMatrix;
+}
+
+async function resolveOriginalSpecAvailability(
+  contract: ReviewContractRecord,
+  options: ReviewContractValidationOptions
+): Promise<{ available: boolean; missingPaths: string[] } | null> {
+  const currentSpecBundlePath = options.currentSpecBundlePath
+    ? resolve(options.repoRoot, options.currentSpecBundlePath)
+    : null;
+  if (currentSpecBundlePath && !(await pathExists(currentSpecBundlePath))) {
+    return {
+      available: false,
+      missingPaths: ['current_spec_bundle_missing']
+    };
+  }
+  const candidatePaths = collectSpecBundleEvidencePaths(contract, options.repoRoot);
+  if (!currentSpecBundlePath && candidatePaths.length > 1) {
+    return {
+      available: false,
+      missingPaths: ['ambiguous_spec_bundle']
+    };
+  }
+  const selectedPaths = currentSpecBundlePath
+    ? candidatePaths.filter((candidatePath) => candidatePath === currentSpecBundlePath)
+    : candidatePaths;
+  if (currentSpecBundlePath && selectedPaths.length === 0) {
+    return {
+      available: false,
+      missingPaths: ['current_spec_bundle_not_referenced']
+    };
+  }
+  let sawLegacyNonProviderSpecBundle = false;
+  for (const absoluteRefPath of selectedPaths) {
+    if (!isAllowedEvidencePath(options, absoluteRefPath) || !(await pathExists(absoluteRefPath))) {
+      continue;
+    }
+    const specBundle = await readJson(absoluteRefPath);
+    if (!isRecord(specBundle)) {
+      return {
+        available: false,
+        missingPaths: ['current_spec_bundle_malformed']
+      };
+    }
+    if (isRecord(specBundle.canonical_original_spec)) {
+      const canonical = specBundle.canonical_original_spec;
+      if (typeof canonical.available === 'boolean') {
+        return {
+          available: canonical.available,
+          missingPaths: normalizeStringArray(canonical.missing_paths)
+        };
+      }
+    }
+    const taskKey = normalizeOptionalString(specBundle?.task_key);
+    if (isLinearProviderTaskKey(taskKey)) {
+      return {
+        available: false,
+        missingPaths: ['canonical_original_spec']
+      };
+    }
+    sawLegacyNonProviderSpecBundle = true;
+  }
+  return sawLegacyNonProviderSpecBundle ? { available: true, missingPaths: [] } : null;
+}
+
+function collectSpecBundleEvidencePaths(contract: ReviewContractRecord, repoRoot: string): string[] {
+  const candidates = new Set<string>();
+  for (const ref of collectEvidenceRefs(contract)) {
+    if (!isRecord(ref)) {
+      continue;
+    }
+    const refPath = normalizeOptionalString(ref.path);
+    if (!refPath || !refPath.endsWith('spec-bundle.json') || isAbsolute(refPath)) {
+      continue;
+    }
+    candidates.add(resolve(repoRoot, refPath));
+  }
+  return [...candidates].sort();
+}
+
 function collectEvidenceRefs(value: unknown): unknown[] {
   if (Array.isArray(value)) {
     return value.flatMap((entry) => collectEvidenceRefs(entry));
@@ -2092,10 +2389,18 @@ function semanticVerdictFromOverall(verdict: ReviewContractAxisVerdict): ReviewS
   return 'unknown';
 }
 
+function intentVerdictFromContractAxis(verdict: ReviewContractAxisVerdict): ReviewIntentMatrixVerdict {
+  return verdict === 'clean' ? 'clean' : verdict === 'unknown' ? 'unknown' : 'findings';
+}
+
 function coerceAxisVerdict(value: unknown): ReviewContractAxisVerdict | null {
   return value === 'clean' || value === 'findings' || value === 'blocked' || value === 'unknown'
     ? value
     : null;
+}
+
+function coerceIntentMatrixVerdict(value: unknown): ReviewIntentMatrixVerdict | null {
+  return value === 'clean' || value === 'findings' || value === 'unknown' ? value : null;
 }
 
 function compareReviewFindingPriority(

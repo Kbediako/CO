@@ -1,6 +1,70 @@
 {
   "items": [
     {
+      "id": "20260531-linear-0d975e30-67a5-4ea4-992a-61576c89d913",
+      "title": "CO-524 review_intent_matrix",
+      "relates_to": "tasks/tasks-linear-0d975e30-67a5-4ea4-992a-61576c89d913.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "status": "in_progress",
+      "last_review": "2026-05-31",
+      "evidence": [
+        "docs/PRD-linear-0d975e30-67a5-4ea4-992a-61576c89d913.md",
+        "docs/TECH_SPEC-linear-0d975e30-67a5-4ea4-992a-61576c89d913.md",
+        "docs/ACTION_PLAN-linear-0d975e30-67a5-4ea4-992a-61576c89d913.md",
+        "tasks/specs/linear-0d975e30-67a5-4ea4-992a-61576c89d913.md",
+        "tasks/tasks-linear-0d975e30-67a5-4ea4-992a-61576c89d913.md",
+        ".agent/task/linear-0d975e30-67a5-4ea4-992a-61576c89d913.md",
+        "tasks/index.json",
+        "docs/TASKS.md",
+        "docs/docs-freshness-registry.json"
+      ],
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue docs child lane",
+          "date": "2026-05-31",
+          "status": "created_for_parent_import",
+          "source_anchor": "ctx:sha256:6e71b8b5b90b781af5d2becb11953604969b8abe358cda6b629323af0a896360#chunk:c000001",
+          "summary": "Docs-first packet frames CO-524 as the review_intent_matrix workflow, preserving original spec, PRD, TECH_SPEC, ACTION_PLAN, coding standards, code change proposals, agent loop change proposals, review_verdict, review_outcome, provider-worker handoff, Codex CLI 0.130.0 compatibility, and goals advisory-only."
+        }
+      },
+      "validation": {
+        "status": "docs_packet_ready_for_parent_import",
+        "passed": [
+          "docs-first packet drafted in scoped child lane",
+          "pre-implementation issue-quality note captured",
+          "fallback and compatibility decision captured",
+          "task registry, task snapshot, and docs freshness registry updated in scoped files"
+        ],
+        "pending": [
+          "parent docs-review",
+          "implementation",
+          "focused review_intent_matrix row coverage, proposal separation, review telemetry, provider-worker handoff, Codex CLI 0.130.0 compatibility, and goals advisory-only tests",
+          "parent final validation floor"
+        ]
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-0d975e30-67a5-4ea4-992a-61576c89d913.md",
+        "task": "tasks/tasks-linear-0d975e30-67a5-4ea4-992a-61576c89d913.md",
+        "agent_task": ".agent/task/linear-0d975e30-67a5-4ea4-992a-61576c89d913.md",
+        "prd": "docs/PRD-linear-0d975e30-67a5-4ea4-992a-61576c89d913.md",
+        "docs": "docs/TECH_SPEC-linear-0d975e30-67a5-4ea4-992a-61576c89d913.md",
+        "action_plan": "docs/ACTION_PLAN-linear-0d975e30-67a5-4ea4-992a-61576c89d913.md"
+      },
+      "source_issue": {
+        "id": "0d975e30-67a5-4ea4-992a-61576c89d913",
+        "identifier": "CO-524",
+        "url": "https://linear.app/asabeko/issue/CO-524"
+      },
+      "notes": {
+        "provider_issue_task_key": "linear-0d975e30-67a5-4ea4-992a-61576c89d913",
+        "protected_terms": "review_intent_matrix; original spec; PRD; TECH_SPEC; ACTION_PLAN; coding standards; code change proposals; agent loop change proposals; review_verdict; review_outcome; provider-worker handoff; Codex CLI 0.130.0; goals advisory-only.",
+        "parent_owned": "Parent owns authoritative issue workspace, Linear state, workpad mutation, docs-review, implementation, validation, PR lifecycle, and final handoff."
+      }
+    },
+    {
       "id": "20260531-linear-617541e3-39f0-4926-8105-9b2a5c053a5b",
       "title": "CO-520 provider-worker Codex goals",
       "relates_to": "tasks/tasks-linear-617541e3-39f0-4926-8105-9b2a5c053a5b.md",

@@ -38,6 +38,7 @@ import {
   formatReviewSemanticVerdictSummary,
   type ReviewOutcomeDisposition
 } from '../../../../scripts/lib/review-execution-telemetry.js';
+import type { ReviewIntentMatrix } from '../../../../scripts/lib/review-contract.js';
 import { findPackageRoot } from '../utils/packageInfo.js';
 import {
   applyResolvedProgramInvocationEnvOverrides,
@@ -124,6 +125,7 @@ interface ReviewTelemetryEvidencePayload {
   axis_verdicts?: unknown;
   axis_finding_counts?: unknown;
   proposal_counts?: unknown;
+  review_intent_matrix?: unknown;
   error?: unknown;
   termination_boundary?: unknown;
   launch_context?: unknown;
@@ -1766,7 +1768,8 @@ function formatReviewTelemetryOutcomeSummary(
   const contractSummary = formatReviewContractTelemetrySummary({
     contract_mode: coerceReviewContractMode(telemetry?.contract_mode),
     contract_validation: coerceReviewContractValidation(telemetry?.contract_validation),
-    contract_overall_verdict: coerceReviewContractAxisVerdict(telemetry?.contract_overall_verdict)
+    contract_overall_verdict: coerceReviewContractAxisVerdict(telemetry?.contract_overall_verdict),
+    review_intent_matrix: coerceReviewIntentMatrix(telemetry?.review_intent_matrix)
   });
   const proposalSummary = formatReviewContractProposalSummary(telemetry);
   return [outcomeSummary, semanticSummary, contractSummary, proposalSummary].filter(Boolean).join('; ');
@@ -1916,6 +1919,10 @@ function resolveGovernedReviewHandoffFailureReason(
   if (contractArtifactFailure) {
     return contractArtifactFailure;
   }
+  const intentMatrixFailure = resolveGovernedReviewIntentMatrixFailureReason(telemetry.review_intent_matrix);
+  if (intentMatrixFailure) {
+    return intentMatrixFailure;
+  }
   const launchContext = coerceTelemetryRecord(telemetry.launch_context);
   const launchFailure = resolveGovernedReviewLaunchContextFailureReason(launchContext);
   if (launchFailure) {
@@ -1926,6 +1933,88 @@ function resolveGovernedReviewHandoffFailureReason(
     return 'agent-loop proposals require routing before handoff';
   }
   return null;
+}
+
+function resolveGovernedReviewIntentMatrixFailureReason(value: unknown): string | null {
+  const matrix = coerceReviewIntentMatrix(value);
+  if (!matrix) {
+    return 'review intent matrix is missing';
+  }
+  for (const axisName of [
+    'original_spec',
+    'coding_standards',
+    'code_change_proposals',
+    'agent_loop_change_proposals'
+  ] as const) {
+    const axis = matrix[axisName];
+    if (axis.required !== true) {
+      return `review intent matrix axis ${axisName} is not required`;
+    }
+    if (axis.verdict === 'unknown') {
+      return `review intent matrix axis ${axisName} is unknown`;
+    }
+    if (axis.verdict === 'findings') {
+      return `review intent matrix axis ${axisName} has findings`;
+    }
+    if (axis.evidence.length === 0) {
+      return `review intent matrix axis ${axisName} has no evidence`;
+    }
+    if (axis.proposed_fixes.length === 0) {
+      return `review intent matrix axis ${axisName} has no proposed fixes`;
+    }
+  }
+  return null;
+}
+
+function coerceReviewIntentMatrix(value: unknown): ReviewIntentMatrix | null {
+  const record = coerceTelemetryRecord(value);
+  if (!record) {
+    return null;
+  }
+  const originalSpec = coerceReviewIntentMatrixAxis(record.original_spec);
+  const codingStandards = coerceReviewIntentMatrixAxis(record.coding_standards);
+  const codeChangeProposals = coerceReviewIntentMatrixAxis(record.code_change_proposals);
+  const agentLoopChangeProposals = coerceReviewIntentMatrixAxis(record.agent_loop_change_proposals);
+  if (!originalSpec || !codingStandards || !codeChangeProposals || !agentLoopChangeProposals) {
+    return null;
+  }
+  return {
+    original_spec: originalSpec,
+    coding_standards: codingStandards,
+    code_change_proposals: codeChangeProposals,
+    agent_loop_change_proposals: agentLoopChangeProposals
+  };
+}
+
+function coerceReviewIntentMatrixAxis(value: unknown): ReviewIntentMatrix[keyof ReviewIntentMatrix] | null {
+  const record = coerceTelemetryRecord(value);
+  if (!record) {
+    return null;
+  }
+  const verdict = coerceReviewIntentMatrixVerdict(record.verdict);
+  if (!verdict) {
+    return null;
+  }
+  return {
+    required: record.required === true,
+    verdict,
+    evidence: coerceTelemetryStringArray(record.evidence),
+    proposed_fixes: coerceTelemetryStringArray(record.proposed_fixes)
+  };
+}
+
+function coerceReviewIntentMatrixVerdict(value: unknown): 'clean' | 'findings' | 'unknown' | null {
+  return value === 'clean' || value === 'findings' || value === 'unknown' ? value : null;
+}
+
+function coerceTelemetryStringArray(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value
+    .filter((entry): entry is string => typeof entry === 'string')
+    .map((entry) => entry.trim())
+    .filter((entry) => entry.length > 0);
 }
 
 function resolveGovernedReviewContractArtifactFailureReason(

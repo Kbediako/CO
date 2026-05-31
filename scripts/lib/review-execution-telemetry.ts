@@ -13,7 +13,8 @@ import {
   type ReviewContractMode,
   type ReviewContractProposalCounts,
   type ReviewContractTelemetry,
-  type ReviewContractTelemetrySource
+  type ReviewContractTelemetrySource,
+  type ReviewIntentMatrix
 } from './review-contract.js';
 
 export interface ReviewTelemetryPayload {
@@ -35,6 +36,7 @@ export interface ReviewTelemetryPayload {
   axis_verdicts?: Record<ReviewContractAxisName, ReviewContractAxisVerdict | null> | null;
   axis_finding_counts?: Record<ReviewContractAxisName, number> | null;
   proposal_counts?: ReviewContractProposalCounts | null;
+  review_intent_matrix?: ReviewIntentMatrix | null;
   summary: ReviewOutputSummary;
 }
 
@@ -192,6 +194,7 @@ export function formatReviewOutcomeSummary(payload: {
   contract_mode?: ReviewContractMode | null;
   contract_validation?: ReviewContractTelemetry['contract_validation'] | null;
   contract_overall_verdict?: ReviewContractAxisVerdict | null;
+  review_intent_matrix?: ReviewIntentMatrix | null;
 }): string {
   const disposition = resolveReviewOutcomeDisposition(payload);
   const boundaryKind = payload.termination_boundary?.kind ?? null;
@@ -226,6 +229,7 @@ export function getEnforceContractReviewFailureReason(payload: {
   contract_overall_verdict?: ReviewContractAxisVerdict | null;
   review_verdict?: ReviewSemanticVerdict | null;
   proposal_counts?: ReviewContractProposalCounts | null;
+  review_intent_matrix?: ReviewIntentMatrix | null;
 } | null, expectedMode?: ReviewContractMode | null): string | null {
   const mode = payload?.contract_mode ?? expectedMode ?? null;
   if (mode !== 'enforce') {
@@ -256,6 +260,10 @@ export function getEnforceContractReviewFailureReason(payload: {
   const semanticVerdict = payload.review_verdict ?? 'unknown';
   if (semanticVerdict !== 'clean') {
     return `semantic review verdict is ${semanticVerdict}`;
+  }
+  const intentMatrixFailure = getReviewIntentMatrixFailureReason(payload.review_intent_matrix ?? null);
+  if (intentMatrixFailure) {
+    return intentMatrixFailure;
   }
   const launchFailure = getEnforceContractLaunchContextFailureReason(payload.launch_context ?? null);
   if (launchFailure) {
@@ -340,7 +348,8 @@ export function buildReviewTelemetryPayload(
           contract_overall_verdict: contractTelemetry.contract_overall_verdict,
           axis_verdicts: contractTelemetry.axis_verdicts,
           axis_finding_counts: contractTelemetry.axis_finding_counts,
-          proposal_counts: contractTelemetry.proposal_counts
+          proposal_counts: contractTelemetry.proposal_counts,
+          review_intent_matrix: contractTelemetry.review_intent_matrix
         }
       : {}),
     summary: sanitizeTelemetrySummaryForPersistence(
@@ -498,6 +507,7 @@ export function formatReviewContractTelemetrySummary(payload: {
   contract_mode?: ReviewContractMode | null;
   contract_validation?: ReviewContractTelemetry['contract_validation'] | null;
   contract_overall_verdict?: ReviewContractAxisVerdict | null;
+  review_intent_matrix?: ReviewIntentMatrix | null;
 }): string | null {
   if (!payload.contract_mode || payload.contract_mode === 'off') {
     return null;
@@ -509,7 +519,52 @@ export function formatReviewContractTelemetrySummary(payload: {
   if (payload.contract_mode === 'shadow' && status === 'missing') {
     return null;
   }
-  return `review contract: mode=${payload.contract_mode}, validation=${status}, overall=${overall}, errors=${errorCount}`;
+  const matrixSummary = payload.review_intent_matrix
+    ? `, intent_matrix=${formatReviewIntentMatrixVerdicts(payload.review_intent_matrix)}`
+    : '';
+  return `review contract: mode=${payload.contract_mode}, validation=${status}, overall=${overall}, errors=${errorCount}${matrixSummary}`;
+}
+
+function getReviewIntentMatrixFailureReason(matrix: ReviewIntentMatrix | null): string | null {
+  if (!matrix) {
+    return 'review intent matrix is missing';
+  }
+  for (const axisName of [
+    'original_spec',
+    'coding_standards',
+    'code_change_proposals',
+    'agent_loop_change_proposals'
+  ] as const) {
+    const axis = matrix[axisName];
+    if (!axis) {
+      return `review intent matrix axis ${axisName} is missing`;
+    }
+    if (axis.required !== true) {
+      return `review intent matrix axis ${axisName} is not required`;
+    }
+    if (axis.verdict === 'unknown') {
+      return `review intent matrix axis ${axisName} is unknown`;
+    }
+    if (axis.verdict === 'findings') {
+      return `review intent matrix axis ${axisName} has findings`;
+    }
+    if (!Array.isArray(axis.evidence) || axis.evidence.length === 0) {
+      return `review intent matrix axis ${axisName} has no evidence`;
+    }
+    if (!Array.isArray(axis.proposed_fixes) || axis.proposed_fixes.length === 0) {
+      return `review intent matrix axis ${axisName} has no proposed fixes`;
+    }
+  }
+  return null;
+}
+
+function formatReviewIntentMatrixVerdicts(matrix: ReviewIntentMatrix): string {
+  return [
+    `original_spec:${matrix.original_spec.verdict}`,
+    `coding_standards:${matrix.coding_standards.verdict}`,
+    `code_change_proposals:${matrix.code_change_proposals.verdict}`,
+    `agent_loop_change_proposals:${matrix.agent_loop_change_proposals.verdict}`
+  ].join(',');
 }
 
 export function coerceReviewSemanticVerdict(value: unknown): ReviewSemanticVerdict | null {

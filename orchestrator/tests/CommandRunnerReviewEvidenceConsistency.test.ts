@@ -84,6 +84,7 @@ type ReviewArtifactOverrides = Partial<{
   axis_verdicts: Record<string, unknown> | null;
   axis_finding_counts: Record<string, unknown> | null;
   proposal_counts: Record<string, unknown> | null;
+  review_intent_matrix: Record<string, unknown> | null;
   error: string | null;
   output_log_path: string;
   outputLogContent: string;
@@ -103,6 +104,21 @@ function governedStructuredLaunchContext(): Record<string, unknown> {
     transport: 'codex-exec-output-schema',
     output_schema_path: 'schemas/review-contract.v1.output.schema.json',
     output_last_message_path: 'review/last-message.json'
+  };
+}
+
+function cleanGovernedReviewIntentMatrix(): Record<string, unknown> {
+  const axis = (evidence: string) => ({
+    required: true,
+    verdict: 'clean',
+    evidence: [evidence],
+    proposed_fixes: [`No change proposed; ${evidence}`]
+  });
+  return {
+    original_spec: axis('Canonical PRD/TECH_SPEC/ACTION_PLAN evidence checked.'),
+    coding_standards: axis('CO coding and workflow standards checked.'),
+    code_change_proposals: axis('No code change proposal is needed.'),
+    agent_loop_change_proposals: axis('No agent-loop change proposal is needed.')
   };
 }
 
@@ -138,6 +154,7 @@ function cleanGovernedReviewArtifactOverrides(overrides: ReviewArtifactOverrides
       code_change: 0,
       agent_loop: 0
     },
+    review_intent_matrix: cleanGovernedReviewIntentMatrix(),
     ...overrides
   };
 }
@@ -1520,7 +1537,8 @@ describe('runCommandStage review evidence consistency', () => {
         proposal_counts: {
           code_change: 0,
           agent_loop: 0
-        }
+        },
+        review_intent_matrix: cleanGovernedReviewIntentMatrix()
       });
       return buildSuccessfulExecResult();
     };
@@ -1551,6 +1569,183 @@ describe('runCommandStage review evidence consistency', () => {
     expect(errorPayload.reason).toBe('provider-linear-worker-authoritative-failed');
     expect(errorPayload.details?.failure_reason).toBe('provider_linear_worker_review_not_clean');
     expect(errorPayload.details?.review_outcome_summary).toContain('review outcome is bounded-success');
+  });
+
+  it('fails governed provider-linear-worker review handoff when the intent matrix is missing', async () => {
+    mockState.runImpl = async (input) => {
+      await writeProviderLinearWorkerProofArtifacts(input, {
+        owner_phase: 'ended',
+        owner_status: 'succeeded',
+        end_reason: 'issue_review_handoff'
+      });
+      await writeReviewArtifacts(
+        input,
+        cleanGovernedReviewArtifactOverrides({
+          review_intent_matrix: undefined
+        })
+      );
+      return buildSuccessfulExecResult();
+    };
+
+    const { env, manifest, paths, stage } = await bootstrapCommandStage(
+      {
+        id: 'provider-linear-worker',
+        title: 'Run provider linear worker with missing governed review intent matrix',
+        command: 'node providerLinearWorkerRunner.js',
+        summaryHint: 'Provider linear worker completed with forced standalone review enabled for handoff'
+      },
+      {
+        FORCE_CODEX_REVIEW: '1',
+        CODEX_REVIEW_NON_INTERACTIVE: '1',
+        CODEX_REVIEW_AUTHORITATIVE_GATE: '1',
+        CODEX_REVIEW_CONTRACT_MODE: 'enforce'
+      }
+    );
+    const result = await runCommandStage({ env, paths, manifest, stage, index: 1 });
+
+    expect(result.exitCode).toBe(1);
+    expect(result.summary).toContain('Provider linear worker failed (governed_review_handoff_not_clean).');
+    expect(result.summary).toContain('governed review handoff failed: review intent matrix is missing');
+
+    const errorPayload = JSON.parse(await readFile(join(env.repoRoot, manifest.commands[0]?.error_file as string), 'utf8')) as { reason?: string; details?: Record<string, unknown> };
+    expect(errorPayload.reason).toBe('provider-linear-worker-authoritative-failed');
+    expect(errorPayload.details?.failure_reason).toBe('provider_linear_worker_review_not_clean');
+    expect(errorPayload.details?.review_outcome_summary).toContain('review intent matrix is missing');
+  });
+
+  it('fails governed provider-linear-worker review handoff when the intent matrix is explicitly null', async () => {
+    mockState.runImpl = async (input) => {
+      await writeProviderLinearWorkerProofArtifacts(input, {
+        owner_phase: 'ended',
+        owner_status: 'succeeded',
+        end_reason: 'issue_review_handoff'
+      });
+      await writeReviewArtifacts(
+        input,
+        cleanGovernedReviewArtifactOverrides({
+          review_intent_matrix: null
+        })
+      );
+      return buildSuccessfulExecResult();
+    };
+
+    const { env, manifest, paths, stage } = await bootstrapCommandStage(
+      {
+        id: 'provider-linear-worker',
+        title: 'Run provider linear worker with null governed review intent matrix',
+        command: 'node providerLinearWorkerRunner.js',
+        summaryHint: 'Provider linear worker completed with forced standalone review enabled for handoff'
+      },
+      {
+        FORCE_CODEX_REVIEW: '1',
+        CODEX_REVIEW_NON_INTERACTIVE: '1',
+        CODEX_REVIEW_AUTHORITATIVE_GATE: '1',
+        CODEX_REVIEW_CONTRACT_MODE: 'enforce'
+      }
+    );
+    const result = await runCommandStage({ env, paths, manifest, stage, index: 1 });
+
+    expect(result.exitCode).toBe(1);
+    expect(result.summary).toContain('Provider linear worker failed (governed_review_handoff_not_clean).');
+    expect(result.summary).toContain('governed review handoff failed: review intent matrix is missing');
+
+    const errorPayload = JSON.parse(await readFile(join(env.repoRoot, manifest.commands[0]?.error_file as string), 'utf8')) as { reason?: string; details?: Record<string, unknown> };
+    expect(errorPayload.reason).toBe('provider-linear-worker-authoritative-failed');
+    expect(errorPayload.details?.failure_reason).toBe('provider_linear_worker_review_not_clean');
+    expect(errorPayload.details?.review_outcome_summary).toContain('review intent matrix is missing');
+  });
+
+  it('fails governed provider-linear-worker review handoff when matrix entries are whitespace-only', async () => {
+    const matrix = cleanGovernedReviewIntentMatrix() as Record<string, Record<string, unknown>>;
+    matrix.original_spec.evidence = ['   '];
+    matrix.original_spec.proposed_fixes = ['  '];
+    mockState.runImpl = async (input) => {
+      await writeProviderLinearWorkerProofArtifacts(input, {
+        owner_phase: 'ended',
+        owner_status: 'succeeded',
+        end_reason: 'issue_review_handoff'
+      });
+      await writeReviewArtifacts(
+        input,
+        cleanGovernedReviewArtifactOverrides({
+          review_intent_matrix: matrix
+        })
+      );
+      return buildSuccessfulExecResult();
+    };
+
+    const { env, manifest, paths, stage } = await bootstrapCommandStage(
+      {
+        id: 'provider-linear-worker',
+        title: 'Run provider linear worker with whitespace governed review intent matrix entries',
+        command: 'node providerLinearWorkerRunner.js',
+        summaryHint: 'Provider linear worker completed with forced standalone review enabled for handoff'
+      },
+      {
+        FORCE_CODEX_REVIEW: '1',
+        CODEX_REVIEW_NON_INTERACTIVE: '1',
+        CODEX_REVIEW_AUTHORITATIVE_GATE: '1',
+        CODEX_REVIEW_CONTRACT_MODE: 'enforce'
+      }
+    );
+    const result = await runCommandStage({ env, paths, manifest, stage, index: 1 });
+
+    expect(result.exitCode).toBe(1);
+    expect(result.summary).toContain('Provider linear worker failed (governed_review_handoff_not_clean).');
+    expect(result.summary).toContain('governed review handoff failed: review intent matrix axis original_spec has no evidence');
+
+    const errorPayload = JSON.parse(await readFile(join(env.repoRoot, manifest.commands[0]?.error_file as string), 'utf8')) as { reason?: string; details?: Record<string, unknown> };
+    expect(errorPayload.reason).toBe('provider-linear-worker-authoritative-failed');
+    expect(errorPayload.details?.failure_reason).toBe('provider_linear_worker_review_not_clean');
+    expect(errorPayload.details?.review_outcome_summary).toContain('review intent matrix axis original_spec has no evidence');
+  });
+
+  it('fails governed provider-linear-worker review handoff when matrix proposed fixes are whitespace-only', async () => {
+    const matrix = cleanGovernedReviewIntentMatrix() as Record<string, Record<string, unknown>>;
+    matrix.original_spec.proposed_fixes = ['  '];
+    mockState.runImpl = async (input) => {
+      await writeProviderLinearWorkerProofArtifacts(input, {
+        owner_phase: 'ended',
+        owner_status: 'succeeded',
+        end_reason: 'issue_review_handoff'
+      });
+      await writeReviewArtifacts(
+        input,
+        cleanGovernedReviewArtifactOverrides({
+          review_intent_matrix: matrix
+        })
+      );
+      return buildSuccessfulExecResult();
+    };
+
+    const { env, manifest, paths, stage } = await bootstrapCommandStage(
+      {
+        id: 'provider-linear-worker',
+        title: 'Run provider linear worker with whitespace governed review intent matrix proposed fixes',
+        command: 'node providerLinearWorkerRunner.js',
+        summaryHint: 'Provider linear worker completed with forced standalone review enabled for handoff'
+      },
+      {
+        FORCE_CODEX_REVIEW: '1',
+        CODEX_REVIEW_NON_INTERACTIVE: '1',
+        CODEX_REVIEW_AUTHORITATIVE_GATE: '1',
+        CODEX_REVIEW_CONTRACT_MODE: 'enforce'
+      }
+    );
+    const result = await runCommandStage({ env, paths, manifest, stage, index: 1 });
+
+    expect(result.exitCode).toBe(1);
+    expect(result.summary).toContain('Provider linear worker failed (governed_review_handoff_not_clean).');
+    expect(result.summary).toContain(
+      'governed review handoff failed: review intent matrix axis original_spec has no proposed fixes'
+    );
+
+    const errorPayload = JSON.parse(await readFile(join(env.repoRoot, manifest.commands[0]?.error_file as string), 'utf8')) as { reason?: string; details?: Record<string, unknown> };
+    expect(errorPayload.reason).toBe('provider-linear-worker-authoritative-failed');
+    expect(errorPayload.details?.failure_reason).toBe('provider_linear_worker_review_not_clean');
+    expect(errorPayload.details?.review_outcome_summary).toContain(
+      'review intent matrix axis original_spec has no proposed fixes'
+    );
   });
 
   it('fails governed provider-linear-worker review handoff after a legacy fallback launch', async () => {
@@ -1592,7 +1787,8 @@ describe('runCommandStage review evidence consistency', () => {
         proposal_counts: {
           code_change: 0,
           agent_loop: 0
-        }
+        },
+        review_intent_matrix: cleanGovernedReviewIntentMatrix()
       });
       return buildSuccessfulExecResult();
     };
@@ -3140,6 +3336,9 @@ async function writeReviewArtifacts(
             code_changes: { verdict: 'clean', clean_signal: 'test fixture', findings: [] },
             agent_loop: { verdict: 'clean', clean_signal: 'test fixture', findings: [] }
           },
+          review_intent_matrix: Object.prototype.hasOwnProperty.call(telemetryOverrides, 'review_intent_matrix')
+            ? telemetryOverrides.review_intent_matrix
+            : cleanGovernedReviewIntentMatrix(),
           code_change_proposals: [],
           agent_loop_proposals: []
         },
