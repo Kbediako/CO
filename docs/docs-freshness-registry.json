@@ -36787,10 +36787,12 @@
     {
       "path": "tasks/specs/linear-1856398b-7746-4d07-af6b-4ad207ffe2b9.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-19",
-      "cadence_days": 30,
-      "next_review": "2026-06-18"
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-31",
+      "cadence_days": 365,
+      "task_status": "done",
+      "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: task checklist records parent implementation, focused docs-hygiene coverage, full validation, review findings addressed, and no open local checklist obligations; reviewed 6 local packet/spec/mirror files for linear-1856398b-7746-4d07-af6b-4ad207ffe2b9; retain this spec row as terminal history for route co-429-completed-lane-registry-residue, not as active docs freshness debt.",
+      "retained_reason": "CO-588 2026-05-31 policy-over-budget cohort remediation: task checklist records parent implementation, focused docs-hygiene coverage, full validation, review findings addressed, and no open local checklist obligations; reviewed 6 local packet/spec/mirror files for linear-1856398b-7746-4d07-af6b-4ad207ffe2b9; retain this spec row as terminal history for route co-429-completed-lane-registry-residue, not as active docs freshness debt."
     },
     {
       "path": "tasks/specs/linear-1c101ebc-4b86-4c1f-b04d-0455e50fbacb.md",
@@ -38251,10 +38253,12 @@
     {
       "path": "tasks/specs/linear-7da2cd4d-977e-450a-b056-307edf560fe0.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-19",
-      "cadence_days": 30,
-      "next_review": "2026-06-18"
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-31",
+      "cadence_days": 365,
+      "task_status": "done",
+      "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: task checklist records docs hygiene/freshness validation, docs:freshness:maintain, spec-guard, standalone review, elegance review, and no open local checklist obligations; reviewed 6 local packet/spec/mirror files for linear-7da2cd4d-977e-450a-b056-307edf560fe0; retain this spec row as terminal history for route co-429-completed-lane-registry-residue, not as active docs freshness debt.",
+      "retained_reason": "CO-588 2026-05-31 policy-over-budget cohort remediation: task checklist records docs hygiene/freshness validation, docs:freshness:maintain, spec-guard, standalone review, elegance review, and no open local checklist obligations; reviewed 6 local packet/spec/mirror files for linear-7da2cd4d-977e-450a-b056-307edf560fe0; retain this spec row as terminal history for route co-429-completed-lane-registry-residue, not as active docs freshness debt."
     },
     {
       "path": "tasks/specs/linear-7e4ab467-3252-417b-8832-21d6f9b49b18.md",
@@ -38356,11 +38360,12 @@
     {
       "path": "tasks/specs/linear-86da539a-e106-44d9-87ea-759281a00a81.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-20",
-      "cadence_days": 30,
-      "notes": "CO-558 reviewed completed pre-expiry spec row with terminal source-issue frontmatter; linked historical packet checklists are not archive-ready, so registry remains active reviewed metadata rather than archive-stub disposition.",
-      "next_review": "2026-06-19"
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-31",
+      "cadence_days": 365,
+      "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: task spec declares status done and task checklist records validation floor, review gate, elegance pass, and no open local checklist obligations; reviewed 6 local packet/spec/mirror files for linear-86da539a-e106-44d9-87ea-759281a00a81; retain this spec row as terminal history for route co-429-completed-lane-registry-residue, not as active docs freshness debt.",
+      "task_status": "done",
+      "retained_reason": "CO-588 2026-05-31 policy-over-budget cohort remediation: task spec declares status done and task checklist records validation floor, review gate, elegance pass, and no open local checklist obligations; reviewed 6 local packet/spec/mirror files for linear-86da539a-e106-44d9-87ea-759281a00a81; retain this spec row as terminal history for route co-429-completed-lane-registry-residue, not as active docs freshness debt."
     },
     {
       "path": "tasks/specs/linear-8720424f-56b0-4539-bebe-041c759fcb74.md",
@@ -38389,10 +38394,12 @@
     {
       "path": "tasks/specs/linear-88401e48-8112-4817-a7ee-dd4f23241a2b.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-19",
-      "cadence_days": 30,
-      "next_review": "2026-06-18"
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-31",
+      "cadence_days": 365,
+      "task_status": "done",
+      "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: task checklist records policy implementation, follow-up mapping, docs gates, standalone review, elegance review, and no open local checklist obligations; reviewed 6 local packet/spec/mirror files for linear-88401e48-8112-4817-a7ee-dd4f23241a2b; retain this spec row as terminal history for route co-429-completed-lane-registry-residue, not as active docs freshness debt.",
+      "retained_reason": "CO-588 2026-05-31 policy-over-budget cohort remediation: task checklist records policy implementation, follow-up mapping, docs gates, standalone review, elegance review, and no open local checklist obligations; reviewed 6 local packet/spec/mirror files for linear-88401e48-8112-4817-a7ee-dd4f23241a2b; retain this spec row as terminal history for route co-429-completed-lane-registry-residue, not as active docs freshness debt."
     },
     {
       "path": "tasks/specs/linear-88a7529f-c7fa-443d-8b64-87b6b45ef312.md",
@@ -40206,10 +40213,12 @@
     {
       "path": "tasks/specs/linear-f838cbde-8bb6-46de-bde2-b749f2e64422.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-19",
-      "cadence_days": 30,
-      "next_review": "2026-06-18"
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-31",
+      "cadence_days": 365,
+      "task_status": "done",
+      "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: task checklist records full validation chain, clean standalone review, elegance pass, and no open local checklist obligations; reviewed 6 local packet/spec/mirror files for linear-f838cbde-8bb6-46de-bde2-b749f2e64422; retain this spec row as terminal history for route co-429-completed-lane-registry-residue, not as active docs freshness debt.",
+      "retained_reason": "CO-588 2026-05-31 policy-over-budget cohort remediation: task checklist records full validation chain, clean standalone review, elegance pass, and no open local checklist obligations; reviewed 6 local packet/spec/mirror files for linear-f838cbde-8bb6-46de-bde2-b749f2e64422; retain this spec row as terminal history for route co-429-completed-lane-registry-residue, not as active docs freshness debt."
     },
     {
       "path": "tasks/specs/linear-f88846f3-24be-48b6-a983-087613fd8f82.md",
