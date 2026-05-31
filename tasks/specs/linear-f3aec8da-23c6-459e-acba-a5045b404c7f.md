@@ -4,7 +4,7 @@ title: "CO-478 review wrapper telemetry findings"
 status: in_progress
 owner: Codex
 created: 2026-05-06
-last_review: 2026-05-06
+last_review: 2026-05-31
 review_cadence_days: 30
 risk_level: high
 related_prd: docs/PRD-linear-f3aec8da-23c6-459e-acba-a5045b404c7f.md

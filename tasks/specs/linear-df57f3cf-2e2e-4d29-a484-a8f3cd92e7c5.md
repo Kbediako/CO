@@ -4,7 +4,7 @@ title: "CO-511 docs:freshness:maintain packet for CO-102 rows"
 status: in_progress
 owner: Codex
 created: 2026-05-07
-last_review: 2026-05-07
+last_review: 2026-05-31
 review_cadence_days: 30
 risk_level: medium
 related_prd: docs/PRD-linear-df57f3cf-2e2e-4d29-a484-a8f3cd92e7c5.md

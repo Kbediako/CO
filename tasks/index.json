@@ -4437,7 +4437,7 @@
         "Codex"
       ],
       "status": "backlog",
-      "last_review": "2026-05-08",
+      "last_review": "2026-05-31",
       "approvals": {
         "traceability_packet": {
           "reviewer": "CO orchestration parent",
@@ -4502,7 +4502,7 @@
         "Codex"
       ],
       "status": "in_progress",
-      "last_review": "2026-05-07",
+      "last_review": "2026-05-31",
       "evidence": [
         "docs/PRD-linear-779bc931-f6b4-4a1c-b16f-145d500aca73.md",
         "docs/TECH_SPEC-linear-779bc931-f6b4-4a1c-b16f-145d500aca73.md",
@@ -4548,7 +4548,7 @@
         "Codex"
       ],
       "status": "in_progress",
-      "last_review": "2026-05-07",
+      "last_review": "2026-05-31",
       "approvals": {
         "docs_packet_child_lane": {
           "reviewer": "docs-packet-fileonly same-issue child lane",
@@ -4584,7 +4584,7 @@
         "Codex"
       ],
       "status": "in_progress",
-      "last_review": "2026-05-07",
+      "last_review": "2026-05-31",
       "canonical_owner_key": "docs:freshness:maintain",
       "canonical_owner_marker": "codex-orchestrator:canonical-owner-key=docs:freshness:maintain",
       "approvals": {
@@ -4627,7 +4627,7 @@
         "Codex"
       ],
       "status": "in_progress",
-      "last_review": "2026-05-07",
+      "last_review": "2026-05-31",
       "approvals": {
         "issue_context": {
           "reviewer": "Codex provider worker for CO-505",
@@ -4668,7 +4668,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-05-06",
+      "last_review": "2026-05-31",
       "status": "in_progress",
       "canonical_owner_key": "review-wrapper:bounded-success-legacy-fallback-metadata",
       "canonical_owner_marker": "codex-orchestrator:canonical-owner-key=review-wrapper:bounded-success-legacy-fallback-metadata",
@@ -4726,7 +4726,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-05-07",
+      "last_review": "2026-05-31",
       "status": "in_progress",
       "canonical_owner_marker": "build-all-strict-test-typecheck-debt",
       "evidence": [
@@ -4776,7 +4776,7 @@
         "Codex"
       ],
       "status": "in_progress",
-      "last_review": "2026-05-06",
+      "last_review": "2026-05-31",
       "canonical_owner_marker": "codex-orchestrator:canonical-owner-key=spec-guard:active-specs:last_review=2026-04-05",
       "approvals": {
         "baseline_reproduction": {
@@ -4823,7 +4823,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-05-06",
+      "last_review": "2026-05-31",
       "status": "in_progress",
       "evidence": [
         "docs/PRD-linear-f3aec8da-23c6-459e-acba-a5045b404c7f.md",
@@ -4864,7 +4864,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-05-05",
+      "last_review": "2026-05-31",
       "status": "in_progress",
       "evidence": [
         "docs/PRD-linear-dd2af462-08ae-4ea2-aa53-92000f06952a.md",
@@ -4906,7 +4906,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-05-05",
+      "last_review": "2026-05-31",
       "canonical_owner_marker": "codex-orchestrator:canonical-owner-key=baseline_cohort_id_sha256:8fe99c9bccb9aba10ce27a2ac178403a2f26b80a4445c8279f52b01da699ae2d",
       "evidence": [
         "docs/PRD-linear-62d5261d-b0ee-4988-9f02-43b3e1c85bde.md",
@@ -4978,7 +4978,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-05-05",
+      "last_review": "2026-05-31",
       "status": "in_progress",
       "canonical_owner_marker": "codex-orchestrator:canonical-owner-key=baseline_cohort_id:co-175-apr-14-march-14-tasks-1164-1195",
       "evidence": [
@@ -5038,7 +5038,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-05-05",
+      "last_review": "2026-05-31",
       "status": "backlog_packet",
       "approvals": {
         "traceability_packet": {
@@ -5079,7 +5079,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-05-05",
+      "last_review": "2026-05-31",
       "status": "implementation",
       "evidence": [
         ".agent/task/linear-0394e0bd-c929-4bb5-9dac-12e22080dfbd.md",
@@ -5143,7 +5143,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-05-05",
+      "last_review": "2026-05-31",
       "approvals": {
         "traceability_packet": {
           "reviewer": "parent orchestrator",
@@ -5175,7 +5175,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-05-05",
+      "last_review": "2026-05-31",
       "status": "in_progress",
       "approvals": {
         "traceability_packet": {
@@ -5208,7 +5208,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-05-05",
+      "last_review": "2026-05-31",
       "approvals": {
         "traceability_packet": {
           "reviewer": "CO-499 traceability packet branch",
@@ -5266,7 +5266,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-05-05",
+      "last_review": "2026-05-31",
       "status": "in_progress",
       "evidence": [
         "docs/PRD-linear-a243025f-d1e4-4960-ac11-ddc1b9806ffe.md",
@@ -5337,7 +5337,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-05-05",
+      "last_review": "2026-05-31",
       "approvals": {
         "traceability_packet": {
           "reviewer": "CO-457 traceability packet branch",
@@ -5369,7 +5369,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-05-05",
+      "last_review": "2026-05-31",
       "status": "in_progress",
       "evidence": [
         "docs/PRD-linear-9801241f-83b0-4f73-93f4-43eb62e3fe36.md",
@@ -5421,7 +5421,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-05-05",
+      "last_review": "2026-05-31",
       "status": "implementation_validated",
       "evidence": [
         "docs/PRD-linear-217c6584-bb47-486a-9765-f24e8ed84fc0.md",
@@ -5744,7 +5744,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-05-05",
+      "last_review": "2026-05-31",
       "status": "in_progress",
       "evidence": [
         "docs/PRD-linear-7e4ab467-3252-417b-8832-21d6f9b49b18.md",
@@ -15748,7 +15748,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-05-08",
+      "last_review": "2026-05-31",
       "approvals": {
         "docs_review": {
           "reviewer": "codex-orchestrator docs-review (failed-other, manual fallback accepted)",
@@ -15772,7 +15772,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-05-08",
+      "last_review": "2026-05-31",
       "approvals": {
         "docs_review": {
           "reviewer": "codex-orchestrator docs-review (failed-other, manual fallback accepted)",
@@ -15796,7 +15796,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-05-08",
+      "last_review": "2026-05-31",
       "approvals": {
         "docs_review": {
           "reviewer": "codex-orchestrator docs-review (failed-other, manual fallback accepted)",
@@ -24765,7 +24765,7 @@
       },
       "created_at": "2026-01-04",
       "completed_at": null,
-      "last_review": "2026-05-06",
+      "last_review": "2026-05-31",
       "approvals": {
         "spec_guard_cohort": {
           "reviewer": "Codex provider worker for CO-503",
@@ -29500,6 +29500,57 @@
       "notes": {
         "protected_terms": "implementation-docs archive automation; docs/docs-freshness-registry.json; status=archived; <!-- docs-archive:stub -->; Full content; Archive branch; Archive path; allow_registry_only; preserved_historical_stub; retained_terminal_packet; docs:freshness; PR #800; Codex P2.",
         "parallelization_decision": "stay_serial/overlapping_scope"
+      }
+    },
+    {
+      "id": "20260531-linear-38f28b8d-bed2-42b8-b07c-d782c13da0c2",
+      "title": "CO-588 consolidated CO orchestration for backlog completion",
+      "relates_to": "tasks/tasks-linear-38f28b8d-bed2-42b8-b07c-d782c13da0c2.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "status": "in_progress",
+      "last_review": "2026-05-31",
+      "canonical_owner_key": "co:consolidated-orchestration:2026-05-31",
+      "canonical_owner_marker": "codex-orchestrator:canonical-owner-key=co:consolidated-orchestration:2026-05-31",
+      "evidence": [
+        "docs/PRD-linear-38f28b8d-bed2-42b8-b07c-d782c13da0c2.md",
+        "docs/TECH_SPEC-linear-38f28b8d-bed2-42b8-b07c-d782c13da0c2.md",
+        "docs/ACTION_PLAN-linear-38f28b8d-bed2-42b8-b07c-d782c13da0c2.md",
+        "tasks/specs/linear-38f28b8d-bed2-42b8-b07c-d782c13da0c2-co-consolidated-orchestration-for-co-backlog-completion.md",
+        "tasks/tasks-linear-38f28b8d-bed2-42b8-b07c-d782c13da0c2.md",
+        ".agent/task/linear-38f28b8d-bed2-42b8-b07c-d782c13da0c2.md",
+        "tasks/index.json",
+        "docs/TASKS.md",
+        "docs/docs-freshness-registry.json"
+      ],
+      "approvals": {
+        "issue_quality_review": {
+          "reviewer": "parent CO orchestrator",
+          "date": "2026-05-31",
+          "status": "approved_for_implementation",
+          "summary": "Live CO-588 issue-context, clean shared-root/control-host proof, no open PRs, docs-freshness baseline evidence, one workpad, and one parallelization decision confirm this is the consolidated control lane rather than another narrow freshness ticket."
+        }
+      },
+      "paths": {
+        "agent_task": ".agent/task/linear-38f28b8d-bed2-42b8-b07c-d782c13da0c2.md",
+        "prd": "docs/PRD-linear-38f28b8d-bed2-42b8-b07c-d782c13da0c2.md",
+        "docs": "docs/TECH_SPEC-linear-38f28b8d-bed2-42b8-b07c-d782c13da0c2.md",
+        "tech_spec_mirror": "docs/TECH_SPEC-linear-38f28b8d-bed2-42b8-b07c-d782c13da0c2.md",
+        "action_plan": "docs/ACTION_PLAN-linear-38f28b8d-bed2-42b8-b07c-d782c13da0c2.md",
+        "spec": "tasks/specs/linear-38f28b8d-bed2-42b8-b07c-d782c13da0c2-co-consolidated-orchestration-for-co-backlog-completion.md",
+        "task": "tasks/tasks-linear-38f28b8d-bed2-42b8-b07c-d782c13da0c2.md"
+      },
+      "source_issue": {
+        "id": "38f28b8d-bed2-42b8-b07c-d782c13da0c2",
+        "identifier": "CO-588",
+        "url": "https://linear.app/asabeko/issue/CO-588"
+      },
+      "notes": {
+        "protected_terms": "docs-first; subagents; Linear issue consolidation; docs:freshness:maintain; block_spec_guard_pre_expiry; WIP under 4; gpt-5.5/xhigh; CO-579; CO-490; CO-519; CO-520; CO-524; CO-528; CO-537; CO-561; CO-588.",
+        "parallelization_decision": "parallelize_now/independent_scope_available",
+        "low_token_linear_policy": "Use full issue-context only for CO-588 or mutation-required issues; prefer list/search summaries, local co-status, GitHub PR state, and repo artifacts."
       }
     }
   ]
