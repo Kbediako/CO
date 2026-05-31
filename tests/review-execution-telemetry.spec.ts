@@ -18,6 +18,7 @@ const THREAD_NOT_FOUND_ROLLOUT_NOISE_LINE =
   'codex_core::session: failed to record rollout items: thread 019de1d2-3b27-7193-8330-0ed726e28044 not found';
 const WARN_THREAD_NOT_FOUND_ROLLOUT_NOISE_LINE = `warn ${THREAD_NOT_FOUND_ROLLOUT_NOISE_LINE}`;
 const CO474_REVIEW_OUTPUT_FIXTURE = new URL('./fixtures/review-execution/co474-review-output-with-findings.log', import.meta.url);
+const AVAILABLE_SPEC_BUNDLE = `${JSON.stringify({ schema_version: 'co.review.input-bundle.v1', bundle: 'spec', canonical_original_spec: { available: true, required_paths: { prd: 'docs/PRD-test.md', tech_spec: 'docs/TECH_SPEC-test.md', action_plan: 'docs/ACTION_PLAN-test.md' }, missing_paths: [] }, task_documents: [] })}\n`;
 
 type WriteTelemetryOptions = Parameters<typeof writeReviewExecutionTelemetry>[0];
 type TelemetryFixtureOptions = Partial<Pick<WriteTelemetryOptions, 'status' | 'terminationBoundary' | 'error' | 'includeRawTelemetry' | 'logPersistFailure' | 'launchContext' | 'contractMode' | 'contractPath'>> & {
@@ -84,6 +85,12 @@ function buildTelemetryCleanContract(evidence: { path: string; sha256: string })
     evidence_refs: [evidence],
     findings: []
   });
+  const intentAxis = (summary: string) => ({
+    required: true,
+    verdict: 'clean' as const,
+    evidence: [summary],
+    proposed_fixes: [`No change proposed; ${summary}`]
+  });
   return {
     schema_version: 'co.review.contract.v1',
     generated_at: '2026-05-14T00:00:00.000Z',
@@ -93,6 +100,12 @@ function buildTelemetryCleanContract(evidence: { path: string; sha256: string })
       coding_standards: axis('Standards checked.'),
       code_changes: axis('Code checked.'),
       agent_loop: axis('Loop checked.')
+    },
+    review_intent_matrix: {
+      original_spec: intentAxis('Spec checked.'),
+      coding_standards: intentAxis('Standards checked.'),
+      code_change_proposals: intentAxis('Code checked.'),
+      agent_loop_change_proposals: intentAxis('Loop checked.')
     },
     code_change_proposals: [],
     agent_loop_proposals: []
@@ -1546,7 +1559,7 @@ describe('review-execution-telemetry', () => {
     expect(payload?.contract_path).toBe('review/contract.json');
 
     const contractSandbox = await makeSandbox();
-    const evidence = await writeContractEvidence(contractSandbox, 'review/inputs/spec-bundle.json', '{"bundle":"spec"}\n');
+    const evidence = await writeContractEvidence(contractSandbox, 'review/inputs/spec-bundle.json', AVAILABLE_SPEC_BUNDLE);
     const contract = buildTelemetryCleanContract(evidence);
     const contractPayload = await writeTelemetryForOutput(
       contractSandbox,
@@ -1562,6 +1575,9 @@ describe('review-execution-telemetry', () => {
     expect(contractPayload?.contract_validation?.status).toBe('valid');
     expect(contractPayload?.contract_overall_verdict).toBe('clean');
     expect(contractPayload?.axis_verdicts?.agent_loop).toBe('clean');
+    expect(contractPayload?.review_intent_matrix?.original_spec.verdict).toBe('clean');
+    const cleanIntentMatrix = contractPayload?.review_intent_matrix;
+    expect(cleanIntentMatrix).toBeDefined();
     expect(contractPayload?.proposal_counts).toEqual({ code_change: 0, agent_loop: 0 });
     expect(getEnforceContractReviewFailureReason(contractPayload)).toBeNull();
     expect(getEnforceContractReviewFailureReason(payload)).toBe('review contract validation is missing');
@@ -1600,6 +1616,26 @@ describe('review-execution-telemetry', () => {
     expect(
       getEnforceContractReviewFailureReason({
         ...contractPayload,
+        review_intent_matrix: undefined
+      })
+    ).toBe('review intent matrix is missing');
+    expect(
+      getEnforceContractReviewFailureReason({
+        ...contractPayload,
+        review_intent_matrix: {
+          ...cleanIntentMatrix!,
+          original_spec: {
+            required: true,
+            verdict: 'unknown',
+            evidence: ['canonical PRD/TECH_SPEC/ACTION_PLAN unavailable'],
+            proposed_fixes: ['Provide canonical original spec evidence.']
+          }
+        }
+      })
+    ).toBe('review intent matrix axis original_spec is unknown');
+    expect(
+      getEnforceContractReviewFailureReason({
+        ...contractPayload,
         proposal_counts: {
           code_change: 0,
           agent_loop: 1
@@ -1611,7 +1647,7 @@ describe('review-execution-telemetry', () => {
     const boundedEvidence = await writeContractEvidence(
       boundedContractSandbox,
       'review/inputs/spec-bundle.json',
-      '{"bundle":"spec"}\n'
+      AVAILABLE_SPEC_BUNDLE
     );
     const boundedContract = buildTelemetryCleanContract(boundedEvidence);
     const boundedPayload = await writeTelemetryForOutput(
@@ -1643,7 +1679,7 @@ describe('review-execution-telemetry', () => {
     ).toBe('review launch used legacy fallback review-wrapper-read-only-sandbox-compatibility');
 
     const shadowSandbox = await makeSandbox();
-    const shadowEvidence = await writeContractEvidence(shadowSandbox, 'review/inputs/spec-bundle.json', '{"bundle":"spec"}\n');
+    const shadowEvidence = await writeContractEvidence(shadowSandbox, 'review/inputs/spec-bundle.json', AVAILABLE_SPEC_BUNDLE);
     const shadowContract = buildTelemetryCleanContract(shadowEvidence);
     const shadowPayload = await writeTelemetryForOutput(
       shadowSandbox,

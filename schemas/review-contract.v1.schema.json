@@ -9,6 +9,7 @@
     "generated_at",
     "overall_verdict",
     "axes",
+    "review_intent_matrix",
     "code_change_proposals",
     "agent_loop_proposals"
   ],
@@ -48,6 +49,9 @@
         }
       }
     },
+    "review_intent_matrix": {
+      "$ref": "#/definitions/review_intent_matrix"
+    },
     "code_change_proposals": {
       "type": "array",
       "items": {
@@ -68,6 +72,14 @@
         "clean",
         "findings",
         "blocked",
+        "unknown"
+      ]
+    },
+    "intent_verdict": {
+      "type": "string",
+      "enum": [
+        "clean",
+        "findings",
         "unknown"
       ]
     },
@@ -224,6 +236,66 @@
           }
         }
       ]
+    },
+    "review_intent_matrix_axis": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "required",
+        "verdict",
+        "evidence",
+        "proposed_fixes"
+      ],
+      "properties": {
+        "required": {
+          "const": true
+        },
+        "verdict": {
+          "$ref": "#/definitions/intent_verdict"
+        },
+        "evidence": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "\\S"
+          }
+        },
+        "proposed_fixes": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "\\S"
+          }
+        }
+      }
+    },
+    "review_intent_matrix": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "original_spec",
+        "coding_standards",
+        "code_change_proposals",
+        "agent_loop_change_proposals"
+      ],
+      "properties": {
+        "original_spec": {
+          "$ref": "#/definitions/review_intent_matrix_axis"
+        },
+        "coding_standards": {
+          "$ref": "#/definitions/review_intent_matrix_axis"
+        },
+        "code_change_proposals": {
+          "$ref": "#/definitions/review_intent_matrix_axis"
+        },
+        "agent_loop_change_proposals": {
+          "$ref": "#/definitions/review_intent_matrix_axis"
+        }
+      }
     },
     "proposal_target": {
       "type": "object",

@@ -21,6 +21,8 @@ const execFileAsync = promisify(execFile);
 const THREAD_NOT_FOUND_ROLLOUT_NOISE_LINE =
   'codex_core::session: failed to record rollout items: thread 019de1d2-3b27-7193-8330-0ed726e28044 not found';
 const WARN_THREAD_NOT_FOUND_ROLLOUT_NOISE_LINE = `warn ${THREAD_NOT_FOUND_ROLLOUT_NOISE_LINE}`;
+const AVAILABLE_SPEC_BUNDLE = `${JSON.stringify({ schema_version: 'co.review.input-bundle.v1', bundle: 'spec', canonical_original_spec: { available: true, required_paths: { prd: 'docs/PRD-test.md', tech_spec: 'docs/TECH_SPEC-test.md', action_plan: 'docs/ACTION_PLAN-test.md' }, missing_paths: [] }, task_documents: [] })}\n`;
+const UNAVAILABLE_SPEC_BUNDLE = `${JSON.stringify({ schema_version: 'co.review.input-bundle.v1', bundle: 'spec', canonical_original_spec: { available: false, required_paths: { prd: null, tech_spec: null, action_plan: null }, missing_paths: ['PRD', 'TECH_SPEC', 'ACTION_PLAN'] }, task_documents: [] })}\n`;
 
 async function makeSandbox(): Promise<string> {
   const sandbox = await mkdtemp(join(tmpdir(), 'review-contract-'));
@@ -35,7 +37,7 @@ afterEach(async () => {
 describe('review contract v1', () => {
   it('validates a fully clean contract with explicit clean signals and evidence hashes', async () => {
     const sandbox = await makeSandbox();
-    const evidenceRef = await writeEvidence(sandbox, 'review/inputs/spec-bundle.json', '{"bundle":"spec"}\n');
+    const evidenceRef = await writeEvidence(sandbox, 'review/inputs/spec-bundle.json', AVAILABLE_SPEC_BUNDLE);
     const contract = buildCleanContract(evidenceRef);
 
     await expect(validateReviewContract(contract, { repoRoot: sandbox })).resolves.toEqual({
@@ -53,6 +55,10 @@ describe('review contract v1', () => {
     expect(telemetry.contract_validation.status).toBe('valid');
     expect(telemetry.review_verdict).toBe('clean');
     expect(telemetry.axis_verdicts.spec_conformance).toBe('clean');
+    expect(telemetry.review_intent_matrix?.original_spec.verdict).toBe('clean');
+    expect(telemetry.review_intent_matrix?.code_change_proposals.proposed_fixes).toEqual([
+      'No change proposed; Code changes checked.'
+    ]);
     await expect(readFile(join(sandbox, 'review', 'contract.json'), 'utf8')).resolves.toContain(
       '"schema_version": "co.review.contract.v1"'
     );
@@ -73,7 +79,7 @@ describe('review contract v1', () => {
 
   it('ignores contract-shaped JSON outside the final reviewer response', async () => {
     const sandbox = await makeSandbox();
-    const evidenceRef = await writeEvidence(sandbox, 'review/inputs/spec-bundle.json', '{"bundle":"spec"}\n');
+    const evidenceRef = await writeEvidence(sandbox, 'review/inputs/spec-bundle.json', AVAILABLE_SPEC_BUNDLE);
     const contract = buildCleanContract(evidenceRef);
     const inspectedTranscript = [
       'exec',
@@ -286,7 +292,7 @@ describe('review contract v1', () => {
 
   it('rejects trailing content after the final contract JSON object', async () => {
     const sandbox = await makeSandbox();
-    const evidenceRef = await writeEvidence(sandbox, 'review/inputs/spec-bundle.json', '{"bundle":"spec"}\n');
+    const evidenceRef = await writeEvidence(sandbox, 'review/inputs/spec-bundle.json', AVAILABLE_SPEC_BUNDLE);
     const contract = buildCleanContract(evidenceRef);
 
     const trailingProseTelemetry = await buildReviewContractTelemetry({
@@ -355,7 +361,7 @@ describe('review contract v1', () => {
 
   it('rejects missing axes and clean verdicts without explicit clean signals', async () => {
     const sandbox = await makeSandbox();
-    const evidenceRef = await writeEvidence(sandbox, 'review/inputs/spec-bundle.json', '{"bundle":"spec"}\n');
+    const evidenceRef = await writeEvidence(sandbox, 'review/inputs/spec-bundle.json', AVAILABLE_SPEC_BUNDLE);
     const missingAxis = buildCleanContract(evidenceRef);
     delete (missingAxis.axes as Record<string, unknown>).agent_loop;
 
@@ -370,9 +376,169 @@ describe('review contract v1', () => {
     expect(ambiguousResult.errors.join('\n')).toContain('clean_signal');
   });
 
+  it('requires a structured review_intent_matrix with all governed intent axes', async () => {
+    const sandbox = await makeSandbox();
+    const evidenceRef = await writeEvidence(sandbox, 'review/inputs/spec-bundle.json', AVAILABLE_SPEC_BUNDLE);
+    const missingMatrix = buildCleanContract(evidenceRef) as Record<string, unknown>;
+    delete missingMatrix.review_intent_matrix;
+
+    const missingMatrixResult = await validateReviewContract(missingMatrix, { repoRoot: sandbox });
+    expect(missingMatrixResult.valid).toBe(false);
+    expect(missingMatrixResult.errors.join('\n')).toContain("must have required property 'review_intent_matrix'");
+
+    const missingIntentAxis = buildCleanContract(evidenceRef);
+    delete (missingIntentAxis.review_intent_matrix as Record<string, unknown>).agent_loop_change_proposals;
+    const missingIntentAxisResult = await validateReviewContract(missingIntentAxis, { repoRoot: sandbox });
+    expect(missingIntentAxisResult.valid).toBe(false);
+    expect(missingIntentAxisResult.errors.join('\n')).toContain(
+      "must have required property 'agent_loop_change_proposals'"
+    );
+  });
+
+  it('fails closed when original_spec is marked clean without canonical PRD TECH_SPEC ACTION_PLAN evidence', async () => {
+    const sandbox = await makeSandbox();
+    const evidenceRef = await writeEvidence(sandbox, 'review/inputs/spec-bundle.json', UNAVAILABLE_SPEC_BUNDLE);
+    const contract = buildCleanContract(evidenceRef);
+
+    const result = await validateReviewContract(contract, { repoRoot: sandbox });
+    expect(result.valid).toBe(false);
+    expect(result.errors.join('\n')).toContain('expected unknown when canonical PRD/TECH_SPEC/ACTION_PLAN evidence is unavailable');
+
+    const telemetry = await buildReviewContractTelemetry({
+      mode: 'enforce',
+      outputText: `codex\n${JSON.stringify(contract)}\n`,
+      repoRoot: sandbox,
+      contractPath: join(sandbox, 'review', 'contract-missing-original-spec.json')
+    });
+    expect(telemetry.contract_validation.status).toBe('invalid');
+    expect(telemetry.review_verdict).toBe('unknown');
+
+    const unavailableUnknown = buildCleanContract(evidenceRef);
+    unavailableUnknown.review_intent_matrix.original_spec = {
+      required: true,
+      verdict: 'unknown',
+      evidence: ['Canonical PRD/TECH_SPEC/ACTION_PLAN evidence was unavailable.'],
+      proposed_fixes: ['Provide canonical original spec evidence before claiming original_spec clean.']
+    };
+    await expect(validateReviewContract(unavailableUnknown, { repoRoot: sandbox })).resolves.toEqual({
+      valid: true,
+      errors: []
+    });
+  });
+
+  it('fails closed when original_spec clean has no positive canonical original-spec evidence', async () => {
+    const sandbox = await makeSandbox();
+    const legacySpecBundle = `${JSON.stringify({
+      schema_version: 'co.review.input-bundle.v1',
+      bundle: 'spec',
+      task_key: 'linear-missing-canonical',
+      task_documents: []
+    })}\n`;
+    const legacyEvidenceRef = await writeEvidence(sandbox, 'review/inputs/spec-bundle.json', legacySpecBundle);
+    const legacyContract = buildCleanContract(legacyEvidenceRef);
+
+    const legacyResult = await validateReviewContract(legacyContract, { repoRoot: sandbox });
+    expect(legacyResult.valid).toBe(false);
+    expect(legacyResult.errors.join('\n')).toContain('canonical_original_spec');
+
+    const datePrefixedSpecBundle = `${JSON.stringify({
+      schema_version: 'co.review.input-bundle.v1',
+      bundle: 'spec',
+      task_key: '20260531-linear-missing-canonical',
+      task_documents: []
+    })}\n`;
+    const datePrefixedEvidenceRef = await writeEvidence(
+      sandbox,
+      'review/inputs/date-prefixed-spec-bundle.json',
+      datePrefixedSpecBundle
+    );
+    const datePrefixedContract = buildCleanContract(datePrefixedEvidenceRef);
+
+    const datePrefixedResult = await validateReviewContract(datePrefixedContract, { repoRoot: sandbox });
+    expect(datePrefixedResult.valid).toBe(false);
+    expect(datePrefixedResult.errors.join('\n')).toContain('canonical_original_spec');
+
+    const nonSpecEvidenceRef = await writeEvidence(sandbox, 'review/inputs/standards-bundle.json', 'standards\n');
+    const noSpecBundleContract = buildCleanContract(nonSpecEvidenceRef);
+
+    const noSpecBundleResult = await validateReviewContract(noSpecBundleContract, { repoRoot: sandbox });
+    expect(noSpecBundleResult.valid).toBe(false);
+    expect(noSpecBundleResult.errors.join('\n')).toContain('missing_paths unavailable');
+  });
+
+  it('binds original_spec clean evidence to the current review spec bundle', async () => {
+    const sandbox = await makeSandbox();
+    const currentRef = await writeEvidence(sandbox, 'review/inputs/spec-bundle.json', UNAVAILABLE_SPEC_BUNDLE);
+    const staleRef = await writeEvidence(
+      sandbox,
+      '.runs/old-review/cli/run/review/inputs/spec-bundle.json',
+      AVAILABLE_SPEC_BUNDLE
+    );
+    const contract = buildCleanContract(staleRef);
+    for (const axis of Object.values(contract.axes)) {
+      axis.evidence_refs = [staleRef, currentRef];
+    }
+
+    const result = await validateReviewContract(contract, {
+      repoRoot: sandbox,
+      currentSpecBundlePath: join(sandbox, 'review', 'inputs', 'spec-bundle.json')
+    });
+    expect(result.valid).toBe(false);
+    expect(result.errors.join('\n')).toContain('expected unknown when canonical PRD/TECH_SPEC/ACTION_PLAN evidence is unavailable');
+    expect(result.errors.join('\n')).toContain('PRD, TECH_SPEC, ACTION_PLAN');
+  });
+
+  it('fails closed when original-spec bundle evidence is ambiguous without a current bundle', async () => {
+    const sandbox = await makeSandbox();
+    const currentRef = await writeEvidence(sandbox, 'review/inputs/spec-bundle.json', AVAILABLE_SPEC_BUNDLE);
+    const staleRef = await writeEvidence(
+      sandbox,
+      '.runs/old-review/cli/run/review/inputs/spec-bundle.json',
+      AVAILABLE_SPEC_BUNDLE
+    );
+    const contract = buildCleanContract(currentRef);
+    for (const axis of Object.values(contract.axes)) {
+      axis.evidence_refs = [currentRef, staleRef];
+    }
+
+    const result = await validateReviewContract(contract, { repoRoot: sandbox });
+    expect(result.valid).toBe(false);
+    expect(result.errors.join('\n')).toContain('ambiguous_spec_bundle');
+  });
+
+  it('rejects original-spec bundle evidence outside the repository root', async () => {
+    const sandbox = await makeSandbox();
+    const outsideRoot = await makeSandbox();
+    const outsidePath = join(outsideRoot, 'spec-bundle.json');
+    await writeFile(outsidePath, AVAILABLE_SPEC_BUNDLE, 'utf8');
+    const outsideRef = {
+      path: relative(sandbox, outsidePath).split(sep).join('/'),
+      sha256: createHash('sha256').update(AVAILABLE_SPEC_BUNDLE).digest('hex')
+    };
+    const contract = buildCleanContract(outsideRef);
+
+    const result = await validateReviewContract(contract, { repoRoot: sandbox });
+    expect(result.valid).toBe(false);
+    expect(result.errors.join('\n')).toContain('evidence path must stay within the repository root');
+  });
+
+  it('fails closed when current original-spec bundle evidence is malformed', async () => {
+    const sandbox = await makeSandbox();
+    const currentRef = await writeEvidence(sandbox, 'review/inputs/spec-bundle.json', 'not json\n');
+    const contract = buildCleanContract(currentRef);
+
+    const result = await validateReviewContract(contract, {
+      repoRoot: sandbox,
+      currentSpecBundlePath: join(sandbox, 'review', 'inputs', 'spec-bundle.json')
+    });
+    expect(result.valid).toBe(false);
+    expect(result.errors.join('\n')).toContain('expected unknown when canonical PRD/TECH_SPEC/ACTION_PLAN evidence is unavailable');
+    expect(result.errors.join('\n')).toContain('current_spec_bundle_malformed');
+  });
+
   it('rejects stale or missing evidence refs', async () => {
     const sandbox = await makeSandbox();
-    const evidenceRef = await writeEvidence(sandbox, 'review/inputs/spec-bundle.json', '{"bundle":"spec"}\n');
+    const evidenceRef = await writeEvidence(sandbox, 'review/inputs/spec-bundle.json', AVAILABLE_SPEC_BUNDLE);
     const staleRef = { ...evidenceRef, sha256: '0'.repeat(64) };
     const contract = buildCleanContract(staleRef);
 
@@ -383,7 +549,7 @@ describe('review contract v1', () => {
 
   it('rejects whitespace-only required strings before evidence refs are trusted', async () => {
     const sandbox = await makeSandbox();
-    const evidenceRef = await writeEvidence(sandbox, 'review/inputs/spec-bundle.json', '{"bundle":"spec"}\n');
+    const evidenceRef = await writeEvidence(sandbox, 'review/inputs/spec-bundle.json', AVAILABLE_SPEC_BUNDLE);
     const blankPathRef = { ...evidenceRef, path: ' ' };
     const contract = buildCleanContract(blankPathRef);
 
@@ -423,7 +589,7 @@ describe('review contract v1', () => {
     await mkdir(repoRoot, { recursive: true });
     await mkdir(runRoot, { recursive: true });
     const artifactPath = join(runRoot, 'spec-bundle.json');
-    const artifactContent = '{"bundle":"spec"}\n';
+    const artifactContent = AVAILABLE_SPEC_BUNDLE;
     await writeFile(artifactPath, artifactContent, 'utf8');
     const artifactRef = {
       path: relative(repoRoot, artifactPath),
@@ -454,7 +620,7 @@ describe('review contract v1', () => {
     await mkdir(repoRoot, { recursive: true });
     await mkdir(join(externalReviewDir, 'inputs'), { recursive: true });
     const artifactPath = join(externalReviewDir, 'inputs', 'spec-bundle.json');
-    const artifactContent = '{"bundle":"spec"}\n';
+    const artifactContent = AVAILABLE_SPEC_BUNDLE;
     await writeFile(artifactPath, artifactContent, 'utf8');
     const externalArtifactRef = {
       path: relative(repoRoot, artifactPath).split(sep).join('/'),
@@ -479,7 +645,7 @@ describe('review contract v1', () => {
 
   it('rejects malformed code and agent-loop proposals', async () => {
     const sandbox = await makeSandbox();
-    const evidenceRef = await writeEvidence(sandbox, 'review/inputs/spec-bundle.json', '{"bundle":"spec"}\n');
+    const evidenceRef = await writeEvidence(sandbox, 'review/inputs/spec-bundle.json', AVAILABLE_SPEC_BUNDLE);
     const contract = buildCleanContract(evidenceRef);
     contract.code_change_proposals.push({
       id: 'code-1',
@@ -512,7 +678,7 @@ describe('review contract v1', () => {
 
   it('keeps the structured-output schema in parity with canonical optional proposal fields', async () => {
     const sandbox = await makeSandbox();
-    const evidenceRef = await writeEvidence(sandbox, 'review/inputs/spec-bundle.json', '{"bundle":"spec"}\n');
+    const evidenceRef = await writeEvidence(sandbox, 'review/inputs/spec-bundle.json', AVAILABLE_SPEC_BUNDLE);
     const contract = buildCleanContract(evidenceRef);
     markCodeChangesFinding(contract, evidenceRef);
     markAgentLoopFinding(contract, evidenceRef);
@@ -559,6 +725,7 @@ describe('review contract v1', () => {
     });
     expect(telemetry.contract_validation.status).toBe('valid');
     expect(telemetry.review_verdict).toBe('findings');
+    expect(telemetry.review_intent_matrix?.code_change_proposals.verdict).toBe('findings');
     const persisted = JSON.parse(
       await readFile(join(sandbox, 'review', 'contract-output-parity.json'), 'utf8')
     ) as {
@@ -575,7 +742,7 @@ describe('review contract v1', () => {
 
   it('maps blocked and findings axes to fail-closed semantic findings', async () => {
     const sandbox = await makeSandbox();
-    const evidenceRef = await writeEvidence(sandbox, 'review/inputs/spec-bundle.json', '{"bundle":"spec"}\n');
+    const evidenceRef = await writeEvidence(sandbox, 'review/inputs/spec-bundle.json', AVAILABLE_SPEC_BUNDLE);
     const contract = buildCleanContract(evidenceRef);
     contract.overall_verdict = 'blocked';
     contract.axes.agent_loop = {
@@ -590,6 +757,12 @@ describe('review contract v1', () => {
           evidence_refs: [evidenceRef]
         }
       ]
+    };
+    contract.review_intent_matrix.agent_loop_change_proposals = {
+      required: true,
+      verdict: 'findings',
+      evidence: ['Required review loop evidence is absent.'],
+      proposed_fixes: ['Restore the missing agent-loop evidence before handoff.']
     };
 
     const telemetry = await buildReviewContractTelemetry({
@@ -608,7 +781,7 @@ describe('review contract v1', () => {
 
   it('rejects blocking agent-loop proposals when the agent-loop axis is clean', async () => {
     const sandbox = await makeSandbox();
-    const evidenceRef = await writeEvidence(sandbox, 'review/inputs/spec-bundle.json', '{"bundle":"spec"}\n');
+    const evidenceRef = await writeEvidence(sandbox, 'review/inputs/spec-bundle.json', AVAILABLE_SPEC_BUNDLE);
     const contract = buildCleanContract(evidenceRef);
     contract.agent_loop_proposals.push({
       id: 'loop-blocking',
@@ -635,7 +808,7 @@ describe('review contract v1', () => {
 
   it('rejects code-change proposals when the code-changes axis is clean', async () => {
     const sandbox = await makeSandbox();
-    const evidenceRef = await writeEvidence(sandbox, 'review/inputs/spec-bundle.json', '{"bundle":"spec"}\n');
+    const evidenceRef = await writeEvidence(sandbox, 'review/inputs/spec-bundle.json', AVAILABLE_SPEC_BUNDLE);
     const contract = buildCleanContract(evidenceRef);
     contract.code_change_proposals.push(buildCodeChangeProposal(evidenceRef));
 
@@ -657,9 +830,10 @@ describe('review contract v1', () => {
 
   it('routes code-change and agent-loop proposals separately for Linear follow-up handling', async () => {
     const sandbox = await makeSandbox();
-    const evidenceRef = await writeEvidence(sandbox, 'review/inputs/spec-bundle.json', '{"bundle":"spec"}\n');
+    const evidenceRef = await writeEvidence(sandbox, 'review/inputs/spec-bundle.json', AVAILABLE_SPEC_BUNDLE);
     const contract = buildCleanContract(evidenceRef);
     markCodeChangesFinding(contract, evidenceRef);
+    markAgentLoopFinding(contract, evidenceRef);
     contract.code_change_proposals.push(buildCodeChangeProposal(evidenceRef));
     contract.agent_loop_proposals.push({
       id: 'loop-1',
@@ -716,8 +890,9 @@ describe('review contract v1', () => {
 
   it('exports memory entries only for accepted validated agent-loop proposals', async () => {
     const sandbox = await makeSandbox();
-    const evidenceRef = await writeEvidence(sandbox, 'review/inputs/spec-bundle.json', '{"bundle":"spec"}\n');
+    const evidenceRef = await writeEvidence(sandbox, 'review/inputs/spec-bundle.json', AVAILABLE_SPEC_BUNDLE);
     const contract = buildCleanContract(evidenceRef);
+    markAgentLoopFinding(contract, evidenceRef);
     contract.agent_loop_proposals.push({
       id: 'loop-1',
       title: 'Capture accepted loop learning',
@@ -818,6 +993,7 @@ describe('review contract v1', () => {
       '.runs/linear-abc/cli/run-1/review/inputs/agent-loop-bundle.json'
     ]);
     expect(result?.promptLines.join('\n')).toContain('Required axes: `spec_conformance`');
+    expect(result?.promptLines.join('\n')).toContain('review_intent_matrix');
     expect(result?.promptLines.join('\n')).toContain(
       'shadow mode: telemetry records the contract for audit while legacy semantic parsing remains authoritative'
     );
@@ -879,18 +1055,19 @@ describe('review contract v1', () => {
     await writeFile(manifestPath, '{"status":"complete","run_id":"run-1"}\n', 'utf8');
     await writeFile(runnerLogPath, 'runner completed\n', 'utf8');
 
-    const snapshotContract = buildCleanContract(sourceRefs[0] as ReviewContractEvidenceRef);
+    const specRef = await writeEvidence(sandbox, 'review/inputs/spec-bundle.json', AVAILABLE_SPEC_BUNDLE);
+    const snapshotContract = buildCleanContract(specRef);
     for (const axis of Object.values(snapshotContract.axes)) {
-      axis.evidence_refs = sourceRefs;
+      axis.evidence_refs = [specRef, ...sourceRefs];
     }
     await expect(validateReviewContract(snapshotContract, { repoRoot: sandbox })).resolves.toEqual({
       valid: true,
       errors: []
     });
 
-    const liveContract = buildCleanContract(liveManifestRef);
+    const liveContract = buildCleanContract(specRef);
     for (const axis of Object.values(liveContract.axes)) {
-      axis.evidence_refs = [liveManifestRef, liveRunnerLogRef];
+      axis.evidence_refs = [specRef, liveManifestRef, liveRunnerLogRef];
     }
     const liveValidation = await validateReviewContract(liveContract, { repoRoot: sandbox });
     expect(liveValidation.valid).toBe(false);
@@ -939,6 +1116,176 @@ describe('review contract v1', () => {
     ) as { skipped_task_document_paths?: string[]; task_documents?: Array<{ content?: string }> };
     expect(specBundle.skipped_task_document_paths).toEqual(['../secret.txt']);
     expect(JSON.stringify(specBundle.task_documents)).not.toContain('super secret content');
+    expect(specBundle.canonical_original_spec).toEqual(
+      expect.objectContaining({
+        available: false
+      })
+    );
+  });
+
+  it('counts paths.tech_spec as canonical original-spec TECH_SPEC evidence', async () => {
+    const sandbox = await makeSandbox();
+    const repoRoot = join(sandbox, 'repo');
+    await mkdir(join(repoRoot, 'tasks'), { recursive: true });
+    await mkdir(join(repoRoot, 'docs'), { recursive: true });
+    await writeFile(
+      join(repoRoot, 'tasks', 'index.json'),
+      JSON.stringify({
+        items: [
+          {
+            id: 'linear-abc',
+            relates_to: 'tasks/tasks-linear-abc.md',
+            paths: {
+              prd: 'docs/PRD-linear-abc.md',
+              tech_spec: 'tasks/specs/linear-abc.md',
+              action_plan: 'docs/ACTION_PLAN-linear-abc.md'
+            }
+          }
+        ]
+      }),
+      'utf8'
+    );
+    await mkdir(join(repoRoot, 'tasks', 'specs'), { recursive: true });
+    await writeFile(join(repoRoot, 'tasks', 'tasks-linear-abc.md'), '# Task\n', 'utf8');
+    await writeFile(join(repoRoot, 'docs', 'PRD-linear-abc.md'), '# PRD\n', 'utf8');
+    await writeFile(join(repoRoot, 'tasks', 'specs', 'linear-abc.md'), '# TECH_SPEC\n', 'utf8');
+    await writeFile(join(repoRoot, 'docs', 'ACTION_PLAN-linear-abc.md'), '# ACTION_PLAN\n', 'utf8');
+    const manifestPath = join(repoRoot, '.runs', 'linear-abc', 'cli', 'run-1', 'manifest.json');
+    await mkdir(join(manifestPath, '..'), { recursive: true });
+    await writeFile(manifestPath, '{"status":"in_progress"}\n', 'utf8');
+
+    await prepareReviewContractInputBundles({
+      repoRoot,
+      reviewDir: join(repoRoot, '.runs', 'linear-abc', 'cli', 'run-1', 'review'),
+      manifestPath,
+      taskKey: 'linear-abc',
+      taskLabel: 'linear-abc',
+      reviewSurface: 'diff',
+      scopePaths: [],
+      notes: 'Goal: test',
+      mode: 'shadow'
+    });
+
+    const specBundle = JSON.parse(
+      await readFile(join(repoRoot, '.runs', 'linear-abc', 'cli', 'run-1', 'review', 'inputs', 'spec-bundle.json'), 'utf8')
+    ) as { canonical_original_spec?: { available?: boolean }; task_documents?: Array<{ path?: string }> };
+    expect(specBundle.canonical_original_spec?.available).toBe(true);
+    expect(specBundle.task_documents?.map((entry) => entry.path)).toContain('tasks/specs/linear-abc.md');
+  });
+
+  it('includes canonical original-spec evidence for date-prefixed Linear task ids', async () => {
+    const sandbox = await makeSandbox();
+    const repoRoot = join(sandbox, 'repo');
+    await mkdir(join(repoRoot, 'tasks'), { recursive: true });
+    await mkdir(join(repoRoot, 'docs'), { recursive: true });
+    await writeFile(
+      join(repoRoot, 'tasks', 'index.json'),
+      JSON.stringify({
+        items: [
+          {
+            id: '20260531-linear-abc',
+            relates_to: 'tasks/tasks-linear-abc.md',
+            paths: {
+              prd: 'docs/PRD-linear-abc.md',
+              tech_spec: 'docs/TECH_SPEC-linear-abc.md',
+              action_plan: 'docs/ACTION_PLAN-linear-abc.md'
+            }
+          }
+        ]
+      }),
+      'utf8'
+    );
+    await writeFile(join(repoRoot, 'tasks', 'tasks-linear-abc.md'), '# Task\n', 'utf8');
+    await writeFile(join(repoRoot, 'docs', 'PRD-linear-abc.md'), '# PRD\n', 'utf8');
+    await writeFile(join(repoRoot, 'docs', 'TECH_SPEC-linear-abc.md'), '# TECH_SPEC\n', 'utf8');
+    await writeFile(join(repoRoot, 'docs', 'ACTION_PLAN-linear-abc.md'), '# ACTION_PLAN\n', 'utf8');
+    const manifestPath = join(repoRoot, '.runs', '20260531-linear-abc', 'cli', 'run-1', 'manifest.json');
+    await mkdir(join(manifestPath, '..'), { recursive: true });
+    await writeFile(manifestPath, '{"status":"in_progress"}\n', 'utf8');
+
+    await prepareReviewContractInputBundles({
+      repoRoot,
+      reviewDir: join(repoRoot, '.runs', '20260531-linear-abc', 'cli', 'run-1', 'review'),
+      manifestPath,
+      taskKey: '20260531-linear-abc',
+      taskLabel: '20260531-linear-abc',
+      reviewSurface: 'diff',
+      scopePaths: [],
+      notes: 'Goal: test',
+      mode: 'shadow'
+    });
+
+    const specBundle = JSON.parse(
+      await readFile(
+        join(repoRoot, '.runs', '20260531-linear-abc', 'cli', 'run-1', 'review', 'inputs', 'spec-bundle.json'),
+        'utf8'
+      )
+    ) as { canonical_original_spec?: { available?: boolean } };
+    expect(specBundle.canonical_original_spec?.available).toBe(true);
+  });
+
+  it('uses the longest matching task-index alias when provider task keys overlap', async () => {
+    const sandbox = await makeSandbox();
+    const repoRoot = join(sandbox, 'repo');
+    await mkdir(join(repoRoot, 'tasks'), { recursive: true });
+    await mkdir(join(repoRoot, 'docs'), { recursive: true });
+    await writeFile(
+      join(repoRoot, 'tasks', 'index.json'),
+      JSON.stringify({
+        items: [
+          {
+            id: '20260531-linear-abc-parent-longer-than-child-key',
+            relates_to: 'tasks/tasks-linear-abc.md',
+            notes: {
+              provider_issue_task_key: 'linear-abc'
+            },
+            paths: {
+              prd: 'docs/PRD-parent.md',
+              tech_spec: 'docs/TECH_SPEC-parent.md',
+              action_plan: 'docs/ACTION_PLAN-parent.md'
+            }
+          },
+          {
+            id: 'linear-abc-review-pass',
+            relates_to: 'tasks/tasks-linear-abc-review-pass.md',
+            paths: {
+              prd: 'docs/PRD-child.md',
+              tech_spec: 'docs/TECH_SPEC-child.md',
+              action_plan: 'docs/ACTION_PLAN-child.md'
+            }
+          }
+        ]
+      }),
+      'utf8'
+    );
+    await writeFile(join(repoRoot, 'tasks', 'tasks-linear-abc-review-pass.md'), '# Task\n', 'utf8');
+    await writeFile(join(repoRoot, 'docs', 'PRD-child.md'), '# PRD\n', 'utf8');
+    await writeFile(join(repoRoot, 'docs', 'TECH_SPEC-child.md'), '# TECH_SPEC\n', 'utf8');
+    await writeFile(join(repoRoot, 'docs', 'ACTION_PLAN-child.md'), '# ACTION_PLAN\n', 'utf8');
+    const manifestPath = join(repoRoot, '.runs', 'linear-abc-review-pass-extra', 'cli', 'run-1', 'manifest.json');
+    await mkdir(join(manifestPath, '..'), { recursive: true });
+    await writeFile(manifestPath, '{"status":"in_progress"}\n', 'utf8');
+
+    await prepareReviewContractInputBundles({
+      repoRoot,
+      reviewDir: join(repoRoot, '.runs', 'linear-abc-review-pass-extra', 'cli', 'run-1', 'review'),
+      manifestPath,
+      taskKey: 'linear-abc-review-pass-extra',
+      taskLabel: 'linear-abc-review-pass-extra',
+      reviewSurface: 'diff',
+      scopePaths: [],
+      notes: 'Goal: test',
+      mode: 'shadow'
+    });
+
+    const specBundle = JSON.parse(
+      await readFile(
+        join(repoRoot, '.runs', 'linear-abc-review-pass-extra', 'cli', 'run-1', 'review', 'inputs', 'spec-bundle.json'),
+        'utf8'
+      )
+    ) as { canonical_original_spec?: { available?: boolean }; task_index_entry?: { id?: string } };
+    expect(specBundle.task_index_entry?.id).toBe('linear-abc-review-pass');
+    expect(specBundle.canonical_original_spec?.available).toBe(true);
   });
 
   it('includes staged and untracked files in the governed change bundle', async () => {
@@ -1149,6 +1496,12 @@ function buildCleanContract(evidenceRef: ReviewContractEvidenceRef) {
     evidence_refs: [evidenceRef],
     findings: []
   });
+  const cleanIntentAxis = (summary: string) => ({
+    required: true,
+    verdict: 'clean' as const,
+    evidence: [summary],
+    proposed_fixes: [`No change proposed; ${summary}`]
+  });
   return {
     schema_version: 'co.review.contract.v1',
     generated_at: '2026-05-14T00:00:00.000Z',
@@ -1158,6 +1511,12 @@ function buildCleanContract(evidenceRef: ReviewContractEvidenceRef) {
       coding_standards: cleanAxis('Coding standards checked.'),
       code_changes: cleanAxis('Code changes checked.'),
       agent_loop: cleanAxis('Agent loop checked.')
+    },
+    review_intent_matrix: {
+      original_spec: cleanIntentAxis('Spec conformance checked.'),
+      coding_standards: cleanIntentAxis('Coding standards checked.'),
+      code_change_proposals: cleanIntentAxis('Code changes checked.'),
+      agent_loop_change_proposals: cleanIntentAxis('Agent loop checked.')
     },
     code_change_proposals: [] as Array<Record<string, unknown>>,
     agent_loop_proposals: [] as Array<Record<string, unknown>>
@@ -1194,6 +1553,12 @@ function markCodeChangesFinding(
       }
     ]
   };
+  contract.review_intent_matrix.code_change_proposals = {
+    required: true,
+    verdict: 'findings',
+    evidence: ['Code-change proposal requires parent action.'],
+    proposed_fixes: ['Apply or explicitly reject the patchable code change proposal.']
+  };
 }
 
 function markAgentLoopFinding(
@@ -1213,6 +1578,12 @@ function markAgentLoopFinding(
         evidence_refs: [evidenceRef]
       }
     ]
+  };
+  contract.review_intent_matrix.agent_loop_change_proposals = {
+    required: true,
+    verdict: 'findings',
+    evidence: ['Agent-loop proposal requires parent action.'],
+    proposed_fixes: ['Route or explicitly reject the agent-loop change proposal before handoff.']
   };
 }
 
