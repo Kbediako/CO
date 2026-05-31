@@ -21,6 +21,7 @@ last_review: 2026-05-31
 - Explicit non-goals carried forward: no provider-worker admission, retry scheduling, Linear workflow, or broad renderer redesign unless focused implementation proves it necessary.
 
 ## Parity / Alignment Matrix
+
 | Surface | Current truth | Reference truth | Target truth / intended delta | Explicitly out-of-scope differences |
 | --- | --- | --- | --- | --- |
 | Current selected status | CO-582 is selected as `failed` from a stale usage-limit run. | Current selected status should reflect current active work. | Terminal released failed proof is not selected as current work. | Removing historical proof visibility. |

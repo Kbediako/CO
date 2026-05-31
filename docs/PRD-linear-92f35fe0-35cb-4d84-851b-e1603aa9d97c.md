@@ -24,6 +24,7 @@
 - Nearby wrong interpretations to reject: do not hide real failed runs for non-terminal issues, do not delete historical proof, do not manually edit provider-intake state as the fix, do not weaken active retry/running failure visibility, and do not make raw failed run status outrank terminal same-issue Linear truth.
 
 ## Parity / Alignment Matrix
+
 | Surface | Current truth | Reference truth | Target truth / intended delta | Explicitly out-of-scope differences |
 | --- | --- | --- | --- | --- |
 | `/ui/data.json` selected issue | CO-582 can be selected as `failed` even though the claim is released/not-active and live issue state is terminal Done. | Current status should represent current work, not stale proof. | Released/not-active terminal same-issue proof is suppressed from current selected status. | Removing audit proof from retained debug sections. |
