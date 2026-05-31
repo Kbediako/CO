@@ -5,7 +5,7 @@ import http from 'node:http';
 import { mkdtemp, mkdir, readFile, realpath, rm, symlink, utimes, writeFile } from 'node:fs/promises';
 import type { Socket } from 'node:net';
 import { tmpdir } from 'node:os';
-import { join, relative } from 'node:path';
+import { dirname, join, relative } from 'node:path';
 import { PassThrough } from 'node:stream';
 
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
@@ -17,6 +17,7 @@ import {
   buildProviderLinearWorkerProgressSemanticSignature,
   buildProviderLinearWorkerResolvedModelProvenance,
   buildProviderWorkerPrompt,
+  deriveProviderWorkerGoalIntentFromSpecPacket,
   defaultAppServerTurnRunner,
   loadProviderLinearWorkerContext,
   mergeProviderWorkerResolvedModelProvenance,
@@ -40,7 +41,8 @@ import {
   type ProviderLinearWorkerChildLaneRecord,
   type ProviderLinearWorkerExecRequest,
   type ProviderLinearWorkerExecResult,
-  type ProviderLinearWorkerProof
+  type ProviderLinearWorkerProof,
+  type ProviderLinearSpecDerivedGoalIntent
 } from '../src/cli/providerLinearWorkerRunner.js';
 import type { LiveLinearTrackedIssue } from '../src/cli/control/linearDispatchSource.js';
 import {
@@ -202,6 +204,101 @@ async function createManifestRoot(
     'utf8'
   );
   return { runDir, manifestPath };
+}
+
+const DEFAULT_PROVIDER_GOAL_CANONICAL_SPEC = [
+  '---',
+  'last_review: 2026-05-31',
+  '---',
+  '',
+  '## Summary',
+  'Adopt provider-worker goals for CO-2 from Linear specs.',
+  '',
+  '## Issue-Shaping Contract',
+  '- Protected terms: provider-worker goals, Linear specs, duplicate prevention, advisory `goal_evidence`, and status projection.',
+  '',
+  '## Technical Requirements',
+  '- Same issue/spec checksum reuses the existing goal instead of creating duplicates.',
+  '- Changed checksums supersede prior goal evidence without overlap.',
+  '',
+  '## Not Done If',
+  '- Goals replace Linear authority.',
+  '- Missing or unsupported goal surfaces disappear.',
+  '',
+  '## Validation Plan',
+  '- Focused tests cover duplicate prevention, objective shaping, status rendering, stale/mismatched, resume, and idempotency.'
+].join('\n');
+
+async function writeProviderGoalCanonicalSpecFixture(
+  repoRoot: string,
+  taskKey: string,
+  content = DEFAULT_PROVIDER_GOAL_CANONICAL_SPEC
+): Promise<string> {
+  const canonicalSpecPath = join(repoRoot, 'tasks', 'specs', `${taskKey}.md`);
+  await mkdir(dirname(canonicalSpecPath), { recursive: true });
+  await writeFile(canonicalSpecPath, content, 'utf8');
+  return canonicalSpecPath;
+}
+
+async function writeProviderGoalPacketFixture(
+  repoRoot: string,
+  taskKey: string,
+  canonicalSpecContent = DEFAULT_PROVIDER_GOAL_CANONICAL_SPEC
+): Promise<string> {
+  const canonicalSpecPath = await writeProviderGoalCanonicalSpecFixture(
+    repoRoot,
+    taskKey,
+    canonicalSpecContent
+  );
+  const packetFiles = new Map<string, string>([
+    [`docs/PRD-${taskKey}.md`, '# PRD\n\nCO-2 provider-worker goals from Linear specs.\n'],
+    [`docs/TECH_SPEC-${taskKey}.md`, '# TECH_SPEC\n\nGoal identity and advisory status projection.\n'],
+    [`docs/ACTION_PLAN-${taskKey}.md`, '# ACTION_PLAN\n\nImplement provider-worker goal derivation and status rendering.\n'],
+    [`tasks/tasks-${taskKey}.md`, '# Checklist\n\n- [x] Docs-first packet created.\n'],
+    [`.agent/task/${taskKey}.md`, '# Agent Checklist\n\n- [x] Docs-first packet mirrored.\n']
+  ]);
+  for (const [relativePath, content] of packetFiles) {
+    const targetPath = join(repoRoot, relativePath);
+    await mkdir(dirname(targetPath), { recursive: true });
+    await writeFile(targetPath, content, 'utf8');
+  }
+  return canonicalSpecPath;
+}
+
+function buildProviderGoalWorkpadBody(
+  issue: Pick<LiveLinearTrackedIssue, 'id' | 'identifier'>,
+  options: {
+    includeIssueContext?: boolean;
+    includeParallelizationDecision?: boolean;
+    planLine?: string;
+  } = {}
+): string {
+  const includeIssueContext = options.includeIssueContext ?? true;
+  const includeParallelizationDecision = options.includeParallelizationDecision ?? true;
+  return [
+    '## Codex Workpad',
+    '',
+    '### Environment / Workspace Stamp',
+    includeIssueContext ? `Issue: ${issue.identifier} / ${issue.id}` : 'Test workspace.',
+    includeParallelizationDecision
+      ? 'linear parallelization decision: stay_serial / single_bounded_change recorded for this turn.'
+      : 'Same-issue child lane note pending.',
+    '',
+    '### Plan',
+    `- [ ] ${options.planLine ?? 'Derive the goal after docs-first.'}`,
+    includeParallelizationDecision
+      ? '- [ ] Keep the Linear parallelization decision visible.'
+      : '- [ ] Keep child-lane notes visible.',
+    '',
+    '### Acceptance Criteria',
+    '- [ ] Reuse the goal for the same canonical spec checksum.',
+    '',
+    '### Validation',
+    '- [ ] Verify objective shaping includes active workpad plan evidence.',
+    '',
+    '### Notes',
+    'Goal evidence is advisory only.'
+  ].join('\n');
 }
 
 function buildSourceRootFreshnessFixture(
@@ -1381,6 +1478,393 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
       expect(persistedManifest.provider_control_host_task_id).toBeUndefined();
       expect(persistedManifest.provider_control_host_run_id).toBeUndefined();
     }
+  });
+
+  it('derives deterministic advisory goal intent from the current Linear spec packet', async () => {
+    const issue = createTrackedIssue({
+      title: 'Derive provider-worker goals from Linear specs'
+    });
+    tempRoot = await mkdtemp(join(tmpdir(), 'provider-linear-worker-goal-intent-'));
+    const taskKey = `linear-${issue.id}`;
+    const canonicalSpecPath = await writeProviderGoalPacketFixture(tempRoot, taskKey);
+    const workpadBody = buildProviderGoalWorkpadBody(issue);
+
+    const intent = await deriveProviderWorkerGoalIntentFromSpecPacket({
+      repoRoot: tempRoot,
+      issue,
+      workpadBody
+    });
+
+    expect(intent).toMatchObject({
+      source: 'linear-spec-packet',
+      issue_id: issue.id,
+      issue_identifier: issue.identifier,
+      provider_issue_task_key: taskKey,
+      status: 'ready',
+      reason: null,
+      authority: 'advisory_only'
+    });
+    expect(intent.spec_path).toBe(`tasks/specs/${taskKey}.md`);
+    expect(intent.spec_checksum).toMatch(/^[a-f0-9]{64}$/u);
+    expect(intent.goal_key).toBe(
+      `provider-worker-goals:${taskKey}:${intent.spec_checksum?.slice(0, 16)}`
+    );
+    expect(intent.objective).toContain('CO-2');
+    expect(intent.objective).toContain('Derive provider-worker goals from Linear specs');
+    expect(intent.objective).toContain('duplicate prevention');
+    expect(intent.objective).toContain('advisory `goal_evidence`');
+    expect(intent.objective).toContain('status projection');
+    expect(intent.objective).toContain('Workpad plan: Derive the goal after docs-first.');
+    expect(intent.objective).not.toContain('Goals replace Linear authority');
+
+    const repeated = await deriveProviderWorkerGoalIntentFromSpecPacket({
+      repoRoot: tempRoot,
+      issue,
+      workpadBody,
+      previousIntent: intent
+    });
+    expect(repeated.goal_key).toBe(intent.goal_key);
+    expect(repeated.objective).toBe(intent.objective);
+    expect(repeated.supersedes).toBeNull();
+
+    await mkdir(join(tempRoot, 'tasks'), { recursive: true });
+    await writeFile(
+      join(tempRoot, 'tasks', `tasks-${taskKey}.md`),
+      '# Checklist\n\n- [x] Validation note updated without changing canonical spec.\n',
+      'utf8'
+    );
+
+    const mutablePacketChanged = await deriveProviderWorkerGoalIntentFromSpecPacket({
+      repoRoot: tempRoot,
+      issue,
+      workpadBody,
+      previousIntent: intent
+    });
+    expect(mutablePacketChanged.spec_checksum).toBe(intent.spec_checksum);
+    expect(mutablePacketChanged.goal_key).toBe(intent.goal_key);
+    expect(mutablePacketChanged.supersedes).toBeNull();
+
+    const revisedWorkpad = workpadBody.replace(
+      '- [ ] Keep the Linear parallelization decision visible.',
+      '- [ ] Use active workpad plan evidence in the objective.'
+    );
+    const workpadChanged = await deriveProviderWorkerGoalIntentFromSpecPacket({
+      repoRoot: tempRoot,
+      issue,
+      workpadBody: revisedWorkpad,
+      previousIntent: intent
+    });
+    expect(workpadChanged.spec_checksum).not.toBe(intent.spec_checksum);
+    expect(workpadChanged.goal_key).not.toBe(intent.goal_key);
+    expect(workpadChanged.objective).toContain('Use active workpad plan evidence in the objective.');
+    expect(workpadChanged.supersedes).toMatchObject({
+      goal_key: intent.goal_key,
+      spec_checksum: intent.spec_checksum,
+      reason: 'spec_checksum_changed'
+    });
+
+    await writeFile(
+      canonicalSpecPath,
+      [
+        '---',
+        'last_review: 2026-05-31',
+        '---',
+        '',
+        '## Technical Requirements',
+        '- Same issue/spec checksum reuses the existing goal instead of creating duplicates.',
+        '- Changed checksums supersede prior goal evidence without overlap.',
+        '- Render missing, unavailable, stale, mismatched-thread, active, and complete status projection states.',
+        '',
+        '## Not Done If',
+        '- Goals replace Linear authority.',
+        '',
+        '## Validation Plan',
+        '- Focused tests cover duplicate prevention and status rendering.'
+      ].join('\n'),
+      'utf8'
+    );
+
+    const changed = await deriveProviderWorkerGoalIntentFromSpecPacket({
+      repoRoot: tempRoot,
+      issue,
+      workpadBody,
+      previousIntent: intent
+    });
+    expect(changed.goal_key).not.toBe(intent.goal_key);
+    expect(changed.supersedes).toMatchObject({
+      goal_key: intent.goal_key,
+      spec_checksum: intent.spec_checksum,
+      reason: 'spec_checksum_changed'
+    });
+  });
+
+  it('keeps provider goal creation blocked until the complete spec packet exists', async () => {
+    const issue = createTrackedIssue({
+      title: 'Derive provider-worker goals from Linear specs'
+    });
+    tempRoot = await mkdtemp(join(tmpdir(), 'provider-linear-worker-goal-incomplete-packet-'));
+    const taskKey = `linear-${issue.id}`;
+    await writeProviderGoalCanonicalSpecFixture(tempRoot, taskKey);
+
+    const intent = await deriveProviderWorkerGoalIntentFromSpecPacket({
+      repoRoot: tempRoot,
+      issue,
+      workpadBody: buildProviderGoalWorkpadBody(issue)
+    });
+
+    expect(intent).toMatchObject({
+      status: 'missing_prerequisite',
+      reason: 'spec_packet_incomplete',
+      spec_path: `tasks/specs/${taskKey}.md`,
+      spec_checksum: null,
+      goal_key: null,
+      objective: null,
+      created_from_paths: [`tasks/specs/${taskKey}.md`]
+    });
+  });
+
+  it('keeps provider goal creation blocked until workpad issue and parallelization evidence exists', async () => {
+    const issue = createTrackedIssue({
+      title: 'Derive provider-worker goals from Linear specs'
+    });
+    tempRoot = await mkdtemp(join(tmpdir(), 'provider-linear-worker-goal-workpad-gate-'));
+    const taskKey = `linear-${issue.id}`;
+    await writeProviderGoalPacketFixture(tempRoot, taskKey);
+
+    const missingIssueContext = await deriveProviderWorkerGoalIntentFromSpecPacket({
+      repoRoot: tempRoot,
+      issue,
+      workpadBody: buildProviderGoalWorkpadBody(issue, {
+        includeIssueContext: false
+      })
+    });
+
+    expect(missingIssueContext).toMatchObject({
+      status: 'missing_prerequisite',
+      reason: 'workpad_issue_context_missing',
+      spec_path: `tasks/specs/${taskKey}.md`,
+      spec_checksum: null,
+      goal_key: null,
+      objective: null
+    });
+
+    const missingParallelizationDecision = await deriveProviderWorkerGoalIntentFromSpecPacket({
+      repoRoot: tempRoot,
+      issue,
+      workpadBody: buildProviderGoalWorkpadBody(issue, {
+        includeParallelizationDecision: false
+      })
+    });
+
+    expect(missingParallelizationDecision).toMatchObject({
+      status: 'missing_prerequisite',
+      reason: 'workpad_parallelization_decision_missing',
+      spec_path: `tasks/specs/${taskKey}.md`,
+      spec_checksum: null,
+      goal_key: null,
+      objective: null
+    });
+  });
+
+  it('keeps provider goal creation blocked until specs and the workpad prerequisite exist', async () => {
+    const issue = createTrackedIssue();
+    tempRoot = await mkdtemp(join(tmpdir(), 'provider-linear-worker-goal-missing-'));
+
+    const missing = await deriveProviderWorkerGoalIntentFromSpecPacket({
+      repoRoot: tempRoot,
+      issue,
+      workpadBody: null
+    });
+
+    expect(missing).toMatchObject({
+      source: 'linear-spec-packet',
+      issue_id: issue.id,
+      issue_identifier: issue.identifier,
+      provider_issue_task_key: `linear-${issue.id}`,
+      status: 'missing_prerequisite',
+      spec_checksum: null,
+      goal_key: null,
+      objective: null,
+      reason: 'canonical_spec_missing'
+    });
+  });
+
+  it('does not derive a ready goal intent from audit-only workpad evidence', async () => {
+    const issue = createTrackedIssue();
+    tempRoot = await mkdtemp(join(tmpdir(), 'provider-linear-worker-goal-audit-only-'));
+    const taskKey = `linear-${issue.id}`;
+    const canonicalSpecPath = join(tempRoot, 'tasks', 'specs', `${taskKey}.md`);
+    await mkdir(dirname(canonicalSpecPath), { recursive: true });
+    await writeFile(
+      canonicalSpecPath,
+      [
+        '## Technical Requirements',
+        '- Same issue/spec checksum reuses the existing goal instead of creating duplicates.'
+      ].join('\n'),
+      'utf8'
+    );
+    const audit = buildSingleEntryAuditSummary({
+      recorded_at: '2026-03-21T09:00:00.000Z',
+      operation: 'upsert-workpad',
+      ok: true,
+      issue_id: issue.id,
+      issue_identifier: issue.identifier,
+      source_setup: null,
+      action: 'updated',
+      via: null,
+      state: null,
+      follow_up_issue_id: null,
+      follow_up_issue_identifier: null,
+      failed_relation_type: null,
+      comment_id: 'workpad-comment-1',
+      attachment_id: null,
+      error_code: null,
+      error_message: null
+    });
+
+    const intent = await deriveProviderWorkerGoalIntentFromSpecPacket({
+      repoRoot: tempRoot,
+      issue,
+      linearAudit: audit
+    });
+
+    expect(intent).toMatchObject({
+      status: 'missing_prerequisite',
+      reason: 'workpad_missing',
+      objective: null,
+      goal_key: null
+    });
+  });
+
+  it('hydrates provider goal intent from cached active workpad body in the runner path', async () => {
+    const { manifestPath, runDir } = await createManifestRoot();
+    const issue = createTrackedIssue({
+      title: 'Derive provider-worker goals from Linear specs'
+    });
+    const taskKey = `linear-${issue.id}`;
+    await writeProviderGoalPacketFixture(
+      tempRoot!,
+      taskKey,
+      [
+        '## Technical Requirements',
+        '- Same issue/spec checksum reuses the existing goal instead of creating duplicates.',
+        '',
+        '## Validation Plan',
+        '- Focused tests cover workpad body hydration.'
+      ].join('\n')
+    );
+    const workpadBody = buildProviderGoalWorkpadBody(issue, {
+      planLine: 'Use cached current workpad plan evidence.'
+    });
+    await writeFile(
+      join(runDir, `provider-linear-issue-context-cache-${issue.id}.json`),
+      JSON.stringify({
+        schema_version: 2,
+        issue_id: issue.id,
+        recorded_at: '2026-03-21T09:00:00.000Z',
+        source_setup: null,
+        issue: {
+          id: issue.id,
+          identifier: issue.identifier,
+          title: issue.title,
+          description: issue.description,
+          comments: [],
+          labels: [],
+          attachments: [],
+          workpad_comment: {
+            id: 'workpad-comment-1',
+            body: workpadBody,
+            url: 'https://linear.example/comment/workpad-comment-1',
+            created_at: '2026-03-21T08:59:00.000Z',
+            updated_at: '2026-03-21T09:00:00.000Z',
+            resolved_at: null
+          }
+        }
+      }),
+      'utf8'
+    );
+    const appServerTurnRunner = vi.fn(async (request) => {
+      expect(String(request.prompt)).toContain('Workpad plan: Use cached current workpad plan evidence.');
+      await appendStaySerialParallelizationDecisionAuditForRequest(request);
+      return {
+        exitCode: 0,
+        stdout: [
+          '{"type":"thread.started","thread_id":"thread-goal-intent"}',
+          '{"type":"turn_context","payload":{"turn_id":"turn-goal-intent-1"}}',
+          '{"type":"notification","method":"turn/completed","params":{"threadId":"thread-goal-intent","turn":{"id":"turn-goal-intent-1","status":"completed"}}}'
+        ].join('\n'),
+        stderr: ''
+      };
+    });
+
+    const proof = await runProviderLinearWorker(
+      {
+        CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath,
+        CODEX_ORCHESTRATOR_ROOT: tempRoot ?? undefined,
+        CODEX_ORCHESTRATOR_RUN_ID: 'run-child',
+        CODEX_ORCHESTRATOR_PROVIDER_WORKER_MAX_TURNS: '1',
+        CODEX_HOME: tempRoot ?? undefined
+      },
+      {
+        readTrackedIssue: createReadTrackedIssueMock()
+          .mockResolvedValueOnce(issue)
+          .mockResolvedValueOnce(createTrackedIssue({ state: 'Done', state_type: 'completed' })),
+        resolveRuntimeContext: vi.fn(async () => createAppServerRuntimeContext()),
+        execRunner: vi.fn(),
+        appServerTurnRunner,
+        now: vi
+          .fn()
+          .mockReturnValueOnce('2026-03-21T09:00:00.000Z')
+          .mockReturnValue('2026-03-21T09:00:01.000Z'),
+        log: { info: vi.fn(), warn: vi.fn(), error: vi.fn() }
+      }
+    );
+
+    expect(proof.goal_intent).toMatchObject({
+      status: 'ready',
+      provider_issue_task_key: taskKey,
+      objective: expect.stringContaining('Workpad plan: Use cached current workpad plan evidence.')
+    });
+  });
+
+  it('adds advisory goal create/reuse/supersession instructions to provider-worker prompts', () => {
+    const issue = createTrackedIssue({
+      title: 'Derive provider-worker goals from Linear specs'
+    });
+    const goalIntent: ProviderLinearSpecDerivedGoalIntent = {
+      source: 'linear-spec-packet',
+      issue_id: issue.id,
+      issue_identifier: issue.identifier,
+      issue_title: issue.title,
+      provider_issue_task_key: `linear-${issue.id}`,
+      spec_path: `tasks/specs/linear-${issue.id}.md`,
+      spec_checksum: 'a'.repeat(64),
+      goal_key: `provider-worker-goals:linear-${issue.id}:${'a'.repeat(16)}`,
+      objective:
+        'Complete CO-2: Derive provider-worker goals from Linear specs. Acceptance boundary: duplicate prevention. Non-goals: no Linear replacement. Validation target: status projection tests.',
+      acceptance_boundary: 'duplicate prevention',
+      non_goals: 'no Linear replacement',
+      validation_target: 'status projection tests',
+      status: 'ready',
+      reason: null,
+      authority: 'advisory_only',
+      workpad_required: true,
+      created_from_paths: [`tasks/specs/linear-${issue.id}.md`],
+      supersedes: null
+    };
+
+    const prompt = buildProviderWorkerPrompt(issue, 1, 5, SOURCE_HELPER_COMMAND, '/tmp/co', {
+      goalIntent
+    });
+
+    expect(prompt).toContain('Codex goal intent (advisory provider-worker continuity):');
+    expect(prompt).toContain(`goal_key \`${goalIntent.goal_key}\``);
+    expect(prompt).toContain(`spec_checksum \`${goalIntent.spec_checksum}\``);
+    expect(prompt).toContain('Call `/goal`/`get_goal` before any `create_goal` attempt');
+    expect(prompt).toContain('Do not create a goal until the active `## Codex Workpad` exists');
+    expect(prompt).toContain('If the current goal already contains the same goal_key/spec_checksum, reuse it');
+    expect(prompt).toContain('If the spec checksum changed, mark the old goal evidence superseded/stale before creating one replacement goal');
+    expect(prompt).toContain('Goal evidence remains advisory-only and cannot authorize Linear transitions');
   });
 
   it('builds a full first-turn prompt and a continuation prompt', () => {
@@ -16318,6 +16802,347 @@ for await (const line of rl) {
       authority: 'advisory_only',
       linear_authority_preserved: true
     });
+  });
+
+  it('binds captured goal evidence to the current spec-derived goal intent when tool output omits metadata', () => {
+    const goalIntent: ProviderLinearSpecDerivedGoalIntent = {
+      source: 'linear-spec-packet',
+      issue_id: 'issue-goal-bind',
+      issue_identifier: 'CO-520',
+      issue_title: 'Derive provider-worker goals from Linear specs',
+      provider_issue_task_key: 'linear-issue-goal-bind',
+      spec_path: 'tasks/specs/linear-issue-goal-bind.md',
+      spec_checksum: 'f'.repeat(64),
+      goal_key: 'provider-worker-goals:linear-issue-goal-bind:ffffffffffffffff',
+      objective:
+        'Complete CO-520 provider-worker goals from Linear specs. ' +
+        'goal_key: provider-worker-goals:linear-issue-goal-bind:ffffffffffffffff; ' +
+        `spec_checksum: ${'f'.repeat(64)}.`,
+      acceptance_boundary: 'Derive one advisory goal per issue/spec attempt.',
+      non_goals: 'Do not use goals as workflow authority.',
+      validation_target: 'Focused goal evidence and status projection tests.',
+      status: 'ready',
+      reason: null,
+      authority: 'advisory_only',
+      workpad_required: true,
+      created_from_paths: ['tasks/specs/linear-issue-goal-bind.md'],
+      supersedes: null
+    };
+    const parsed = parseProviderLinearWorkerJsonl(
+      [
+        JSON.stringify({
+          timestamp: '2026-03-21T09:00:00.100Z',
+          type: 'thread.started',
+          thread_id: 'thread-goal-bind'
+        }),
+        JSON.stringify({
+          timestamp: '2026-03-21T09:00:00.200Z',
+          type: 'turn_context',
+          payload: { turn_id: 'turn-goal-bind-1' }
+        }),
+        JSON.stringify({
+          timestamp: '2026-03-21T09:00:00.300Z',
+          type: 'response_item',
+          payload: {
+            type: 'function_call',
+            name: 'get_goal',
+            call_id: 'call-tool-goal-bind'
+          }
+        }),
+        JSON.stringify({
+          timestamp: '2026-03-21T09:00:00.500Z',
+          type: 'response_item',
+          payload: {
+            type: 'function_call_output',
+            call_id: 'call-tool-goal-bind',
+            output: JSON.stringify({
+              objective: goalIntent.objective,
+              status: 'active',
+              updatedAt: '2026-03-21T09:00:00.450Z'
+            })
+          }
+        })
+      ].join('\n')
+    );
+
+    const proofGoalEvidence = normalizeProviderLinearGoalEvidenceForProof(
+      {
+        candidate: parsed.goalEvidence,
+        previous: null,
+        proofThreadId: 'thread-goal-bind',
+        proofTurnId: 'turn-goal-bind-1',
+        observedAt: '2026-03-21T09:00:01.000Z',
+        currentTurnStartedAt: '2026-03-21T09:00:00.000Z',
+        featureEnabled: true,
+        runtimeMode: 'appserver',
+        goalIntent
+      }
+    );
+
+    expect(proofGoalEvidence).toMatchObject({
+      capture_mode: 'captured',
+      provider_issue_task_key: goalIntent.provider_issue_task_key,
+      spec_checksum: goalIntent.spec_checksum,
+      goal_key: goalIntent.goal_key,
+      authority: 'advisory_only',
+      linear_authority_preserved: true
+    });
+  });
+
+  it('marks carried captured goal evidence stale when the current spec checksum changed', () => {
+    const goalIntent: ProviderLinearSpecDerivedGoalIntent = {
+      source: 'linear-spec-packet',
+      issue_id: 'issue-goal-stale',
+      issue_identifier: 'CO-520',
+      issue_title: 'Derive provider-worker goals from Linear specs',
+      provider_issue_task_key: 'linear-issue-goal-stale',
+      spec_path: 'tasks/specs/linear-issue-goal-stale.md',
+      spec_checksum: 'b'.repeat(64),
+      goal_key: 'provider-worker-goals:linear-issue-goal-stale:bbbbbbbbbbbbbbbb',
+      objective:
+        'Complete CO-520 provider-worker goals from Linear specs. ' +
+        'goal_key: provider-worker-goals:linear-issue-goal-stale:bbbbbbbbbbbbbbbb; ' +
+        `spec_checksum: ${'b'.repeat(64)}.`,
+      acceptance_boundary: 'Derive one advisory goal per issue/spec attempt.',
+      non_goals: 'Do not use goals as workflow authority.',
+      validation_target: 'Focused stale checksum projection tests.',
+      status: 'ready',
+      reason: null,
+      authority: 'advisory_only',
+      workpad_required: true,
+      created_from_paths: ['tasks/specs/linear-issue-goal-stale.md'],
+      supersedes: {
+        goal_key: 'provider-worker-goals:linear-issue-goal-stale:aaaaaaaaaaaaaaaa',
+        spec_checksum: 'a'.repeat(64),
+        reason: 'spec_checksum_changed'
+      }
+    };
+
+    const proofGoalEvidence = normalizeProviderLinearGoalEvidenceForProof({
+      candidate: null,
+      previous: {
+        source: 'codex-goals',
+        feature_available: true,
+        feature_enabled: true,
+        capture_mode: 'captured',
+        capture_timestamp: '2026-03-21T09:00:00.500Z',
+        thread_id: 'thread-goal-stale',
+        turn_id: 'turn-goal-stale-1',
+        objective:
+          'Complete CO-520 provider-worker goals from Linear specs. ' +
+          'goal_key: provider-worker-goals:linear-issue-goal-stale:aaaaaaaaaaaaaaaa; ' +
+          `spec_checksum: ${'a'.repeat(64)}.`,
+        status: 'active',
+        token_budget: null,
+        tokens_used: null,
+        elapsed_seconds: null,
+        created_at: '2026-03-21T08:59:59.000Z',
+        updated_at: '2026-03-21T09:00:00.500Z',
+        provider_issue_task_key: 'linear-issue-goal-stale',
+        spec_checksum: 'a'.repeat(64),
+        goal_key: 'provider-worker-goals:linear-issue-goal-stale:aaaaaaaaaaaaaaaa',
+        authority: 'advisory_only',
+        linear_authority_preserved: true,
+        not_authorized_for: [...PROVIDER_LINEAR_GOAL_EVIDENCE_NOT_AUTHORIZED_FOR],
+        reason: null
+      },
+      proofThreadId: 'thread-goal-stale',
+      proofTurnId: 'turn-goal-stale-2',
+      observedAt: '2026-03-21T09:00:01.000Z',
+      currentTurnStartedAt: '2026-03-21T09:00:00.000Z',
+      featureEnabled: true,
+      runtimeMode: 'appserver',
+      goalIntent
+    });
+
+    expect(proofGoalEvidence).toMatchObject({
+      capture_mode: 'stale',
+      provider_issue_task_key: 'linear-issue-goal-stale',
+      spec_checksum: 'a'.repeat(64),
+      goal_key: 'provider-worker-goals:linear-issue-goal-stale:aaaaaaaaaaaaaaaa',
+      objective: null,
+      status: null,
+      reason: `goal_spec_checksum_mismatch:${'a'.repeat(64)}->${'b'.repeat(64)}`
+    });
+  });
+
+  it('preserves current-turn mismatched goal identity instead of rebinding previous metadata', () => {
+    const goalIntent: ProviderLinearSpecDerivedGoalIntent = {
+      source: 'linear-spec-packet',
+      issue_id: 'issue-goal-candidate-stale',
+      issue_identifier: 'CO-520',
+      issue_title: 'Derive provider-worker goals from Linear specs',
+      provider_issue_task_key: 'linear-issue-goal-candidate-stale',
+      spec_path: 'tasks/specs/linear-issue-goal-candidate-stale.md',
+      spec_checksum: 'b'.repeat(64),
+      goal_key: 'provider-worker-goals:linear-issue-goal-candidate-stale:bbbbbbbbbbbbbbbb',
+      objective:
+        'Complete CO-520 provider-worker goals from Linear specs. ' +
+        'goal_key: provider-worker-goals:linear-issue-goal-candidate-stale:bbbbbbbbbbbbbbbb; ' +
+        `spec_checksum: ${'b'.repeat(64)}.`,
+      acceptance_boundary: 'Derive one advisory goal per issue/spec attempt.',
+      non_goals: 'Do not use goals as workflow authority.',
+      validation_target: 'Focused stale candidate identity tests.',
+      status: 'ready',
+      reason: null,
+      authority: 'advisory_only',
+      workpad_required: true,
+      created_from_paths: ['tasks/specs/linear-issue-goal-candidate-stale.md'],
+      supersedes: null
+    };
+
+    const proofGoalEvidence = normalizeProviderLinearGoalEvidenceForProof({
+      candidate: {
+        source: 'codex-goals',
+        feature_available: true,
+        feature_enabled: true,
+        capture_mode: 'captured',
+        capture_timestamp: '2026-03-21T09:00:00.500Z',
+        thread_id: 'thread-goal-candidate-stale',
+        turn_id: 'turn-goal-candidate-stale-2',
+        objective:
+          'Complete CO-520 provider-worker goals from Linear specs. ' +
+          'goal_key: provider-worker-goals:linear-issue-goal-candidate-stale:aaaaaaaaaaaaaaaa; ' +
+          `spec_checksum: ${'a'.repeat(64)}.`,
+        status: 'active',
+        token_budget: null,
+        tokens_used: null,
+        elapsed_seconds: null,
+        created_at: '2026-03-21T08:59:59.000Z',
+        updated_at: '2026-03-21T09:00:00.500Z',
+        provider_issue_task_key: 'linear-issue-goal-candidate-stale',
+        spec_checksum: 'a'.repeat(64),
+        goal_key: 'provider-worker-goals:linear-issue-goal-candidate-stale:aaaaaaaaaaaaaaaa',
+        authority: 'advisory_only',
+        linear_authority_preserved: true,
+        not_authorized_for: [...PROVIDER_LINEAR_GOAL_EVIDENCE_NOT_AUTHORIZED_FOR],
+        reason: null
+      },
+      previous: {
+        source: 'codex-goals',
+        feature_available: true,
+        feature_enabled: true,
+        capture_mode: 'captured',
+        capture_timestamp: '2026-03-21T08:59:00.500Z',
+        thread_id: 'thread-goal-candidate-stale',
+        turn_id: 'turn-goal-candidate-stale-1',
+        objective: goalIntent.objective,
+        status: 'active',
+        token_budget: null,
+        tokens_used: null,
+        elapsed_seconds: null,
+        created_at: '2026-03-21T08:58:59.000Z',
+        updated_at: '2026-03-21T08:59:00.500Z',
+        provider_issue_task_key: goalIntent.provider_issue_task_key,
+        spec_checksum: goalIntent.spec_checksum,
+        goal_key: goalIntent.goal_key,
+        authority: 'advisory_only',
+        linear_authority_preserved: true,
+        not_authorized_for: [...PROVIDER_LINEAR_GOAL_EVIDENCE_NOT_AUTHORIZED_FOR],
+        reason: null
+      },
+      proofThreadId: 'thread-goal-candidate-stale',
+      proofTurnId: 'turn-goal-candidate-stale-2',
+      observedAt: '2026-03-21T09:00:01.000Z',
+      currentTurnStartedAt: '2026-03-21T09:00:00.000Z',
+      featureEnabled: true,
+      runtimeMode: 'appserver',
+      goalIntent
+    });
+
+    expect(proofGoalEvidence).toMatchObject({
+      capture_mode: 'stale',
+      provider_issue_task_key: 'linear-issue-goal-candidate-stale',
+      spec_checksum: 'a'.repeat(64),
+      goal_key: 'provider-worker-goals:linear-issue-goal-candidate-stale:aaaaaaaaaaaaaaaa',
+      objective: null,
+      status: null,
+      reason: `goal_spec_checksum_mismatch:${'a'.repeat(64)}->${'b'.repeat(64)}`
+    });
+  });
+
+  it('marks metadata-free captured goal evidence stale when the objective does not prove the current goal intent', () => {
+    const goalIntent: ProviderLinearSpecDerivedGoalIntent = {
+      source: 'linear-spec-packet',
+      issue_id: 'issue-goal-unverified',
+      issue_identifier: 'CO-520',
+      issue_title: 'Derive provider-worker goals from Linear specs',
+      provider_issue_task_key: 'linear-issue-goal-unverified',
+      spec_path: 'tasks/specs/linear-issue-goal-unverified.md',
+      spec_checksum: 'c'.repeat(64),
+      goal_key: 'provider-worker-goals:linear-issue-goal-unverified:cccccccccccccccc',
+      objective:
+        'Complete CO-520 provider-worker goals from Linear specs. ' +
+        'goal_key: provider-worker-goals:linear-issue-goal-unverified:cccccccccccccccc; ' +
+        `spec_checksum: ${'c'.repeat(64)}.`,
+      acceptance_boundary: 'Derive one advisory goal per issue/spec attempt.',
+      non_goals: 'Do not use goals as workflow authority.',
+      validation_target: 'Focused unverified goal projection tests.',
+      status: 'ready',
+      reason: null,
+      authority: 'advisory_only',
+      workpad_required: true,
+      created_from_paths: ['tasks/specs/linear-issue-goal-unverified.md'],
+      supersedes: null
+    };
+    const parsed = parseProviderLinearWorkerJsonl(
+      [
+        JSON.stringify({
+          timestamp: '2026-03-21T09:00:00.100Z',
+          type: 'thread.started',
+          thread_id: 'thread-goal-unverified'
+        }),
+        JSON.stringify({
+          timestamp: '2026-03-21T09:00:00.200Z',
+          type: 'turn_context',
+          payload: { turn_id: 'turn-goal-unverified-1' }
+        }),
+        JSON.stringify({
+          timestamp: '2026-03-21T09:00:00.300Z',
+          type: 'response_item',
+          payload: {
+            type: 'function_call',
+            name: 'get_goal',
+            call_id: 'call-tool-goal-unverified'
+          }
+        }),
+        JSON.stringify({
+          timestamp: '2026-03-21T09:00:00.500Z',
+          type: 'response_item',
+          payload: {
+            type: 'function_call_output',
+            call_id: 'call-tool-goal-unverified',
+            output: JSON.stringify({
+              objective: 'Complete an unrelated provider-worker goal.',
+              status: 'active',
+              updatedAt: '2026-03-21T09:00:00.450Z'
+            })
+          }
+        })
+      ].join('\n')
+    );
+
+    const proofGoalEvidence = normalizeProviderLinearGoalEvidenceForProof({
+      candidate: parsed.goalEvidence,
+      previous: null,
+      proofThreadId: 'thread-goal-unverified',
+      proofTurnId: 'turn-goal-unverified-1',
+      observedAt: '2026-03-21T09:00:01.000Z',
+      currentTurnStartedAt: '2026-03-21T09:00:00.000Z',
+      featureEnabled: true,
+      runtimeMode: 'appserver',
+      goalIntent
+    });
+
+    expect(proofGoalEvidence).toMatchObject({
+      capture_mode: 'stale',
+      provider_issue_task_key: 'linear-issue-goal-unverified',
+      objective: null,
+      status: null,
+      reason: 'goal_identity_unverified'
+    });
+    expect(proofGoalEvidence.spec_checksum).toBeUndefined();
+    expect(proofGoalEvidence.goal_key).toBeUndefined();
   });
 
   it('marks unavailable goal evidence as disabled when the goals feature is off', async () => {

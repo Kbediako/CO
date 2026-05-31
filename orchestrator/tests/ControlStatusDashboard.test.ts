@@ -847,6 +847,114 @@ describe('control status dashboard', () => {
     );
   });
 
+  it('renders advisory provider goal state in full and compact CO STATUS frames', () => {
+    const baseDataset = buildDataset();
+    const goalSummary = {
+      state: 'active',
+      authority: 'advisory_only',
+      issue_id: 'issue-26',
+      task_key: 'linear-a861',
+      checksum: 'abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789',
+      checksum_short: 'abcdef0123456789',
+      goal_key: 'provider-worker-goals:linear-a861:abcdef0123456789',
+      capture_mode: 'captured',
+      status: 'active',
+      thread_id: 'thread-26',
+      turn_id: 'turn-26',
+      objective_preview: 'Complete CO-26 provider-worker goals from Linear specs.',
+      reason: null,
+      updated_at: '2026-03-30T01:14:59.000Z'
+    } as const;
+    const dataset = buildDataset({
+      running: [
+        {
+          ...baseDataset.running[0],
+          goal_summary: goalSummary
+        }
+      ],
+      issues: [
+        {
+          ...baseDataset.issues[0],
+          goal_summary: goalSummary
+        },
+        baseDataset.issues[1]
+      ]
+    });
+    const commonInput = {
+      dataset,
+      baseUrl: 'http://127.0.0.1:4100',
+      taskId: 'local-mcp',
+      runId: 'control-host',
+      runDir: '/repo/.runs/local-mcp/cli/control-host',
+      startPipelineId: 'provider-linear-worker',
+      terminalColumns: 180,
+      throughputTps: 1842.7
+    };
+
+    const fullFrame = stripAnsi(renderControlStatusFrame(commonInput));
+    expect(fullFrame).toContain(
+      '│   ↳ CO-26 goal active | checksum abcdef0123456789 | status active | advisory_only'
+    );
+    expect(fullFrame).toContain('Complete CO-26 provider-worker goals from Linear specs.');
+
+    const compactFrame = stripAnsi(
+      renderControlStatusFrame({
+        ...commonInput,
+        viewMode: 'compact'
+      })
+    );
+    expect(compactFrame).toContain('Running: CO-26 | running | goal active abcdef0123456789 |');
+  });
+
+  it.each([
+    ['missing', 'goal missing'],
+    ['unavailable', 'goal unavailable'],
+    ['stale', 'goal stale'],
+    ['mismatched_thread', 'goal mismatched-thread'],
+    ['complete', 'goal complete']
+  ] as const)('renders %s advisory goal summaries in compact CO STATUS', (state, expected) => {
+    const baseDataset = buildDataset();
+    const dataset = buildDataset({
+      running: [
+        {
+          ...baseDataset.running[0],
+          goal_summary: {
+            state,
+            authority: 'advisory_only',
+            issue_id: 'issue-26',
+            task_key: 'linear-a861',
+            checksum: null,
+            checksum_short: null,
+            goal_key: null,
+            capture_mode: state === 'missing' ? null : state,
+            status: state,
+            thread_id: null,
+            turn_id: null,
+            objective_preview: null,
+            reason: `${state}_fixture`,
+            updated_at: null
+          }
+        }
+      ]
+    });
+
+    const frame = stripAnsi(
+      renderControlStatusFrame({
+        dataset,
+        baseUrl: 'http://127.0.0.1:4100',
+        taskId: 'local-mcp',
+        runId: 'control-host',
+        runDir: '/repo/.runs/local-mcp/cli/control-host',
+        startPipelineId: 'provider-linear-worker',
+        terminalColumns: 160,
+        throughputTps: 1842.7,
+        viewMode: 'compact'
+      })
+    );
+
+    expect(frame).toContain(`Running: CO-26 | running | ${expected} |`);
+  });
+
   it('labels live primary-screen renders as primary scrollback', () => {
     const frame = renderControlStatusFrame({
       dataset: buildDataset(),

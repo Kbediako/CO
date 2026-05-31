@@ -1694,6 +1694,9 @@
         "elapsed_seconds": { "type": ["number", "null"], "minimum": 0 },
         "created_at": { "type": ["string", "null"] },
         "updated_at": { "type": ["string", "null"] },
+        "provider_issue_task_key": { "type": ["string", "null"] },
+        "spec_checksum": { "type": ["string", "null"] },
+        "goal_key": { "type": ["string", "null"] },
         "authority": { "type": "string", "const": "advisory_only" },
         "linear_authority_preserved": { "type": "boolean", "const": true },
         "not_authorized_for": {

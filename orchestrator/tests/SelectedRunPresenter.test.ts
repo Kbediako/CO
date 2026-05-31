@@ -436,6 +436,582 @@ describe('OperatorDashboardPresenter', () => {
     ]);
   });
 
+  it('projects compact advisory provider goal summaries from worker proof', () => {
+    const projection = buildProjection();
+    const proof = projection.issues[0].payload.provider_linear_worker_proof as NonNullable<
+      ControlIssuePayload['provider_linear_worker_proof']
+    > & {
+      goal_intent?: Record<string, unknown>;
+      goal_evidence?: Record<string, unknown>;
+    };
+    proof.goal_intent = {
+      source: 'linear-spec-packet',
+      provider_issue_task_key: 'linear-issue-7',
+      spec_checksum: 'abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789',
+      goal_key: 'provider-worker-goals:linear-issue-7:abcdef0123456789',
+      objective: 'Complete CO-7 provider-worker goals from Linear specs.',
+      authority: 'advisory_only',
+      status: 'ready'
+    };
+    proof.goal_evidence = {
+      source: 'codex-goals',
+      feature_available: true,
+      feature_enabled: true,
+      capture_mode: 'captured',
+      capture_timestamp: '2026-03-27T04:04:30.000Z',
+      thread_id: 'thread-7',
+      turn_id: 'turn-4',
+      objective: 'Complete CO-7 provider-worker goals from Linear specs.',
+      status: 'active',
+      token_budget: 5000,
+      tokens_used: 250,
+      elapsed_seconds: 120,
+      created_at: '2026-03-27T04:00:00.000Z',
+      updated_at: '2026-03-27T04:04:30.000Z',
+      spec_checksum: 'abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789',
+      goal_key: 'provider-worker-goals:linear-issue-7:abcdef0123456789',
+      authority: 'advisory_only',
+      linear_authority_preserved: true,
+      not_authorized_for: [
+        'linear_transition',
+        'workpad_replacement',
+        'pr_attachment',
+        'review_handoff',
+        'ready_review_success',
+        'merge_closeout',
+        'hook_recovery_success',
+        'long_poll_terminal_status',
+        'hook_resume_control_integration',
+        'tui_automation'
+      ],
+      reason: null
+    };
+
+    const dataset = buildUiDataset({
+      projection,
+      generatedAt: '2026-03-27T04:06:02.000Z'
+    });
+
+    expect(dataset.running[0].goal_summary).toMatchObject({
+      state: 'active',
+      authority: 'advisory_only',
+      issue_id: 'issue-7',
+      task_key: 'linear-issue-7',
+      checksum: 'abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789',
+      checksum_short: 'abcdef0123456789',
+      goal_key: 'provider-worker-goals:linear-issue-7:abcdef0123456789',
+      status: 'active',
+      reason: null
+    });
+    expect(dataset.issues[0].goal_summary).toEqual(dataset.running[0].goal_summary);
+    expect(dataset.running[0].goal_summary?.objective_preview).toContain('Complete CO-7 provider-worker goals');
+  });
+
+  it('projects missing-prerequisite provider goal intent ahead of generic unavailable evidence', () => {
+    const projection = buildProjection();
+    const proof = projection.issues[0].payload.provider_linear_worker_proof as NonNullable<
+      ControlIssuePayload['provider_linear_worker_proof']
+    > & {
+      goal_intent?: Record<string, unknown>;
+      goal_evidence?: Record<string, unknown>;
+    };
+    proof.goal_intent = {
+      source: 'linear-spec-packet',
+      issue_id: 'issue-7',
+      issue_identifier: 'CO-7',
+      issue_title: 'Derive provider-worker goals from Linear specs',
+      provider_issue_task_key: 'linear-issue-7',
+      spec_path: null,
+      spec_checksum: null,
+      goal_key: null,
+      objective: null,
+      acceptance_boundary: null,
+      non_goals: null,
+      validation_target: null,
+      status: 'missing_prerequisite',
+      reason: 'canonical_spec_missing',
+      authority: 'advisory_only',
+      workpad_required: true,
+      created_from_paths: [],
+      supersedes: null
+    };
+    proof.goal_evidence = {
+      source: 'codex-goals',
+      feature_available: true,
+      feature_enabled: true,
+      capture_mode: 'unavailable',
+      capture_timestamp: '2026-03-27T04:04:30.000Z',
+      thread_id: 'thread-7',
+      turn_id: 'turn-4',
+      objective: null,
+      status: null,
+      token_budget: null,
+      tokens_used: null,
+      elapsed_seconds: null,
+      created_at: null,
+      updated_at: null,
+      authority: 'advisory_only',
+      linear_authority_preserved: true,
+      not_authorized_for: [
+        'linear_transition',
+        'workpad_replacement',
+        'pr_attachment',
+        'review_handoff',
+        'ready_review_success',
+        'merge_closeout',
+        'hook_recovery_success',
+        'long_poll_terminal_status',
+        'hook_resume_control_integration',
+        'tui_automation'
+      ],
+      reason: 'goal_state_not_observed'
+    };
+
+    const dataset = buildUiDataset({
+      projection,
+      generatedAt: '2026-03-27T04:06:02.000Z'
+    });
+
+    expect(dataset.running[0].goal_summary).toMatchObject({
+      state: 'missing',
+      task_key: 'linear-issue-7',
+      capture_mode: 'unavailable',
+      status: 'missing_prerequisite',
+      reason: 'canonical_spec_missing'
+    });
+    expect(dataset.issues[0].goal_summary).toEqual(dataset.running[0].goal_summary);
+  });
+
+  it('projects stale provider goal summaries when evidence checksum differs from current intent', () => {
+    const projection = buildProjection();
+    const proof = projection.issues[0].payload.provider_linear_worker_proof as NonNullable<
+      ControlIssuePayload['provider_linear_worker_proof']
+    > & {
+      goal_intent?: Record<string, unknown>;
+      goal_evidence?: Record<string, unknown>;
+    };
+    proof.goal_intent = {
+      source: 'linear-spec-packet',
+      issue_id: 'issue-7',
+      issue_identifier: 'CO-7',
+      issue_title: 'Derive provider-worker goals from Linear specs',
+      provider_issue_task_key: 'linear-issue-7',
+      spec_path: 'tasks/specs/linear-issue-7.md',
+      spec_checksum: 'b'.repeat(64),
+      goal_key: 'provider-worker-goals:linear-issue-7:bbbbbbbbbbbbbbbb',
+      objective: 'Complete CO-7 provider-worker goals from Linear specs.',
+      acceptance_boundary: 'Derive current goal.',
+      non_goals: 'No lifecycle authority.',
+      validation_target: 'Stale checksum projection.',
+      status: 'ready',
+      reason: null,
+      authority: 'advisory_only',
+      workpad_required: true,
+      created_from_paths: ['tasks/specs/linear-issue-7.md'],
+      supersedes: null
+    };
+    proof.goal_evidence = {
+      source: 'codex-goals',
+      feature_available: true,
+      feature_enabled: true,
+      capture_mode: 'captured',
+      capture_timestamp: '2026-03-27T04:04:30.000Z',
+      thread_id: 'thread-7',
+      turn_id: 'turn-4',
+      objective: 'Complete an old CO-7 provider-worker goal.',
+      status: 'active',
+      token_budget: 5000,
+      tokens_used: 250,
+      elapsed_seconds: 120,
+      created_at: '2026-03-27T04:00:00.000Z',
+      updated_at: '2026-03-27T04:04:30.000Z',
+      provider_issue_task_key: 'linear-issue-7',
+      spec_checksum: 'a'.repeat(64),
+      goal_key: 'provider-worker-goals:linear-issue-7:aaaaaaaaaaaaaaaa',
+      authority: 'advisory_only',
+      linear_authority_preserved: true,
+      not_authorized_for: [
+        'linear_transition',
+        'workpad_replacement',
+        'pr_attachment',
+        'review_handoff',
+        'ready_review_success',
+        'merge_closeout',
+        'hook_recovery_success',
+        'long_poll_terminal_status',
+        'hook_resume_control_integration',
+        'tui_automation'
+      ],
+      reason: null
+    };
+
+    const dataset = buildUiDataset({
+      projection,
+      generatedAt: '2026-03-27T04:06:02.000Z'
+    });
+
+    expect(dataset.running[0].goal_summary).toMatchObject({
+      state: 'stale',
+      checksum: 'a'.repeat(64),
+      goal_key: 'provider-worker-goals:linear-issue-7:aaaaaaaaaaaaaaaa',
+      status: null,
+      reason: `goal_spec_checksum_mismatch:${'a'.repeat(64)}->${'b'.repeat(64)}`
+    });
+  });
+
+  it('fails closed when captured provider goal evidence lacks current intent identity', () => {
+    const projection = buildProjection();
+    const proof = projection.issues[0].payload.provider_linear_worker_proof as NonNullable<
+      ControlIssuePayload['provider_linear_worker_proof']
+    > & {
+      goal_evidence?: Record<string, unknown>;
+    };
+    delete (proof as { goal_intent?: unknown }).goal_intent;
+    proof.goal_evidence = {
+      source: 'codex-goals',
+      feature_available: true,
+      feature_enabled: true,
+      capture_mode: 'captured',
+      capture_timestamp: '2026-03-27T04:04:30.000Z',
+      thread_id: 'thread-7',
+      turn_id: 'turn-4',
+      objective: 'Complete an unbound provider-worker goal.',
+      status: 'active',
+      token_budget: 5000,
+      tokens_used: 250,
+      elapsed_seconds: 120,
+      created_at: '2026-03-27T04:00:00.000Z',
+      updated_at: '2026-03-27T04:04:30.000Z',
+      authority: 'advisory_only',
+      linear_authority_preserved: true,
+      not_authorized_for: [
+        'linear_transition',
+        'workpad_replacement',
+        'pr_attachment',
+        'review_handoff',
+        'ready_review_success',
+        'merge_closeout',
+        'hook_recovery_success',
+        'long_poll_terminal_status',
+        'hook_resume_control_integration',
+        'tui_automation'
+      ],
+      reason: null
+    };
+
+    const dataset = buildUiDataset({
+      projection,
+      generatedAt: '2026-03-27T04:06:02.000Z'
+    });
+
+    expect(dataset.running[0].goal_summary).toMatchObject({
+      state: 'stale',
+      checksum: null,
+      goal_key: null,
+      status: null,
+      reason: 'goal_identity_unverified'
+    });
+  });
+
+  it('fails closed when captured provider goal evidence does not match ready intent identity', () => {
+    const projection = buildProjection();
+    const proof = projection.issues[0].payload.provider_linear_worker_proof as NonNullable<
+      ControlIssuePayload['provider_linear_worker_proof']
+    > & {
+      goal_intent?: Record<string, unknown>;
+      goal_evidence?: Record<string, unknown>;
+    };
+    proof.goal_intent = {
+      source: 'linear-spec-packet',
+      issue_id: 'issue-7',
+      issue_identifier: 'CO-7',
+      issue_title: 'Derive provider-worker goals from Linear specs',
+      provider_issue_task_key: 'linear-issue-7',
+      spec_path: 'tasks/specs/linear-issue-7.md',
+      spec_checksum: 'b'.repeat(64),
+      goal_key: 'provider-worker-goals:linear-issue-7:bbbbbbbbbbbbbbbb',
+      objective: 'Complete CO-7 provider-worker goals from Linear specs.',
+      acceptance_boundary: 'Derive current goal.',
+      non_goals: 'No lifecycle authority.',
+      validation_target: 'Unbound captured evidence projection.',
+      status: 'ready',
+      reason: null,
+      authority: 'advisory_only',
+      workpad_required: true,
+      created_from_paths: ['tasks/specs/linear-issue-7.md'],
+      supersedes: null
+    };
+    proof.goal_evidence = {
+      source: 'codex-goals',
+      feature_available: true,
+      feature_enabled: true,
+      capture_mode: 'captured',
+      capture_timestamp: '2026-03-27T04:04:30.000Z',
+      thread_id: 'thread-7',
+      turn_id: 'turn-4',
+      objective: 'Complete a provider-worker goal that does not prove current identity.',
+      status: 'active',
+      token_budget: 5000,
+      tokens_used: 250,
+      elapsed_seconds: 120,
+      created_at: '2026-03-27T04:00:00.000Z',
+      updated_at: '2026-03-27T04:04:30.000Z',
+      authority: 'advisory_only',
+      linear_authority_preserved: true,
+      not_authorized_for: [
+        'linear_transition',
+        'workpad_replacement',
+        'pr_attachment',
+        'review_handoff',
+        'ready_review_success',
+        'merge_closeout',
+        'hook_recovery_success',
+        'long_poll_terminal_status',
+        'hook_resume_control_integration',
+        'tui_automation'
+      ],
+      reason: null
+    };
+
+    const dataset = buildUiDataset({
+      projection,
+      generatedAt: '2026-03-27T04:06:02.000Z'
+    });
+
+    expect(dataset.running[0].goal_summary).toMatchObject({
+      state: 'stale',
+      checksum: null,
+      goal_key: null,
+      status: null,
+      reason: 'goal_identity_unverified'
+    });
+  });
+
+  it('does not backfill current intent identity into stale unverified goal summaries', () => {
+    const projection = buildProjection();
+    const proof = projection.issues[0].payload.provider_linear_worker_proof as NonNullable<
+      ControlIssuePayload['provider_linear_worker_proof']
+    > & {
+      goal_intent?: Record<string, unknown>;
+      goal_evidence?: Record<string, unknown>;
+    };
+    proof.goal_intent = {
+      source: 'linear-spec-packet',
+      issue_id: 'issue-7',
+      issue_identifier: 'CO-7',
+      issue_title: 'Derive provider-worker goals from Linear specs',
+      provider_issue_task_key: 'linear-issue-7',
+      spec_path: 'tasks/specs/linear-issue-7.md',
+      spec_checksum: 'b'.repeat(64),
+      goal_key: 'provider-worker-goals:linear-issue-7:bbbbbbbbbbbbbbbb',
+      objective: 'Complete CO-7 provider-worker goals from Linear specs.',
+      acceptance_boundary: 'Derive current goal.',
+      non_goals: 'No lifecycle authority.',
+      validation_target: 'Stale identity projection.',
+      status: 'ready',
+      reason: null,
+      authority: 'advisory_only',
+      workpad_required: true,
+      created_from_paths: ['tasks/specs/linear-issue-7.md'],
+      supersedes: null
+    };
+    proof.goal_evidence = {
+      source: 'codex-goals',
+      feature_available: true,
+      feature_enabled: true,
+      capture_mode: 'stale',
+      capture_timestamp: '2026-03-27T04:04:30.000Z',
+      thread_id: 'thread-7',
+      turn_id: 'turn-4',
+      objective: null,
+      status: null,
+      token_budget: null,
+      tokens_used: null,
+      elapsed_seconds: null,
+      created_at: null,
+      updated_at: null,
+      authority: 'advisory_only',
+      linear_authority_preserved: true,
+      not_authorized_for: [
+        'linear_transition',
+        'workpad_replacement',
+        'pr_attachment',
+        'review_handoff',
+        'ready_review_success',
+        'merge_closeout',
+        'hook_recovery_success',
+        'long_poll_terminal_status',
+        'hook_resume_control_integration',
+        'tui_automation'
+      ],
+      reason: 'goal_identity_unverified'
+    };
+
+    const dataset = buildUiDataset({
+      projection,
+      generatedAt: '2026-03-27T04:06:02.000Z'
+    });
+
+    expect(dataset.running[0].goal_summary).toMatchObject({
+      state: 'stale',
+      checksum: null,
+      goal_key: null,
+      status: null,
+      reason: 'goal_identity_unverified'
+    });
+  });
+
+  it('does not backfill current goal key when stale evidence only proves an old checksum', () => {
+    const projection = buildProjection();
+    const proof = projection.issues[0].payload.provider_linear_worker_proof as NonNullable<
+      ControlIssuePayload['provider_linear_worker_proof']
+    > & {
+      goal_intent?: Record<string, unknown>;
+      goal_evidence?: Record<string, unknown>;
+    };
+    proof.goal_intent = {
+      source: 'linear-spec-packet',
+      issue_id: 'issue-7',
+      issue_identifier: 'CO-7',
+      issue_title: 'Derive provider-worker goals from Linear specs',
+      provider_issue_task_key: 'linear-issue-7',
+      spec_path: 'tasks/specs/linear-issue-7.md',
+      spec_checksum: 'b'.repeat(64),
+      goal_key: 'provider-worker-goals:linear-issue-7:bbbbbbbbbbbbbbbb',
+      objective: 'Complete CO-7 provider-worker goals from Linear specs.',
+      acceptance_boundary: 'Derive current goal.',
+      non_goals: 'No lifecycle authority.',
+      validation_target: 'Stale partial identity projection.',
+      status: 'ready',
+      reason: null,
+      authority: 'advisory_only',
+      workpad_required: true,
+      created_from_paths: ['tasks/specs/linear-issue-7.md'],
+      supersedes: null
+    };
+    proof.goal_evidence = {
+      source: 'codex-goals',
+      feature_available: true,
+      feature_enabled: true,
+      capture_mode: 'stale',
+      capture_timestamp: '2026-03-27T04:04:30.000Z',
+      thread_id: 'thread-7',
+      turn_id: 'turn-4',
+      objective: null,
+      status: null,
+      token_budget: null,
+      tokens_used: null,
+      elapsed_seconds: null,
+      created_at: null,
+      updated_at: null,
+      provider_issue_task_key: 'linear-issue-7',
+      spec_checksum: 'a'.repeat(64),
+      authority: 'advisory_only',
+      linear_authority_preserved: true,
+      not_authorized_for: [
+        'linear_transition',
+        'workpad_replacement',
+        'pr_attachment',
+        'review_handoff',
+        'ready_review_success',
+        'merge_closeout',
+        'hook_recovery_success',
+        'long_poll_terminal_status',
+        'hook_resume_control_integration',
+        'tui_automation'
+      ],
+      reason: `goal_spec_checksum_mismatch:${'a'.repeat(64)}->${'b'.repeat(64)}`
+    };
+
+    const dataset = buildUiDataset({
+      projection,
+      generatedAt: '2026-03-27T04:06:02.000Z'
+    });
+
+    expect(dataset.running[0].goal_summary).toMatchObject({
+      state: 'stale',
+      checksum: 'a'.repeat(64),
+      goal_key: null,
+      status: null,
+      reason: `goal_spec_checksum_mismatch:${'a'.repeat(64)}->${'b'.repeat(64)}`
+    });
+  });
+
+  it('does not backfill current intent identity into mismatched-thread goal summaries', () => {
+    const projection = buildProjection();
+    const proof = projection.issues[0].payload.provider_linear_worker_proof as NonNullable<
+      ControlIssuePayload['provider_linear_worker_proof']
+    > & {
+      goal_intent?: Record<string, unknown>;
+      goal_evidence?: Record<string, unknown>;
+    };
+    proof.goal_intent = {
+      source: 'linear-spec-packet',
+      issue_id: 'issue-7',
+      issue_identifier: 'CO-7',
+      issue_title: 'Derive provider-worker goals from Linear specs',
+      provider_issue_task_key: 'linear-issue-7',
+      spec_path: 'tasks/specs/linear-issue-7.md',
+      spec_checksum: 'b'.repeat(64),
+      goal_key: 'provider-worker-goals:linear-issue-7:bbbbbbbbbbbbbbbb',
+      objective: 'Complete CO-7 provider-worker goals from Linear specs.',
+      acceptance_boundary: 'Derive current goal.',
+      non_goals: 'No lifecycle authority.',
+      validation_target: 'Mismatched-thread identity projection.',
+      status: 'ready',
+      reason: null,
+      authority: 'advisory_only',
+      workpad_required: true,
+      created_from_paths: ['tasks/specs/linear-issue-7.md'],
+      supersedes: null
+    };
+    proof.goal_evidence = {
+      source: 'codex-goals',
+      feature_available: true,
+      feature_enabled: true,
+      capture_mode: 'thread_mismatch',
+      capture_timestamp: '2026-03-27T04:04:30.000Z',
+      thread_id: 'thread-other',
+      turn_id: 'turn-4',
+      objective: null,
+      status: null,
+      token_budget: null,
+      tokens_used: null,
+      elapsed_seconds: null,
+      created_at: null,
+      updated_at: null,
+      authority: 'advisory_only',
+      linear_authority_preserved: true,
+      not_authorized_for: [
+        'linear_transition',
+        'workpad_replacement',
+        'pr_attachment',
+        'review_handoff',
+        'ready_review_success',
+        'merge_closeout',
+        'hook_recovery_success',
+        'long_poll_terminal_status',
+        'hook_resume_control_integration',
+        'tui_automation'
+      ],
+      reason: 'goal_thread_mismatch:thread-other->thread-7'
+    };
+
+    const dataset = buildUiDataset({
+      projection,
+      generatedAt: '2026-03-27T04:06:02.000Z'
+    });
+
+    expect(dataset.running[0].goal_summary).toMatchObject({
+      state: 'mismatched_thread',
+      checksum: null,
+      goal_key: null,
+      status: null,
+      objective_preview: null,
+      reason: 'goal_thread_mismatch:thread-other->thread-7'
+    });
+  });
+
   it('keeps stale proof workspace paths from overriding current dashboard rows', () => {
     const staleProof = {
       issue_id: 'issue-10',

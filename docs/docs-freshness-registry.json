@@ -5049,6 +5049,13 @@
       "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: local packet remains non-terminal because 4 open checklist item(s) remain; sample: .agent/task/linear-612a3dc3-f66f-4ba3-aea9-1282b54d93fe.md:28 - [ ] `codex-orchestrator co-status --format json` completes against authenticated `/ui/data.json` while provider workers are active. Evidence: source-level hot-path benchmark passes; live globally supervised after evidence is pending package rollout because the installed LaunchAgent still runs the global package.; reviewed 4 local packet/spec/mirror files for linear-612a3dc3-f66f-4ba3-aea9-1282b54d93fe; keep status active and cadence_days 30 after evidence review for route co-429-completed-lane-registry-residue."
     },
     {
+      "path": ".agent/task/linear-617541e3-39f0-4926-8105-9b2a5c053a5b.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-31",
+      "cadence_days": 30
+    },
+    {
       "path": ".agent/task/linear-61ddd0d1-664b-4060-949b-33eb4e7255ac.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "archived",
@@ -12059,6 +12066,13 @@
       "last_review": "2026-05-31",
       "cadence_days": 30,
       "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: local packet remains non-terminal because 4 open checklist item(s) remain; sample: .agent/task/linear-612a3dc3-f66f-4ba3-aea9-1282b54d93fe.md:28 - [ ] `codex-orchestrator co-status --format json` completes against authenticated `/ui/data.json` while provider workers are active. Evidence: source-level hot-path benchmark passes; live globally supervised after evidence is pending package rollout because the installed LaunchAgent still runs the global package.; reviewed 4 local packet/spec/mirror files for linear-612a3dc3-f66f-4ba3-aea9-1282b54d93fe; keep status active and cadence_days 30 after evidence review for route co-429-completed-lane-registry-residue."
+    },
+    {
+      "path": "docs/ACTION_PLAN-linear-617541e3-39f0-4926-8105-9b2a5c053a5b.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-31",
+      "cadence_days": 30
     },
     {
       "path": "docs/ACTION_PLAN-linear-61ddd0d1-664b-4060-949b-33eb4e7255ac.md",
@@ -22517,6 +22531,13 @@
       "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: local packet remains non-terminal because 4 open checklist item(s) remain; sample: .agent/task/linear-612a3dc3-f66f-4ba3-aea9-1282b54d93fe.md:28 - [ ] `codex-orchestrator co-status --format json` completes against authenticated `/ui/data.json` while provider workers are active. Evidence: source-level hot-path benchmark passes; live globally supervised after evidence is pending package rollout because the installed LaunchAgent still runs the global package.; reviewed 4 local packet/spec/mirror files for linear-612a3dc3-f66f-4ba3-aea9-1282b54d93fe; keep status active and cadence_days 30 after evidence review for route co-429-completed-lane-registry-residue."
     },
     {
+      "path": "docs/PRD-linear-617541e3-39f0-4926-8105-9b2a5c053a5b.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-31",
+      "cadence_days": 30
+    },
+    {
       "path": "docs/PRD-linear-61ddd0d1-664b-4060-949b-33eb4e7255ac.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "archived",
@@ -29982,6 +30003,13 @@
       "status": "archived",
       "last_review": "2026-05-13",
       "cadence_days": 365
+    },
+    {
+      "path": "docs/TECH_SPEC-linear-617541e3-39f0-4926-8105-9b2a5c053a5b.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-31",
+      "cadence_days": 30
     },
     {
       "path": "docs/TECH_SPEC-linear-61ddd0d1-664b-4060-949b-33eb4e7255ac.md",
@@ -37771,6 +37799,13 @@
       "next_review": "2026-06-18"
     },
     {
+      "path": "tasks/specs/linear-617541e3-39f0-4926-8105-9b2a5c053a5b.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-31",
+      "cadence_days": 30
+    },
+    {
       "path": "tasks/specs/linear-61ddd0d1-664b-4060-949b-33eb4e7255ac.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "archived",
@@ -45197,6 +45232,13 @@
       "last_review": "2026-05-31",
       "cadence_days": 30,
       "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: local packet remains non-terminal because 4 open checklist item(s) remain; sample: .agent/task/linear-612a3dc3-f66f-4ba3-aea9-1282b54d93fe.md:28 - [ ] `codex-orchestrator co-status --format json` completes against authenticated `/ui/data.json` while provider workers are active. Evidence: source-level hot-path benchmark passes; live globally supervised after evidence is pending package rollout because the installed LaunchAgent still runs the global package.; reviewed 4 local packet/spec/mirror files for linear-612a3dc3-f66f-4ba3-aea9-1282b54d93fe; keep status active and cadence_days 30 after evidence review for route co-429-completed-lane-registry-residue."
+    },
+    {
+      "path": "tasks/tasks-linear-617541e3-39f0-4926-8105-9b2a5c053a5b.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-31",
+      "cadence_days": 30
     },
     {
       "path": "tasks/tasks-linear-61ddd0d1-664b-4060-949b-33eb4e7255ac.md",

@@ -1,4 +1,5 @@
 import { spawn, type StdioOptions } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import process from 'node:process';
 import { setTimeout as sleep } from 'node:timers/promises';
@@ -533,11 +534,57 @@ export interface ProviderLinearGoalEvidence {
   elapsed_seconds: number | null;
   created_at: string | null;
   updated_at: string | null;
+  provider_issue_task_key?: string | null;
+  spec_checksum?: string | null;
+  goal_key?: string | null;
   authority: 'advisory_only';
   linear_authority_preserved: true;
   not_authorized_for: string[];
   reason: string | null;
 }
+
+export type ProviderLinearSpecDerivedGoalIntentStatus = 'ready' | 'missing_prerequisite';
+
+export interface ProviderLinearSpecDerivedGoalSupersession {
+  goal_key: string | null;
+  spec_checksum: string | null;
+  reason: 'spec_checksum_changed';
+}
+
+export interface ProviderLinearSpecDerivedGoalIntent {
+  source: 'linear-spec-packet';
+  issue_id: string;
+  issue_identifier: string;
+  issue_title: string;
+  provider_issue_task_key: string;
+  spec_path: string | null;
+  spec_checksum: string | null;
+  goal_key: string | null;
+  objective: string | null;
+  acceptance_boundary: string | null;
+  non_goals: string | null;
+  validation_target: string | null;
+  status: ProviderLinearSpecDerivedGoalIntentStatus;
+  reason: string | null;
+  authority: 'advisory_only';
+  workpad_required: true;
+  created_from_paths: string[];
+  supersedes: ProviderLinearSpecDerivedGoalSupersession | null;
+}
+
+const PROVIDER_LINEAR_SPEC_DERIVED_GOAL_PACKET_PATHS = [
+  (taskKey: string) => `docs/PRD-${taskKey}.md`,
+  (taskKey: string) => `docs/TECH_SPEC-${taskKey}.md`,
+  (taskKey: string) => `docs/ACTION_PLAN-${taskKey}.md`,
+  (taskKey: string) => `tasks/specs/${taskKey}.md`,
+  (taskKey: string) => `tasks/tasks-${taskKey}.md`,
+  (taskKey: string) => `.agent/task/${taskKey}.md`
+] as const;
+
+const PROVIDER_LINEAR_SPEC_DERIVED_GOAL_CANONICAL_SPEC = (taskKey: string): string =>
+  `tasks/specs/${taskKey}.md`;
+const PROVIDER_LINEAR_ISSUE_CONTEXT_CACHE_FILENAME_STEM = 'provider-linear-issue-context-cache';
+const PROVIDER_LINEAR_ISSUE_CONTEXT_CACHE_FILENAME = 'provider-linear-issue-context-cache.json';
 
 export interface ProviderLinearWorkerProof {
   issue_id: string;
@@ -565,6 +612,7 @@ export interface ProviderLinearWorkerProof {
   runtime?: ProviderLinearWorkerRuntimeProof | null;
   appserver_supervision?: ProviderLinearWorkerAppServerSupervisionProof | null;
   goal_evidence?: ProviderLinearGoalEvidence | null;
+  goal_intent?: ProviderLinearSpecDerivedGoalIntent | null;
   auth_provenance?: ProviderLinearWorkerAuthProvenance | null;
   resolved_model_provenance?: ProviderLinearWorkerResolvedModelProvenance | null;
   worker_control?: ProviderLinearWorkerControlPlane | null;
@@ -1554,6 +1602,424 @@ function normalizeOptionalString(value: unknown): string | null {
   }
   const trimmed = value.trim();
   return trimmed.length > 0 ? trimmed : null;
+}
+
+function normalizeProviderLinearGoalPacketText(value: string): string {
+  return value
+    .replace(/\r\n|\r/gu, '\n')
+    .replace(/[ \t]+/gu, ' ')
+    .trim();
+}
+
+async function readProviderLinearGoalPacketFile(
+  repoRoot: string,
+  relativePath: string
+): Promise<{ relativePath: string; content: string } | null> {
+  try {
+    const content = await readFile(join(repoRoot, relativePath), 'utf8');
+    return {
+      relativePath,
+      content
+    };
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException)?.code === 'ENOENT') {
+      return null;
+    }
+    throw error;
+  }
+}
+
+function sanitizeProviderLinearIssueContextCacheArtifactKey(issueId: string): string {
+  return issueId.replace(/[^A-Za-z0-9._-]/gu, '_');
+}
+
+function extractProviderLinearGoalWorkpadBodyFromCachedContext(
+  value: unknown,
+  issueId: string
+): string | null {
+  if (!value || typeof value !== 'object') {
+    return null;
+  }
+  const record = value as Record<string, unknown>;
+  if (record.issue_id !== issueId) {
+    return null;
+  }
+  const issue = record.issue;
+  if (!issue || typeof issue !== 'object') {
+    return null;
+  }
+  const issueRecord = issue as Record<string, unknown>;
+  const workpadComment = issueRecord.workpad_comment;
+  if (workpadComment && typeof workpadComment === 'object') {
+    const body = resolveProviderLinearGoalWorkpadBody({
+      workpadBody: (workpadComment as Record<string, unknown>).body as string | null | undefined
+    });
+    if (body) {
+      return body;
+    }
+  }
+  const comments = issueRecord.comments;
+  if (!Array.isArray(comments)) {
+    return null;
+  }
+  for (const comment of comments) {
+    if (!comment || typeof comment !== 'object') {
+      continue;
+    }
+    const commentRecord = comment as Record<string, unknown>;
+    if (commentRecord.resolved_at !== null && commentRecord.resolved_at !== undefined) {
+      continue;
+    }
+    const body = resolveProviderLinearGoalWorkpadBody({
+      workpadBody: commentRecord.body as string | null | undefined
+    });
+    if (body) {
+      return body;
+    }
+  }
+  return null;
+}
+
+async function readProviderLinearGoalWorkpadBodyFromIssueContextCache(input: {
+  auditPath: string | null;
+  issueId: string;
+}): Promise<string | null> {
+  const auditPath = normalizeOptionalString(input.auditPath);
+  const issueId = normalizeOptionalString(input.issueId);
+  if (!auditPath || !issueId) {
+    return null;
+  }
+  const cacheDirectory = dirname(auditPath);
+  const cacheArtifactKey = sanitizeProviderLinearIssueContextCacheArtifactKey(issueId);
+  const cachePaths = [
+    join(cacheDirectory, `${PROVIDER_LINEAR_ISSUE_CONTEXT_CACHE_FILENAME_STEM}-${cacheArtifactKey}.json`),
+    join(cacheDirectory, PROVIDER_LINEAR_ISSUE_CONTEXT_CACHE_FILENAME)
+  ];
+  for (const cachePath of cachePaths) {
+    try {
+      const parsed = JSON.parse(await readFile(cachePath, 'utf8')) as unknown;
+      const body = extractProviderLinearGoalWorkpadBodyFromCachedContext(parsed, issueId);
+      if (body) {
+        return body;
+      }
+    } catch {
+      continue;
+    }
+  }
+  return null;
+}
+
+function resolveProviderLinearGoalWorkpadBody(input: {
+  workpadBody?: string | null;
+}): string | null {
+  const workpadBody = normalizeOptionalString(input.workpadBody);
+  if (workpadBody && /(^|\n)## Codex Workpad(\n|$)/u.test(workpadBody)) {
+    return workpadBody;
+  }
+  return null;
+}
+
+function extractProviderLinearGoalMarkdownSection(
+  markdown: string,
+  headingNames: string[]
+): string | null {
+  const normalizedNames = new Set(
+    headingNames.map((name) => name.trim().toLowerCase()).filter((name) => name.length > 0)
+  );
+  const lines = markdown.replace(/\r\n|\r/gu, '\n').split('\n');
+  let collecting = false;
+  let collectingLevel: number | null = null;
+  const collected: string[] = [];
+  for (const line of lines) {
+    const headingMatch = /^(#{1,6})\s+(.+?)\s*#*\s*$/u.exec(line);
+    if (headingMatch) {
+      const level = headingMatch[1]?.length ?? 0;
+      const heading = headingMatch[2]?.trim().toLowerCase() ?? '';
+      if (collecting && collectingLevel !== null && level <= collectingLevel) {
+        break;
+      }
+      if (!collecting && normalizedNames.has(heading)) {
+        collecting = true;
+        collectingLevel = level;
+        continue;
+      }
+    }
+    if (collecting) {
+      collected.push(line);
+    }
+  }
+  return normalizeOptionalString(collected.join('\n'));
+}
+
+function summarizeProviderLinearGoalMarkdownText(value: string | null, maxLength: number): string | null {
+  const normalized = normalizeOptionalString(
+    (value ?? '')
+      .replace(/```[\s\S]*?```/gu, ' ')
+      .replace(/`([^`]+)`/gu, '`$1`')
+      .split(/\n+/u)
+      .map((line) =>
+        line
+          .replace(/^\s*(?:[-*+]|\d+[.)])\s+/u, '')
+          .replace(/^\[[ xX]\]\s+/u, '')
+          .trim()
+      )
+      .filter((line) => line.length > 0)
+      .join('; ')
+      .replace(/\s+/gu, ' ')
+  );
+  if (!normalized) {
+    return null;
+  }
+  if (normalized.length <= maxLength) {
+    return normalized;
+  }
+  return `${normalized.slice(0, Math.max(0, maxLength - 3)).trimEnd()}...`;
+}
+
+function summarizeProviderLinearGoalNonGoals(value: string | null): string | null {
+  const summary = summarizeProviderLinearGoalMarkdownText(value, 220);
+  if (!summary) {
+    return null;
+  }
+  return normalizeOptionalString(
+    summary
+      .replace(/\bGoals replace Linear authority\b\.?/giu, 'Linear remains workflow authority')
+      .replace(/\bgoals replace Linear authority\b\.?/giu, 'Linear remains workflow authority')
+  );
+}
+
+function summarizeProviderLinearGoalWorkpadPlan(value: string | null): string | null {
+  if (!value) {
+    return null;
+  }
+  const plan = summarizeProviderLinearGoalMarkdownText(
+    extractProviderLinearGoalMarkdownSection(value, ['Plan']),
+    180
+  );
+  const acceptance = summarizeProviderLinearGoalMarkdownText(
+    extractProviderLinearGoalMarkdownSection(value, ['Acceptance Criteria']),
+    160
+  );
+  const parts = [
+    plan,
+    acceptance ? `acceptance: ${acceptance}` : null
+  ].filter((part): part is string => part !== null);
+  return parts.length > 0 ? parts.join('; ') : null;
+}
+
+function providerLinearGoalWorkpadHasIssueContext(
+  workpadBody: string,
+  issue: Pick<LiveLinearTrackedIssue, 'id' | 'identifier'>
+): boolean {
+  const normalizedBody = workpadBody.toLowerCase();
+  const issueId = normalizeOptionalString(issue.id)?.toLowerCase();
+  const issueIdentifier = normalizeOptionalString(issue.identifier)?.toLowerCase();
+  return (
+    (issueId !== undefined && normalizedBody.includes(issueId)) ||
+    (issueIdentifier !== undefined && normalizedBody.includes(issueIdentifier))
+  );
+}
+
+function providerLinearGoalWorkpadHasParallelizationDecision(workpadBody: string): boolean {
+  const normalizedBody = workpadBody.toLowerCase();
+  return (
+    /\blinear\s+parallelization\b/u.test(normalizedBody) ||
+    (/\bparallelization\b/u.test(normalizedBody) && /\bdecision\b/u.test(normalizedBody))
+  );
+}
+
+function buildProviderLinearSpecDerivedGoalObjective(input: {
+  issue: Pick<LiveLinearTrackedIssue, 'identifier' | 'title'>;
+  goalKey: string;
+  checksum: string;
+  acceptanceBoundary: string | null;
+  nonGoals: string | null;
+  validationTarget: string | null;
+  workpadPlan: string;
+}): string {
+  const parts = [
+    `Complete ${input.issue.identifier}: ${input.issue.title}.`,
+    `Acceptance boundary: ${input.acceptanceBoundary ?? 'derive one spec-bound provider-worker goal with duplicate prevention'}.`,
+    `Non-goals: ${input.nonGoals ?? 'no Linear replacement; goal state stays advisory'}.`,
+    `Validation target: ${input.validationTarget ?? 'focused duplicate prevention, resume, stale/mismatched, and status projection tests'}.`,
+    `Workpad plan: ${input.workpadPlan}.`,
+    'Maintain duplicate prevention, advisory `goal_evidence`, and compact status projection.',
+    `goal_key: ${input.goalKey}; spec_checksum: ${input.checksum}.`
+  ];
+  return parts.join(' ');
+}
+
+export async function deriveProviderWorkerGoalIntentFromSpecPacket(input: {
+  repoRoot: string;
+  issue: Pick<LiveLinearTrackedIssue, 'id' | 'identifier' | 'title'>;
+  workpadBody?: string | null;
+  linearAudit?: ProviderLinearAuditSummary | null;
+  previousIntent?: ProviderLinearSpecDerivedGoalIntent | null;
+}): Promise<ProviderLinearSpecDerivedGoalIntent> {
+  const taskKey = `linear-${input.issue.id}`;
+  const canonicalSpecRelativePath = PROVIDER_LINEAR_SPEC_DERIVED_GOAL_CANONICAL_SPEC(taskKey);
+  const missingBase: Omit<
+    ProviderLinearSpecDerivedGoalIntent,
+    'status' | 'reason' | 'spec_path'
+  > = {
+    source: 'linear-spec-packet',
+    issue_id: input.issue.id,
+    issue_identifier: input.issue.identifier,
+    issue_title: input.issue.title,
+    provider_issue_task_key: taskKey,
+    spec_checksum: null,
+    goal_key: null,
+    objective: null,
+    acceptance_boundary: null,
+    non_goals: null,
+    validation_target: null,
+    authority: 'advisory_only',
+    workpad_required: true,
+    created_from_paths: [],
+    supersedes: null
+  };
+  const canonicalSpec = await readProviderLinearGoalPacketFile(input.repoRoot, canonicalSpecRelativePath);
+  if (!canonicalSpec) {
+    return {
+      ...missingBase,
+      spec_path: null,
+      status: 'missing_prerequisite',
+      reason: 'canonical_spec_missing'
+    };
+  }
+  const workpadBody = resolveProviderLinearGoalWorkpadBody({
+    workpadBody: input.workpadBody
+  });
+  if (!workpadBody) {
+    return {
+      ...missingBase,
+      spec_path: canonicalSpecRelativePath,
+      status: 'missing_prerequisite',
+      reason: 'workpad_missing',
+      created_from_paths: [canonicalSpecRelativePath]
+    };
+  }
+
+  const workpadPlan = summarizeProviderLinearGoalWorkpadPlan(workpadBody);
+  if (!workpadPlan) {
+    return {
+      ...missingBase,
+      spec_path: canonicalSpecRelativePath,
+      status: 'missing_prerequisite',
+      reason: 'workpad_plan_missing',
+      created_from_paths: [canonicalSpecRelativePath]
+    };
+  }
+
+  const packetFiles = (
+    await Promise.all(
+      PROVIDER_LINEAR_SPEC_DERIVED_GOAL_PACKET_PATHS.map((buildPath) =>
+        readProviderLinearGoalPacketFile(input.repoRoot, buildPath(taskKey))
+      )
+    )
+  ).filter((entry): entry is { relativePath: string; content: string } => entry !== null);
+  const packetFilePaths = new Set(packetFiles.map((entry) => entry.relativePath));
+  const missingPacketPaths = PROVIDER_LINEAR_SPEC_DERIVED_GOAL_PACKET_PATHS
+    .map((buildPath) => buildPath(taskKey))
+    .filter((relativePath) => !packetFilePaths.has(relativePath));
+  if (missingPacketPaths.length > 0) {
+    return {
+      ...missingBase,
+      spec_path: canonicalSpecRelativePath,
+      status: 'missing_prerequisite',
+      reason: 'spec_packet_incomplete',
+      created_from_paths: packetFiles.map((entry) => entry.relativePath)
+    };
+  }
+  if (!providerLinearGoalWorkpadHasIssueContext(workpadBody, input.issue)) {
+    return {
+      ...missingBase,
+      spec_path: canonicalSpecRelativePath,
+      status: 'missing_prerequisite',
+      reason: 'workpad_issue_context_missing',
+      created_from_paths: packetFiles.map((entry) => entry.relativePath)
+    };
+  }
+  if (!providerLinearGoalWorkpadHasParallelizationDecision(workpadBody)) {
+    return {
+      ...missingBase,
+      spec_path: canonicalSpecRelativePath,
+      status: 'missing_prerequisite',
+      reason: 'workpad_parallelization_decision_missing',
+      created_from_paths: packetFiles.map((entry) => entry.relativePath)
+    };
+  }
+  const hash = createHash('sha256');
+  hash.update(canonicalSpec.relativePath);
+  hash.update('\0');
+  hash.update(normalizeProviderLinearGoalPacketText(canonicalSpec.content));
+  hash.update('\0');
+  hash.update(normalizeProviderLinearGoalPacketText(workpadPlan));
+  const specChecksum = hash.digest('hex');
+  const goalKey = `provider-worker-goals:${taskKey}:${specChecksum.slice(0, 16)}`;
+  const acceptanceBoundary =
+    summarizeProviderLinearGoalMarkdownText(
+      extractProviderLinearGoalMarkdownSection(canonicalSpec.content, [
+        'Technical Requirements',
+        'Acceptance Criteria',
+        'Summary'
+      ]),
+      240
+    ) ?? 'derive one spec-bound provider-worker goal with duplicate prevention';
+  const nonGoals =
+    summarizeProviderLinearGoalNonGoals(
+      extractProviderLinearGoalMarkdownSection(canonicalSpec.content, [
+        'Not Done If',
+        'Non-goals',
+        'Non Goals'
+      ])
+    ) ?? 'no Linear replacement; goal state stays advisory';
+  const validationTarget =
+    summarizeProviderLinearGoalMarkdownText(
+      extractProviderLinearGoalMarkdownSection(canonicalSpec.content, [
+        'Validation Plan',
+        'Validation',
+        'Test Plan',
+        'Testing'
+      ]),
+      220
+    ) ?? 'focused duplicate prevention, resume, stale/mismatched, and status projection tests';
+  const previousIntent = input.previousIntent ?? null;
+  return {
+    source: 'linear-spec-packet',
+    issue_id: input.issue.id,
+    issue_identifier: input.issue.identifier,
+    issue_title: input.issue.title,
+    provider_issue_task_key: taskKey,
+    spec_path: canonicalSpecRelativePath,
+    spec_checksum: specChecksum,
+    goal_key: goalKey,
+    objective: buildProviderLinearSpecDerivedGoalObjective({
+      issue: input.issue,
+      goalKey,
+      checksum: specChecksum,
+      acceptanceBoundary,
+      nonGoals,
+      validationTarget,
+      workpadPlan
+    }),
+    acceptance_boundary: acceptanceBoundary,
+    non_goals: nonGoals,
+    validation_target: validationTarget,
+    status: 'ready',
+    reason: null,
+    authority: 'advisory_only',
+    workpad_required: true,
+    created_from_paths: packetFiles.map((entry) => entry.relativePath),
+    supersedes:
+      previousIntent?.spec_checksum && previousIntent.spec_checksum !== specChecksum
+        ? {
+            goal_key: previousIntent.goal_key ?? null,
+            spec_checksum: previousIntent.spec_checksum,
+            reason: 'spec_checksum_changed'
+          }
+        : null
+  };
 }
 
 function stringifyProviderLinearWorkerAppServerTurnError(value: unknown): string | null {
@@ -3843,6 +4309,33 @@ function buildDeterministicMutationSuppressionSection(
   ];
 }
 
+function buildProviderWorkerGoalIntentGuidance(
+  goalIntent: ProviderLinearSpecDerivedGoalIntent | null | undefined
+): string[] {
+  if (!goalIntent) {
+    return [];
+  }
+  const lines = ['Codex goal intent (advisory provider-worker continuity):'];
+  if (goalIntent.status !== 'ready' || !goalIntent.goal_key || !goalIntent.spec_checksum || !goalIntent.objective) {
+    return [
+      ...lines,
+      `- Goal creation remains blocked by \`${goalIntent.reason ?? 'goal_intent_missing_prerequisite'}\`; keep missing goal evidence visible in status instead of failing open.`,
+      '- Do not create a goal until the active `## Codex Workpad` exists and the canonical spec packet/checksum is available for this issue attempt.',
+      '- Goal evidence remains advisory-only and cannot authorize Linear transitions, PR attachment, review handoff, ready-review success, merge closeout, hook recovery, or long-poll terminal status.'
+    ];
+  }
+  return [
+    ...lines,
+    `- goal_key \`${goalIntent.goal_key}\`; spec_checksum \`${goalIntent.spec_checksum}\`; task_key \`${goalIntent.provider_issue_task_key}\`; source \`${goalIntent.source}\`.`,
+    `- Objective: ${goalIntent.objective}`,
+    '- Call `/goal`/`get_goal` before any `create_goal` attempt; create exactly one active Codex goal for this Linear issue/spec attempt.',
+    '- Do not create a goal until the active `## Codex Workpad` exists and the canonical spec packet/checksum is available for this issue attempt.',
+    '- If the current goal already contains the same goal_key/spec_checksum, reuse it; update only stale advisory evidence instead of creating duplicates.',
+    '- If the spec checksum changed, mark the old goal evidence superseded/stale before creating one replacement goal so goals never overlap across attempts.',
+    '- Goal evidence remains advisory-only and cannot authorize Linear transitions, PR attachment, review handoff, ready-review success, merge closeout, hook recovery, or long-poll terminal status.'
+  ];
+}
+
 export function buildProviderWorkerPrompt(
   issue: LiveLinearTrackedIssue,
   turnNumber: number,
@@ -3856,6 +4349,7 @@ export function buildProviderWorkerPrompt(
     manifestPath?: string | null;
     residentSession?: ProviderLinearResidentSessionState | null;
     continueResidentSessionOnBoot?: boolean;
+    goalIntent?: ProviderLinearSpecDerivedGoalIntent | null;
   } = {}
 ): string {
   const deterministicMutationSuppressions = buildDeterministicMutationSuppressionSection(
@@ -3874,6 +4368,7 @@ export function buildProviderWorkerPrompt(
     manifest: attemptContext.manifest ?? null,
     manifestPath: attemptContext.manifestPath ?? null
   });
+  const goalIntentGuidance = buildProviderWorkerGoalIntentGuidance(attemptContext.goalIntent ?? null);
   const continueResidentSessionOnBoot = attemptContext.continueResidentSessionOnBoot === true;
   const logicalTurnCount = attemptContext.residentSession?.logical_turn_count ?? 0;
   if (turnNumber > 1 || continueResidentSessionOnBoot) {
@@ -3894,6 +4389,7 @@ export function buildProviderWorkerPrompt(
       '- `Acceptance Criteria` and `Validation` must contain non-empty checkbox list items (`- [ ] task` / `- [x] task`). `Environment / Workspace Stamp`, `Plan`, and `Notes` can stay free-form.',
       '- If the ticket includes `Validation`, `Test Plan`, or `Testing` requirements, mirror them in the workpad `Acceptance Criteria` and `Validation` sections.',
       ...goalEvidenceWorkpadGuidance,
+      ...goalIntentGuidance,
       '- If the issue is `Todo` or the live team\'s equivalent queued state (for example `Ready`) and not blocked by a non-terminal dependency, move it into the team\'s actual started state before active coding instead of assuming a fixed state name.',
       `- When you discover a meaningful out-of-scope improvement, use \`${helperCommand} create-follow-up --issue-id ${issue.id} ...\` to file or reuse a same-project follow-up issue in \`Backlog\` with a clear title, description, intent checksum, non-goals, \`Not Done If\`, acceptance criteria, a \`related\` link, the required parity matrix for parity/alignment follow-ups, and optional blocker linkage instead of expanding scope. For recurring baseline debt, pass the exact \`--canonical-owner-key\` from machine output such as \`docs:freshness:maintain\` so the helper reuses an open stamped owner before creating a new one.`,
       ...deterministicMutationSuppressions,
@@ -3941,6 +4437,7 @@ export function buildProviderWorkerPrompt(
     '- If the ticket includes `Validation`, `Test Plan`, or `Testing` requirements, mirror them in the workpad `Acceptance Criteria` and `Validation` sections.',
     '- Refresh the same workpad after each meaningful milestone and immediately before any review or merge handoff. Keep final closeout in that same workpad comment.',
     ...goalEvidenceWorkpadGuidance,
+    ...goalIntentGuidance,
     '- If a PR is already attached, run a full PR feedback sweep before any new implementation work: review top-level comments, inline review comments, and review summaries; resolve each actionable item or post explicit, justified pushback.',
     ...deterministicMutationSuppressions,
     buildRuntimeProofGuidance(helperCommand, issue.id),
@@ -5398,8 +5895,14 @@ function buildProviderLinearGoalEvidence(input: {
   elapsedSeconds: number | null;
   createdAt: string | null;
   updatedAt: string | null;
+  providerIssueTaskKey?: string | null;
+  specChecksum?: string | null;
+  goalKey?: string | null;
   reason: string | null;
 }): ProviderLinearGoalEvidence {
+  const providerIssueTaskKey = normalizeOptionalString(input.providerIssueTaskKey);
+  const specChecksum = normalizeOptionalString(input.specChecksum);
+  const goalKey = normalizeOptionalString(input.goalKey);
   return {
     source: 'codex-goals',
     feature_available: input.featureAvailable,
@@ -5415,6 +5918,9 @@ function buildProviderLinearGoalEvidence(input: {
     elapsed_seconds: input.elapsedSeconds,
     created_at: input.createdAt,
     updated_at: input.updatedAt,
+    ...(providerIssueTaskKey ? { provider_issue_task_key: providerIssueTaskKey } : {}),
+    ...(specChecksum ? { spec_checksum: specChecksum } : {}),
+    ...(goalKey ? { goal_key: goalKey } : {}),
     authority: 'advisory_only',
     linear_authority_preserved: true,
     not_authorized_for: [...PROVIDER_LINEAR_GOAL_EVIDENCE_NOT_AUTHORIZED_FOR],
@@ -5479,6 +5985,9 @@ export function normalizeProviderLinearGoalEvidenceValue(value: unknown): Provid
     elapsedSeconds: normalizeNonNegativeNumber(value.elapsed_seconds),
     createdAt: normalizeProviderLinearGoalIsoTimestamp(value.created_at),
     updatedAt: normalizeProviderLinearGoalIsoTimestamp(value.updated_at),
+    providerIssueTaskKey: normalizeOptionalString(value.provider_issue_task_key),
+    specChecksum: normalizeOptionalString(value.spec_checksum),
+    goalKey: normalizeOptionalString(value.goal_key),
     reason: normalizeOptionalString(value.reason)
   });
   if (
@@ -5500,6 +6009,9 @@ export function normalizeProviderLinearGoalEvidenceValue(value: unknown): Provid
       elapsedSeconds: null,
       createdAt: null,
       updatedAt: null,
+      providerIssueTaskKey: capturedEvidence.provider_issue_task_key ?? null,
+      specChecksum: capturedEvidence.spec_checksum ?? null,
+      goalKey: capturedEvidence.goal_key ?? null,
       reason: 'goal_feature_available_malformed'
     });
   }
@@ -5522,6 +6034,9 @@ export function normalizeProviderLinearGoalEvidenceValue(value: unknown): Provid
       elapsedSeconds: null,
       createdAt: null,
       updatedAt: null,
+      providerIssueTaskKey: capturedEvidence.provider_issue_task_key ?? null,
+      specChecksum: capturedEvidence.spec_checksum ?? null,
+      goalKey: capturedEvidence.goal_key ?? null,
       reason: 'goal_feature_enabled_malformed'
     });
   }
@@ -5548,6 +6063,9 @@ export function normalizeProviderLinearGoalEvidenceValue(value: unknown): Provid
       elapsedSeconds: null,
       createdAt: null,
       updatedAt: null,
+      providerIssueTaskKey: capturedEvidence.provider_issue_task_key ?? null,
+      specChecksum: capturedEvidence.spec_checksum ?? null,
+      goalKey: capturedEvidence.goal_key ?? null,
       reason: 'goal_captured_payload_missing'
     });
   }
@@ -5565,6 +6083,9 @@ export function normalizeProviderLinearGoalEvidenceValue(value: unknown): Provid
     elapsedSeconds: null,
     createdAt: null,
     updatedAt: null,
+    providerIssueTaskKey: capturedEvidence.provider_issue_task_key ?? null,
+    specChecksum: capturedEvidence.spec_checksum ?? null,
+    goalKey: capturedEvidence.goal_key ?? null,
     reason: capturedEvidence.reason
   });
 }
@@ -5572,6 +6093,7 @@ export function normalizeProviderLinearGoalEvidenceValue(value: unknown): Provid
 export function normalizeProviderLinearGoalEvidenceForProof(input: {
   candidate?: ProviderLinearGoalEvidence | null;
   previous?: ProviderLinearGoalEvidence | null;
+  goalIntent?: ProviderLinearSpecDerivedGoalIntent | null;
   proofThreadId?: string | null;
   proofTurnId?: string | null;
   observedAt: string;
@@ -5581,12 +6103,42 @@ export function normalizeProviderLinearGoalEvidenceForProof(input: {
 }): ProviderLinearGoalEvidence {
   const candidate = normalizeProviderLinearGoalEvidenceValue(input.candidate);
   const previous = normalizeProviderLinearGoalEvidenceValue(input.previous);
+  const intentProviderIssueTaskKey = normalizeOptionalString(input.goalIntent?.provider_issue_task_key);
+  const intentSpecChecksum = normalizeOptionalString(input.goalIntent?.spec_checksum);
+  const intentGoalKey = normalizeOptionalString(input.goalIntent?.goal_key);
+  const hasReadyGoalIntent =
+    input.goalIntent?.status === 'ready' &&
+    intentProviderIssueTaskKey !== null &&
+    intentSpecChecksum !== null &&
+    intentGoalKey !== null;
+  const bindMetadata = (
+    evidence: ProviderLinearGoalEvidence,
+    options: { allowIntentIssueTaskKey?: boolean; allowIntentMetadata?: boolean } = {}
+  ): ProviderLinearGoalEvidence => {
+    const providerIssueTaskKey =
+      evidence.provider_issue_task_key ??
+      (options.allowIntentMetadata === true || options.allowIntentIssueTaskKey === true
+        ? intentProviderIssueTaskKey
+        : previous?.provider_issue_task_key);
+    const specChecksum =
+      evidence.spec_checksum ??
+      (options.allowIntentMetadata === true ? intentSpecChecksum : previous?.spec_checksum);
+    const goalKey =
+      evidence.goal_key ??
+      (options.allowIntentMetadata === true ? intentGoalKey : previous?.goal_key);
+    return {
+      ...evidence,
+      ...(providerIssueTaskKey ? { provider_issue_task_key: providerIssueTaskKey } : {}),
+      ...(specChecksum ? { spec_checksum: specChecksum } : {}),
+      ...(goalKey ? { goal_key: goalKey } : {})
+    };
+  };
   const previousForFeatureEnabled = previous?.capture_mode === 'disabled' ? null : previous;
   const featureEnabled =
     input.featureEnabled ?? candidate?.feature_enabled ?? previousForFeatureEnabled?.feature_enabled ?? null;
   const runtimeMode = normalizeOptionalString(input.runtimeMode);
   if (featureEnabled === false) {
-    return buildProviderLinearGoalEvidence({
+    return bindMetadata(buildProviderLinearGoalEvidence({
       featureAvailable:
         candidate?.feature_available ??
         previous?.feature_available ??
@@ -5604,7 +6156,7 @@ export function normalizeProviderLinearGoalEvidenceForProof(input: {
       createdAt: null,
       updatedAt: null,
       reason: 'goals_feature_disabled'
-    });
+    }), { allowIntentMetadata: hasReadyGoalIntent });
   }
   const candidateBase = candidate?.capture_mode === 'disabled' ? null : candidate;
   const previousBase = previous?.capture_mode === 'disabled' ? null : previous;
@@ -5635,6 +6187,25 @@ export function normalizeProviderLinearGoalEvidenceForProof(input: {
   const featureAvailable = base.feature_available ?? (runtimeMode === 'appserver' ? true : false);
   const captureTimestamp = base.capture_timestamp ?? input.observedAt;
   const freshnessCaptureTimestamp = base.capture_timestamp ?? (candidate ? input.observedAt : null);
+  const baseSpecChecksum = normalizeOptionalString(base.spec_checksum);
+  const baseGoalKey = normalizeOptionalString(base.goal_key);
+  const baseObjective = normalizeOptionalString(base.objective);
+  const baseMatchesIntent =
+    hasReadyGoalIntent &&
+    (
+      baseSpecChecksum === intentSpecChecksum ||
+      baseGoalKey === intentGoalKey ||
+      (baseObjective?.includes(intentGoalKey) === true &&
+        baseObjective.includes(intentSpecChecksum))
+    );
+  const baseMismatchesIntent =
+    hasReadyGoalIntent &&
+    (
+      (baseSpecChecksum !== null && baseSpecChecksum !== intentSpecChecksum) ||
+      (baseGoalKey !== null && baseGoalKey !== intentGoalKey)
+    );
+  const baseHasObservedGoalEvidence = candidateBase !== null || previousBase !== null;
+  let allowIntentMetadataBinding = baseMatchesIntent || (!baseHasObservedGoalEvidence && hasReadyGoalIntent);
   const freshnessTimestamp =
     captureMode === 'captured' || captureMode === 'cleared'
       ? freshnessCaptureTimestamp ??
@@ -5654,6 +6225,18 @@ export function normalizeProviderLinearGoalEvidenceForProof(input: {
   } else if (!goalThreadId && (captureMode === 'captured' || captureMode === 'cleared')) {
     captureMode = 'thread_mismatch';
     reason = proofThreadId ? `goal_thread_missing:${proofThreadId}` : 'goal_thread_missing';
+  } else if ((captureMode === 'captured' || captureMode === 'cleared') && baseMismatchesIntent) {
+    captureMode = 'stale';
+    allowIntentMetadataBinding = false;
+    if (baseSpecChecksum !== null && baseSpecChecksum !== intentSpecChecksum) {
+      reason = `goal_spec_checksum_mismatch:${baseSpecChecksum}->${intentSpecChecksum}`;
+    } else {
+      reason = `goal_key_mismatch:${baseGoalKey}->${intentGoalKey}`;
+    }
+  } else if (captureMode === 'captured' && hasReadyGoalIntent && !baseMatchesIntent) {
+    captureMode = 'stale';
+    allowIntentMetadataBinding = false;
+    reason = 'goal_identity_unverified';
   } else if ((captureMode === 'captured' || captureMode === 'cleared') && featureAvailable === false) {
     captureMode = 'unavailable';
     reason = 'goal_surface_unavailable';
@@ -5672,7 +6255,7 @@ export function normalizeProviderLinearGoalEvidenceForProof(input: {
     reason = 'goal_evidence_predates_current_turn';
   }
   if (captureMode !== 'captured') {
-    return buildProviderLinearGoalEvidence({
+    return bindMetadata(buildProviderLinearGoalEvidence({
       featureAvailable,
       featureEnabled,
       captureMode,
@@ -5686,10 +6269,16 @@ export function normalizeProviderLinearGoalEvidenceForProof(input: {
       elapsedSeconds: null,
       createdAt: null,
       updatedAt: null,
+      providerIssueTaskKey: base.provider_issue_task_key ?? null,
+      specChecksum: base.spec_checksum ?? null,
+      goalKey: base.goal_key ?? null,
       reason
+    }), {
+      allowIntentIssueTaskKey: reason === 'goal_identity_unverified' && hasReadyGoalIntent,
+      allowIntentMetadata: allowIntentMetadataBinding
     });
   }
-  return {
+  return bindMetadata({
     ...base,
     feature_available: featureAvailable,
     feature_enabled: featureEnabled,
@@ -5700,7 +6289,7 @@ export function normalizeProviderLinearGoalEvidenceForProof(input: {
     linear_authority_preserved: true,
     not_authorized_for: [...PROVIDER_LINEAR_GOAL_EVIDENCE_NOT_AUTHORIZED_FOR],
     reason
-  };
+  }, { allowIntentMetadata: allowIntentMetadataBinding });
 }
 
 function selectProviderWorkerManifestGoalEvidence(
@@ -8544,6 +9133,7 @@ function normalizeProviderLinearWorkerProofForUpdatedAtComparison(
         }
       : proof.appserver_supervision ?? null,
     goal_evidence: proof.goal_evidence ?? null,
+    goal_intent: proof.goal_intent ?? null,
     auth_provenance: proof.auth_provenance ?? null,
     resolved_model_provenance: proof.resolved_model_provenance ?? null,
     failure_diagnosis: proof.failure_diagnosis ?? null,
@@ -8614,6 +9204,7 @@ function selectProviderLinearWorkerProofTelemetryFields(
     tokens: proof.tokens,
     rate_limits: proof.rate_limits ?? null,
     goal_evidence: proof.goal_evidence ?? null,
+    goal_intent: proof.goal_intent ?? null,
     auth_provenance: proof.auth_provenance ?? null,
     resolved_model_provenance: proof.resolved_model_provenance ?? null,
     worker_control: proof.worker_control ?? null,
@@ -9661,7 +10252,8 @@ async function hydrateProviderLinearWorkerProofFromSessionLog(
               proof.attempt_started_at ??
               null,
             featureEnabled: null,
-            runtimeMode: proof.runtime?.selected_mode ?? null
+            runtimeMode: proof.runtime?.selected_mode ?? null,
+            goalIntent: proof.goal_intent ?? null
           }),
     failure_diagnosis: parseState.failureDiagnosis ?? (liveTurnChanged ? null : proof.failure_diagnosis ?? null)
   };
@@ -12871,7 +13463,8 @@ async function writeProofSnapshot(
               observedAt: deps.now(),
               currentTurnStartedAt: proof.current_turn_started_at ?? proof.attempt_started_at ?? null,
               featureEnabled: normalizedProofGoalEvidence?.capture_mode === 'disabled' ? false : null,
-              runtimeMode: proof.runtime?.selected_mode ?? null
+              runtimeMode: proof.runtime?.selected_mode ?? null,
+              goalIntent: proof.goal_intent ?? null
             }),
       linear_budget: linearBudget
     };
@@ -12955,7 +13548,8 @@ export async function refreshProviderLinearWorkerProofSnapshot(
               observedAt: now(),
               currentTurnStartedAt: parsed.current_turn_started_at ?? parsed.attempt_started_at ?? null,
               featureEnabled: null,
-              runtimeMode: parsed.runtime?.selected_mode ?? null
+              runtimeMode: parsed.runtime?.selected_mode ?? null,
+              goalIntent: parsed.goal_intent ?? null
             }),
       linear_budget: linearBudget,
       updated_at: parsed.updated_at ?? null
@@ -13163,6 +13757,7 @@ export async function runProviderLinearWorker(
       featureEnabled: configModelDefaults.goals_feature_enabled ?? null,
       runtimeMode: runtimeContext.runtime.selected_mode
     }),
+    goal_intent: null,
     auth_provenance: buildProviderWorkerRuntimeAuthProvenance({
       env: childEnv,
       runtime: runtimeContext.runtime,
@@ -13232,6 +13827,30 @@ export async function runProviderLinearWorker(
   };
 
   finalProof = await persistProof(finalProof);
+  const refreshGoalIntentForIssue = async (
+    currentIssue: LiveLinearTrackedIssue,
+    proof: ProviderLinearWorkerProof
+  ): Promise<ProviderLinearWorkerProof> => {
+    const workpadBody = await readProviderLinearGoalWorkpadBodyFromIssueContextCache({
+      auditPath,
+      issueId: currentIssue.id
+    });
+    const goalIntent = await deriveProviderWorkerGoalIntentFromSpecPacket({
+      repoRoot: context.repoRoot,
+      issue: currentIssue,
+      workpadBody,
+      linearAudit: proof.linear_audit ?? null,
+      previousIntent: proof.goal_intent ?? null
+    });
+    if (JSON.stringify(goalIntent) === JSON.stringify(proof.goal_intent ?? null)) {
+      return proof;
+    }
+    return {
+      ...proof,
+      goal_intent: goalIntent,
+      updated_at: deps.now()
+    };
+  };
   const readTrackedIssueWithFailClosedProof = async (): Promise<LiveLinearTrackedIssue> => {
     let rateLimitRetryConsumed = false;
     let shouldReadTrackedIssue = true;
@@ -13280,6 +13899,7 @@ export async function runProviderLinearWorker(
   };
 
   let issue = await readTrackedIssueWithFailClosedProof();
+  finalProof = await persistProof(await refreshGoalIntentForIssue(issue, finalProof));
   let threadId: string | null = residentSessionSeed?.source_thread_id ?? null;
   let turnId: string | null = null;
   let lifecycle = classifyProviderLinearWorkerLifecycle(issue);
@@ -13502,7 +14122,8 @@ export async function runProviderLinearWorker(
             observedAt: deps.now(),
             currentTurnStartedAt: turnStartedAt ?? finalProof.current_turn_started_at ?? null,
             featureEnabled: currentTurnGoalsFeatureEnabled ?? null,
-            runtimeMode: runtimeContext.runtime.selected_mode
+            runtimeMode: runtimeContext.runtime.selected_mode,
+            goalIntent: finalProof.goal_intent ?? null
           }),
           auth_provenance: mergeProviderWorkerAuthProvenance(
             finalProof.auth_provenance ?? null,
@@ -13610,6 +14231,7 @@ export async function runProviderLinearWorker(
           : turnNumber > 1
             ? threadId ?? finalProof.thread_id ?? null
             : null;
+      finalProof = await persistProof(await refreshGoalIntentForIssue(issue, finalProof));
       const prompt = buildProviderWorkerPrompt(
         issue,
         turnNumber,
@@ -13622,7 +14244,8 @@ export async function runProviderLinearWorker(
           manifest: context.manifest,
           manifestPath: context.manifestPath,
           residentSession: finalProof.resident_session ?? null,
-          continueResidentSessionOnBoot
+          continueResidentSessionOnBoot,
+          goalIntent: finalProof.goal_intent ?? null
         }
       );
       const args =
@@ -13680,7 +14303,8 @@ export async function runProviderLinearWorker(
             observedAt: turnStartedAt,
             currentTurnStartedAt: turnStartedAt,
             featureEnabled: currentTurnGoalsFeatureEnabled ?? null,
-            runtimeMode: runtimeContext.runtime.selected_mode
+            runtimeMode: runtimeContext.runtime.selected_mode,
+            goalIntent: finalProof.goal_intent ?? null
           }),
           // Runtime-reported model provenance is turn-scoped; start each turn from
           // current command/config evidence until this turn reports runtime metadata.
@@ -14034,8 +14658,10 @@ export async function runProviderLinearWorker(
           observedAt: deps.now(),
           currentTurnStartedAt: turnStartedAt,
           featureEnabled: currentTurnGoalsFeatureEnabled ?? null,
-          runtimeMode: runtimeContext.runtime.selected_mode
+          runtimeMode: runtimeContext.runtime.selected_mode,
+          goalIntent: finalProof.goal_intent ?? null
         }),
+        goal_intent: finalProof.goal_intent ?? null,
         auth_provenance: mergeProviderWorkerAuthProvenance(
           finalProof.auth_provenance ?? null,
           parsed.authProvenance
@@ -14072,6 +14698,7 @@ export async function runProviderLinearWorker(
         updated_at: deps.now()
       };
       finalProof = await persistProof(finalProof);
+      finalProof = await persistProof(await refreshGoalIntentForIssue(issue, finalProof));
 
       if (execResult.exitCode !== 0) {
         const endReason = useAppServerControl
