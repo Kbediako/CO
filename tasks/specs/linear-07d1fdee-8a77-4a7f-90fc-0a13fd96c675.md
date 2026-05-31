@@ -5,7 +5,7 @@ relates_to: docs/PRD-linear-07d1fdee-8a77-4a7f-90fc-0a13fd96c675.md
 risk: medium
 owners:
   - Codex
-last_review: 2026-05-08
+last_review: 2026-05-31
 ---
 
 ## Summary

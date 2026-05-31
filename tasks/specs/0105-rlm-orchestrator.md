@@ -1,6 +1,6 @@
 # Mini-Spec - Recursive Language Model Orchestrator (Task 0105)
 
-last_review: 2026-05-06
+last_review: 2026-05-31
 ## Summary & Scope
 - Add an RLM runner that can be invoked via `npx` on any repo.
 - Loop includes self-refine/critique, tool recursion, and validator gating.

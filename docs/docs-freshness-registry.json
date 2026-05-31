@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generated_at": "2026-05-26",
+  "generated_at": "2026-05-31",
   "entries": [
     {
       "path": ".agent/AGENTS.md",
@@ -3753,8 +3753,9 @@
       "path": ".agent/task/co-361-first-post-v0-2-0-release-prep.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-04-26",
-      "cadence_days": 30
+      "last_review": "2026-05-31",
+      "cadence_days": 30,
+      "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: local packet remains active because local metadata is not terminal (task spec status in_progress); reviewed 6 local packet/spec/mirror files for co-361-first-post-v0-2-0-release-prep; keep status active and cadence_days 30 after evidence review for route co-429-completed-lane-registry-residue."
     },
     {
       "path": ".agent/task/design-reference-pipeline.md",
@@ -3804,8 +3805,9 @@
       "path": ".agent/task/linear-013cb593-b45d-4623-a75d-bc0945510518.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-04-26",
-      "cadence_days": 30
+      "last_review": "2026-05-31",
+      "cadence_days": 30,
+      "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: local packet remains non-terminal because 32 open checklist item(s) remain; sample: .agent/task/linear-013cb593-b45d-4623-a75d-bc0945510518.md:34 - [ ] Parent adds read-only advisory to the doctor checkout-posture surface, `co-status`, or shared equivalent. Evidence: parent-owned.; reviewed 6 local packet/spec/mirror files for linear-013cb593-b45d-4623-a75d-bc0945510518; keep status active and cadence_days 30 after evidence review for route co-429-completed-lane-registry-residue."
     },
     {
       "path": ".agent/task/linear-01e21df6-6438-4246-a423-a686f6020c5e.md",
@@ -3841,8 +3843,9 @@
       "path": ".agent/task/linear-0354e9d0-84ee-4340-b098-a9c685c191b5.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-04-27",
-      "cadence_days": 30
+      "last_review": "2026-05-31",
+      "cadence_days": 30,
+      "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: local packet remains non-terminal because 4 open checklist item(s) remain; sample: tasks/tasks-linear-0354e9d0-84ee-4340-b098-a9c685c191b5.md:20 - [ ] Docs freshness: unrelated March 28 baseline tracked by CO-410.; reviewed 6 local packet/spec/mirror files for linear-0354e9d0-84ee-4340-b098-a9c685c191b5; keep status active and cadence_days 30 after evidence review for route co-429-completed-lane-registry-residue."
     },
     {
       "path": ".agent/task/linear-03561618-a006-41f3-808b-617e5562fe9b.md",
@@ -3952,8 +3955,9 @@
       "path": ".agent/task/linear-0b2377a2-366f-4309-a508-610e524c9d94.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-04-26",
-      "cadence_days": 30
+      "last_review": "2026-05-31",
+      "cadence_days": 30,
+      "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: local packet remains non-terminal because 1 open checklist item(s) remain; sample: tasks/tasks-linear-0b2377a2-366f-4309-a508-610e524c9d94.md:23 - [ ] PR #698 ready-review drain clean.; reviewed 6 local packet/spec/mirror files for linear-0b2377a2-366f-4309-a508-610e524c9d94; keep status active and cadence_days 30 after evidence review for route co-429-completed-lane-registry-residue."
     },
     {
       "path": ".agent/task/linear-0b49c08c-5cfc-46b5-b34c-ec7d3dece5e0.md",
@@ -4045,8 +4049,9 @@
       "path": ".agent/task/linear-1383a1c1-3937-4eb9-b205-050d299e85d5.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-04-26",
-      "cadence_days": 30
+      "last_review": "2026-05-31",
+      "cadence_days": 30,
+      "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: local packet remains non-terminal because 2 open checklist item(s) remain; sample: .agent/task/linear-1383a1c1-3937-4eb9-b205-050d299e85d5.md:19 - [ ] PR attached and ready-review drain completed before `In Review`.; reviewed 6 local packet/spec/mirror files for linear-1383a1c1-3937-4eb9-b205-050d299e85d5; keep status active and cadence_days 30 after evidence review for route co-429-completed-lane-registry-residue."
     },
     {
       "path": ".agent/task/linear-156d7133-00ba-40be-bd35-67cd3ae46e21.md",
@@ -4086,9 +4091,12 @@
     {
       "path": ".agent/task/linear-1856398b-7746-4d07-af6b-4ad207ffe2b9.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-26",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-31",
+      "cadence_days": 365,
+      "task_status": "done",
+      "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: task checklist records parent implementation, focused docs-hygiene coverage, full validation, review findings addressed, and no open local checklist obligations; reviewed 6 local packet/spec/mirror files for linear-1856398b-7746-4d07-af6b-4ad207ffe2b9; retain this row as terminal history for route co-429-completed-lane-registry-residue, not as active docs freshness debt.",
+      "retained_reason": "CO-588 2026-05-31 policy-over-budget cohort remediation: task checklist records parent implementation, focused docs-hygiene coverage, full validation, review findings addressed, and no open local checklist obligations; reviewed 6 local packet/spec/mirror files for linear-1856398b-7746-4d07-af6b-4ad207ffe2b9; retain this row as terminal history for route co-429-completed-lane-registry-residue, not as active docs freshness debt."
     },
     {
       "path": ".agent/task/linear-1c101ebc-4b86-4c1f-b04d-0455e50fbacb.md",
@@ -4456,8 +4464,9 @@
       "path": ".agent/task/linear-358ad1ac-46e4-4eaa-a610-b983dac28aba.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-04-26",
-      "cadence_days": 30
+      "last_review": "2026-05-31",
+      "cadence_days": 30,
+      "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: local packet remains non-terminal because 2 open checklist item(s) remain; sample: tasks/tasks-linear-358ad1ac-46e4-4eaa-a610-b983dac28aba.md:53 - [ ] Parent updates Linear workpad with current docs/implementation/validation status. Evidence: pending final parent refresh.; reviewed 6 local packet/spec/mirror files for linear-358ad1ac-46e4-4eaa-a610-b983dac28aba; keep status active and cadence_days 30 after evidence review for route co-429-completed-lane-registry-residue."
     },
     {
       "path": ".agent/task/linear-37c1035e-d319-4306-8a41-648f2ab836e6.md",
@@ -4472,6 +4481,23 @@
       "status": "archived",
       "last_review": "2026-05-13",
       "cadence_days": 365
+    },
+    {
+      "path": ".agent/task/linear-38f28b8d-bed2-42b8-b07c-d782c13da0c2.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-31",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "38f28b8d-bed2-42b8-b07c-d782c13da0c2",
+        "identifier": "CO-588",
+        "url": "https://linear.app/asabeko/issue/CO-588"
+      },
+      "doc_class": "task_mirror",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-31",
+      "next_review": "2026-06-30",
+      "notes": "CO-588 consolidated control lane packet for reducing Linear/token fanout, preserving WIP under 4, keeping CO-579 passive non-terminal docs:freshness:maintain owner, keeping CO-490 blocked absent fresh cloud evidence, and delegating bounded execution streams."
     },
     {
       "path": ".agent/task/linear-39a559e9-8da2-444d-93e6-2c3ad216f730.md",
@@ -4507,8 +4533,9 @@
       "path": ".agent/task/linear-3b516fb7-dd94-4ca6-abb9-81edf906a1ba.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-04-27",
-      "cadence_days": 30
+      "last_review": "2026-05-31",
+      "cadence_days": 30,
+      "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: local packet remains non-terminal because 14 open checklist item(s) remain; sample: .agent/task/linear-3b516fb7-dd94-4ca6-abb9-81edf906a1ba.md:34 - [ ] Parent reconciles live CO-397 Linear issue context before implementation.; reviewed 6 local packet/spec/mirror files for linear-3b516fb7-dd94-4ca6-abb9-81edf906a1ba; keep status active and cadence_days 30 after evidence review for route co-429-completed-lane-registry-residue."
     },
     {
       "path": ".agent/task/linear-3c52bf66-f805-4537-8671-ad1dec2f4623.md",
@@ -4644,8 +4671,9 @@
       "path": ".agent/task/linear-488135bf-954e-4bd9-be7a-ad09d75f5f29.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-04-27",
-      "cadence_days": 30
+      "last_review": "2026-05-31",
+      "cadence_days": 30,
+      "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: local packet remains non-terminal because 2 open checklist item(s) remain; sample: .agent/task/linear-488135bf-954e-4bd9-be7a-ad09d75f5f29.md:10 - [ ] PR checks / ready-review quiet window green.; reviewed 6 local packet/spec/mirror files for linear-488135bf-954e-4bd9-be7a-ad09d75f5f29; keep status active and cadence_days 30 after evidence review for route co-429-completed-lane-registry-residue."
     },
     {
       "path": ".agent/task/linear-49206921-3c8d-4db6-bfd9-62414509e96a.md",
@@ -4985,8 +5013,9 @@
       "path": ".agent/task/linear-5ef45396-4546-4699-9d4a-c69fb9179868.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-04-27",
-      "cadence_days": 30
+      "last_review": "2026-05-31",
+      "cadence_days": 30,
+      "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: local packet remains non-terminal because 2 open checklist item(s) remain; sample: .agent/task/linear-5ef45396-4546-4699-9d4a-c69fb9179868.md:47 - [ ] PR checks and ready-review drain before Linear review handoff.; reviewed 6 local packet/spec/mirror files for linear-5ef45396-4546-4699-9d4a-c69fb9179868; keep status active and cadence_days 30 after evidence review for route co-429-completed-lane-registry-residue."
     },
     {
       "path": ".agent/task/linear-5f2ebb52-e5f5-4367-84e2-4039ba031b26.md",
@@ -5015,8 +5044,9 @@
       "path": ".agent/task/linear-612a3dc3-f66f-4ba3-aea9-1282b54d93fe.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-04-26",
-      "cadence_days": 30
+      "last_review": "2026-05-31",
+      "cadence_days": 30,
+      "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: local packet remains non-terminal because 4 open checklist item(s) remain; sample: .agent/task/linear-612a3dc3-f66f-4ba3-aea9-1282b54d93fe.md:28 - [ ] `codex-orchestrator co-status --format json` completes against authenticated `/ui/data.json` while provider workers are active. Evidence: source-level hot-path benchmark passes; live globally supervised after evidence is pending package rollout because the installed LaunchAgent still runs the global package.; reviewed 4 local packet/spec/mirror files for linear-612a3dc3-f66f-4ba3-aea9-1282b54d93fe; keep status active and cadence_days 30 after evidence review for route co-429-completed-lane-registry-residue."
     },
     {
       "path": ".agent/task/linear-61ddd0d1-664b-4060-949b-33eb4e7255ac.md",
@@ -5110,8 +5140,9 @@
       "path": ".agent/task/linear-67e2ffd2-a653-4d69-9241-5f32c459a682.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-04-26",
-      "cadence_days": 30
+      "last_review": "2026-05-31",
+      "cadence_days": 30,
+      "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: local packet remains non-terminal because 2 open checklist item(s) remain; sample: .agent/task/linear-67e2ffd2-a653-4d69-9241-5f32c459a682.md:42 - [ ] Parent owns PR lifecycle and Linear state.; reviewed 5 local packet/spec/mirror files for linear-67e2ffd2-a653-4d69-9241-5f32c459a682; keep status active and cadence_days 30 after evidence review for route co-429-completed-lane-registry-residue."
     },
     {
       "path": ".agent/task/linear-69030f04-cfa5-491b-8928-8f325f00da8d.md",
@@ -5499,9 +5530,12 @@
     {
       "path": ".agent/task/linear-7da2cd4d-977e-450a-b056-307edf560fe0.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-26",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-31",
+      "cadence_days": 365,
+      "task_status": "done",
+      "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: task checklist records docs hygiene/freshness validation, docs:freshness:maintain, spec-guard, standalone review, elegance review, and no open local checklist obligations; reviewed 6 local packet/spec/mirror files for linear-7da2cd4d-977e-450a-b056-307edf560fe0; retain this row as terminal history for route co-429-completed-lane-registry-residue, not as active docs freshness debt.",
+      "retained_reason": "CO-588 2026-05-31 policy-over-budget cohort remediation: task checklist records docs hygiene/freshness validation, docs:freshness:maintain, spec-guard, standalone review, elegance review, and no open local checklist obligations; reviewed 6 local packet/spec/mirror files for linear-7da2cd4d-977e-450a-b056-307edf560fe0; retain this row as terminal history for route co-429-completed-lane-registry-residue, not as active docs freshness debt."
     },
     {
       "path": ".agent/task/linear-7e4ab467-3252-417b-8832-21d6f9b49b18.md",
@@ -5603,9 +5637,12 @@
     {
       "path": ".agent/task/linear-86da539a-e106-44d9-87ea-759281a00a81.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-27",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-31",
+      "cadence_days": 365,
+      "task_status": "done",
+      "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: task spec declares status done and task checklist records validation floor, review gate, elegance pass, and no open local checklist obligations; reviewed 6 local packet/spec/mirror files for linear-86da539a-e106-44d9-87ea-759281a00a81; retain this row as terminal history for route co-429-completed-lane-registry-residue, not as active docs freshness debt.",
+      "retained_reason": "CO-588 2026-05-31 policy-over-budget cohort remediation: task spec declares status done and task checklist records validation floor, review gate, elegance pass, and no open local checklist obligations; reviewed 6 local packet/spec/mirror files for linear-86da539a-e106-44d9-87ea-759281a00a81; retain this row as terminal history for route co-429-completed-lane-registry-residue, not as active docs freshness debt."
     },
     {
       "path": ".agent/task/linear-8720424f-56b0-4539-bebe-041c759fcb74.md",
@@ -5633,9 +5670,12 @@
     {
       "path": ".agent/task/linear-88401e48-8112-4817-a7ee-dd4f23241a2b.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-26",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-31",
+      "cadence_days": 365,
+      "task_status": "done",
+      "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: task checklist records policy implementation, follow-up mapping, docs gates, standalone review, elegance review, and no open local checklist obligations; reviewed 6 local packet/spec/mirror files for linear-88401e48-8112-4817-a7ee-dd4f23241a2b; retain this row as terminal history for route co-429-completed-lane-registry-residue, not as active docs freshness debt.",
+      "retained_reason": "CO-588 2026-05-31 policy-over-budget cohort remediation: task checklist records policy implementation, follow-up mapping, docs gates, standalone review, elegance review, and no open local checklist obligations; reviewed 6 local packet/spec/mirror files for linear-88401e48-8112-4817-a7ee-dd4f23241a2b; retain this row as terminal history for route co-429-completed-lane-registry-residue, not as active docs freshness debt."
     },
     {
       "path": ".agent/task/linear-88a7529f-c7fa-443d-8b64-87b6b45ef312.md",
@@ -5832,8 +5872,9 @@
       "path": ".agent/task/linear-9473c8b2-3fcb-48e6-8fd1-d3993dd3caa7.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-04-26",
-      "cadence_days": 30
+      "last_review": "2026-05-31",
+      "cadence_days": 30,
+      "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: local packet remains non-terminal because 20 open checklist item(s) remain; sample: .agent/task/linear-9473c8b2-3fcb-48e6-8fd1-d3993dd3caa7.md:23 - [ ] Parent docs-review confirms the packet is not narrower than CO-381.; reviewed 6 local packet/spec/mirror files for linear-9473c8b2-3fcb-48e6-8fd1-d3993dd3caa7; keep status active and cadence_days 30 after evidence review for route co-429-completed-lane-registry-residue."
     },
     {
       "path": ".agent/task/linear-94e9697f-2424-4883-b408-a83233e360fa.md",
@@ -5874,8 +5915,9 @@
       "path": ".agent/task/linear-964ca955-cf9b-4d1b-887b-4d3bb49069d8.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-04-27",
-      "cadence_days": 30
+      "last_review": "2026-05-31",
+      "cadence_days": 30,
+      "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: local packet remains non-terminal because 6 open checklist item(s) remain; sample: .agent/task/linear-964ca955-cf9b-4d1b-887b-4d3bb49069d8.md:41 - [ ] Latest `origin/main` merged into the branch before review-state transition. Evidence: branch started from `origin/main` `49d888416`; pre-handoff merge still pending after implementation.; reviewed 6 local packet/spec/mirror files for linear-964ca955-cf9b-4d1b-887b-4d3bb49069d8; keep status active and cadence_days 30 after evidence review for route co-429-completed-lane-registry-residue."
     },
     {
       "path": ".agent/task/linear-975669a4-3804-4b5b-9a7b-e1b7c77d3926.md",
@@ -6349,8 +6391,9 @@
       "path": ".agent/task/linear-b131706d-e40f-42db-8f29-9f1ddd636187.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-04-26",
-      "cadence_days": 30
+      "last_review": "2026-05-31",
+      "cadence_days": 30,
+      "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: local packet remains non-terminal because 2 open checklist item(s) remain; sample: .agent/task/linear-b131706d-e40f-42db-8f29-9f1ddd636187.md:43 - [ ] PR attach and ready-review drain before review transition; reviewed 6 local packet/spec/mirror files for linear-b131706d-e40f-42db-8f29-9f1ddd636187; keep status active and cadence_days 30 after evidence review for route co-429-completed-lane-registry-residue."
     },
     {
       "path": ".agent/task/linear-b1835ea5-3d28-493a-934e-1b38048270ce.md",
@@ -6408,8 +6451,9 @@
       "path": ".agent/task/linear-b7074b86-3d38-4dfe-baa9-73b2cc8d686f.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-04-26",
-      "cadence_days": 30
+      "last_review": "2026-05-31",
+      "cadence_days": 30,
+      "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: local packet remains non-terminal because 4 open checklist item(s) remain; sample: .agent/task/linear-b7074b86-3d38-4dfe-baa9-73b2cc8d686f.md:36 - [ ] Parent reconciles against authoritative Linear issue/workpad state and CO-386 template. Evidence: pending parent lane.; reviewed 6 local packet/spec/mirror files for linear-b7074b86-3d38-4dfe-baa9-73b2cc8d686f; keep status active and cadence_days 30 after evidence review for route co-429-completed-lane-registry-residue."
     },
     {
       "path": ".agent/task/linear-b7381274-d6eb-4886-86f4-3976b154c26d.md",
@@ -6669,8 +6713,9 @@
       "path": ".agent/task/linear-c8e3a464-ec50-4fa4-aff5-d8a780626600.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-04-27",
-      "cadence_days": 30
+      "last_review": "2026-05-31",
+      "cadence_days": 30,
+      "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: local packet remains non-terminal because 17 open checklist item(s) remain; sample: .agent/task/linear-c8e3a464-ec50-4fa4-aff5-d8a780626600.md:18 - [ ] Standalone review approval captured - Parent lane owned.; reviewed 5 local packet/spec/mirror files for linear-c8e3a464-ec50-4fa4-aff5-d8a780626600; keep status active and cadence_days 30 after evidence review for route co-429-completed-lane-registry-residue."
     },
     {
       "path": ".agent/task/linear-c8f25aac-5bc5-4210-8fc5-a143d6b14df0.md",
@@ -6942,8 +6987,9 @@
       "path": ".agent/task/linear-d9cbfbc7-d653-463e-bf2a-878f0feac52f.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-04-26",
-      "cadence_days": 30
+      "last_review": "2026-05-31",
+      "cadence_days": 30,
+      "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: local packet remains non-terminal because 2 open checklist item(s) remain; sample: .agent/task/linear-d9cbfbc7-d653-463e-bf2a-878f0feac52f.md:20 - [ ] PR attached, automated feedback drain clean, and Linear moved to `In Review` only after required checks are green.; reviewed 6 local packet/spec/mirror files for linear-d9cbfbc7-d653-463e-bf2a-878f0feac52f; keep status active and cadence_days 30 after evidence review for route co-429-completed-lane-registry-residue."
     },
     {
       "path": ".agent/task/linear-da009c42-d0fc-4834-be72-f977a778693c.md",
@@ -6963,8 +7009,9 @@
       "path": ".agent/task/linear-da290822-55a2-4794-8caa-3a6f1d9c3eff.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-04-27",
-      "cadence_days": 30
+      "last_review": "2026-05-31",
+      "cadence_days": 30,
+      "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: local packet remains non-terminal because 4 open checklist item(s) remain; sample: .agent/task/linear-da290822-55a2-4794-8caa-3a6f1d9c3eff.md:11 - [ ] Address current PR feedback, rerun touched-surface validation, and regain a clean `pr ready-review` quiet window.; reviewed 6 local packet/spec/mirror files for linear-da290822-55a2-4794-8caa-3a6f1d9c3eff; keep status active and cadence_days 30 after evidence review for route co-429-completed-lane-registry-residue."
     },
     {
       "path": ".agent/task/linear-dbddac50-c205-4402-a7a5-e2325a9c4373.md",
@@ -7043,8 +7090,9 @@
       "path": ".agent/task/linear-df2bd49b-2dd6-413f-8d90-af40d033dace.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-04-26",
-      "cadence_days": 30
+      "last_review": "2026-05-31",
+      "cadence_days": 30,
+      "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: local packet remains non-terminal because 8 open checklist item(s) remain; sample: .agent/task/linear-df2bd49b-2dd6-413f-8d90-af40d033dace.md:37 - [ ] `npm run test`. Blocked by unrelated existing failures in `orchestrator/tests/Doctor.test.ts` and `orchestrator/tests/RuntimeProvider.test.ts`; the rerun still failed there while the focused Linear slice remained green.; reviewed 6 local packet/spec/mirror files for linear-df2bd49b-2dd6-413f-8d90-af40d033dace; keep status active and cadence_days 30 after evidence review for route co-429-completed-lane-registry-residue."
     },
     {
       "path": ".agent/task/linear-df57f3cf-2e2e-4d29-a484-a8f3cd92e7c5.md",
@@ -7134,8 +7182,9 @@
       "path": ".agent/task/linear-e6039710-4596-45b2-a268-53bfa3cb2ac9.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-04-27",
-      "cadence_days": 30
+      "last_review": "2026-05-31",
+      "cadence_days": 30,
+      "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: local packet remains non-terminal because 4 open checklist item(s) remain; sample: .agent/task/linear-e6039710-4596-45b2-a268-53bfa3cb2ac9.md:36 - [ ] Parent records terminal PR and ready-review handoff evidence.; reviewed 6 local packet/spec/mirror files for linear-e6039710-4596-45b2-a268-53bfa3cb2ac9; keep status active and cadence_days 30 after evidence review for route co-429-completed-lane-registry-residue."
     },
     {
       "path": ".agent/task/linear-e8f55d3d-1975-4da0-9b33-4307f7d63a08.md",
@@ -7158,8 +7207,9 @@
       "path": ".agent/task/linear-e913b2ab-2be9-4891-bf54-0ac4642ba012.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-04-27",
-      "cadence_days": 30
+      "last_review": "2026-05-31",
+      "cadence_days": 30,
+      "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: local packet remains non-terminal because 6 open checklist item(s) remain; sample: .agent/task/linear-e913b2ab-2be9-4891-bf54-0ac4642ba012.md:43 - [ ] Open PR for `CO-8`, attach it to Linear, handle feedback, and wait for required checks to reach terminal green.; reviewed 6 local packet/spec/mirror files for linear-e913b2ab-2be9-4891-bf54-0ac4642ba012; keep status active and cadence_days 30 after evidence review for route co-429-completed-lane-registry-residue."
     },
     {
       "path": ".agent/task/linear-e934e6ea-8fdd-480c-9656-22c020cb19cf.md",
@@ -7233,8 +7283,9 @@
       "path": ".agent/task/linear-f04ab1c2-79e6-4a98-84e1-85efb6583116.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-04-27",
-      "cadence_days": 30
+      "last_review": "2026-05-31",
+      "cadence_days": 30,
+      "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: local packet remains non-terminal because 2 open checklist item(s) remain; sample: .agent/task/linear-f04ab1c2-79e6-4a98-84e1-85efb6583116.md:41 - [ ] Parent records terminal PR and ready-review handoff evidence.; reviewed 6 local packet/spec/mirror files for linear-f04ab1c2-79e6-4a98-84e1-85efb6583116; keep status active and cadence_days 30 after evidence review for route co-429-completed-lane-registry-residue."
     },
     {
       "path": ".agent/task/linear-f0d312eb-055f-4926-80df-8fcaaf56839c.md",
@@ -7366,8 +7417,9 @@
       "path": ".agent/task/linear-f76b2a52-f0a5-4145-8d21-3e4f23a98d25.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-04-26",
-      "cadence_days": 30
+      "last_review": "2026-05-31",
+      "cadence_days": 30,
+      "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: local packet remains non-terminal because 2 open checklist item(s) remain; sample: .agent/task/linear-f76b2a52-f0a5-4145-8d21-3e4f23a98d25.md:36 - [ ] PR ready-review drain completes before review transition.; reviewed 6 local packet/spec/mirror files for linear-f76b2a52-f0a5-4145-8d21-3e4f23a98d25; keep status active and cadence_days 30 after evidence review for route co-429-completed-lane-registry-residue."
     },
     {
       "path": ".agent/task/linear-f79825fb-1b0a-46a9-89ec-77738e8ae4c8.md",
@@ -7403,9 +7455,12 @@
     {
       "path": ".agent/task/linear-f838cbde-8bb6-46de-bde2-b749f2e64422.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-26",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-31",
+      "cadence_days": 365,
+      "task_status": "done",
+      "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: task checklist records full validation chain, clean standalone review, elegance pass, and no open local checklist obligations; reviewed 6 local packet/spec/mirror files for linear-f838cbde-8bb6-46de-bde2-b749f2e64422; retain this row as terminal history for route co-429-completed-lane-registry-residue, not as active docs freshness debt.",
+      "retained_reason": "CO-588 2026-05-31 policy-over-budget cohort remediation: task checklist records full validation chain, clean standalone review, elegance pass, and no open local checklist obligations; reviewed 6 local packet/spec/mirror files for linear-f838cbde-8bb6-46de-bde2-b749f2e64422; retain this row as terminal history for route co-429-completed-lane-registry-residue, not as active docs freshness debt."
     },
     {
       "path": ".agent/task/linear-f88846f3-24be-48b6-a983-087613fd8f82.md",
@@ -7432,8 +7487,9 @@
       "path": ".agent/task/linear-fb31f0d5-56c4-4f56-8faa-1e4ef63a705a.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-04-26",
-      "cadence_days": 30
+      "last_review": "2026-05-31",
+      "cadence_days": 30,
+      "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: local packet remains non-terminal because 1 open checklist item(s) remain; sample: tasks/tasks-linear-fb31f0d5-56c4-4f56-8faa-1e4ef63a705a.md:43 - [ ] PR attached and `pr ready-review` drain clean before transition to `In Review`.; reviewed 6 local packet/spec/mirror files for linear-fb31f0d5-56c4-4f56-8faa-1e4ef63a705a; keep status active and cadence_days 30 after evidence review for route co-429-completed-lane-registry-residue."
     },
     {
       "path": ".agent/task/linear-fb4c95d0-da68-4312-b3bb-3bd6282aa79f.md",
@@ -7463,8 +7519,9 @@
       "path": ".agent/task/linear-fd05f8a0-420a-4313-a462-690881c0a45c.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-04-27",
-      "cadence_days": 30
+      "last_review": "2026-05-31",
+      "cadence_days": 30,
+      "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: local packet remains non-terminal because 4 open checklist item(s) remain; sample: .agent/task/linear-fd05f8a0-420a-4313-a462-690881c0a45c.md:57 - [ ] Parent reconciles live CO-399 Linear issue context before implementation.; reviewed 6 local packet/spec/mirror files for linear-fd05f8a0-420a-4313-a462-690881c0a45c; keep status active and cadence_days 30 after evidence review for route co-429-completed-lane-registry-residue."
     },
     {
       "path": ".agent/task/linear-fd4bf705-11a9-4717-948c-addfb4fa3f83.md",
@@ -7646,8 +7703,9 @@
       "path": "docs/ACTION_PLAN-co-361-first-post-v0-2-0-release-prep.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-04-26",
-      "cadence_days": 30
+      "last_review": "2026-05-31",
+      "cadence_days": 30,
+      "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: local packet remains active because local metadata is not terminal (task spec status in_progress); reviewed 6 local packet/spec/mirror files for co-361-first-post-v0-2-0-release-prep; keep status active and cadence_days 30 after evidence review for route co-429-completed-lane-registry-residue."
     },
     {
       "path": "docs/ACTION_PLAN-co-codex-alpha-agent-first-policy.md",
@@ -10726,8 +10784,9 @@
       "path": "docs/ACTION_PLAN-linear-013cb593-b45d-4623-a75d-bc0945510518.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-04-26",
-      "cadence_days": 30
+      "last_review": "2026-05-31",
+      "cadence_days": 30,
+      "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: local packet remains non-terminal because 32 open checklist item(s) remain; sample: .agent/task/linear-013cb593-b45d-4623-a75d-bc0945510518.md:34 - [ ] Parent adds read-only advisory to the doctor checkout-posture surface, `co-status`, or shared equivalent. Evidence: parent-owned.; reviewed 6 local packet/spec/mirror files for linear-013cb593-b45d-4623-a75d-bc0945510518; keep status active and cadence_days 30 after evidence review for route co-429-completed-lane-registry-residue."
     },
     {
       "path": "docs/ACTION_PLAN-linear-01e21df6-6438-4246-a423-a686f6020c5e.md",
@@ -10763,8 +10822,9 @@
       "path": "docs/ACTION_PLAN-linear-0354e9d0-84ee-4340-b098-a9c685c191b5.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-04-27",
-      "cadence_days": 30
+      "last_review": "2026-05-31",
+      "cadence_days": 30,
+      "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: local packet remains non-terminal because 4 open checklist item(s) remain; sample: tasks/tasks-linear-0354e9d0-84ee-4340-b098-a9c685c191b5.md:20 - [ ] Docs freshness: unrelated March 28 baseline tracked by CO-410.; reviewed 6 local packet/spec/mirror files for linear-0354e9d0-84ee-4340-b098-a9c685c191b5; keep status active and cadence_days 30 after evidence review for route co-429-completed-lane-registry-residue."
     },
     {
       "path": "docs/ACTION_PLAN-linear-03561618-a006-41f3-808b-617e5562fe9b.md",
@@ -10881,8 +10941,9 @@
       "path": "docs/ACTION_PLAN-linear-0b2377a2-366f-4309-a508-610e524c9d94.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-04-26",
-      "cadence_days": 30
+      "last_review": "2026-05-31",
+      "cadence_days": 30,
+      "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: local packet remains non-terminal because 1 open checklist item(s) remain; sample: tasks/tasks-linear-0b2377a2-366f-4309-a508-610e524c9d94.md:23 - [ ] PR #698 ready-review drain clean.; reviewed 6 local packet/spec/mirror files for linear-0b2377a2-366f-4309-a508-610e524c9d94; keep status active and cadence_days 30 after evidence review for route co-429-completed-lane-registry-residue."
     },
     {
       "path": "docs/ACTION_PLAN-linear-0b49c08c-5cfc-46b5-b34c-ec7d3dece5e0.md",
@@ -10976,8 +11037,9 @@
       "path": "docs/ACTION_PLAN-linear-1383a1c1-3937-4eb9-b205-050d299e85d5.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-04-26",
-      "cadence_days": 30
+      "last_review": "2026-05-31",
+      "cadence_days": 30,
+      "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: local packet remains non-terminal because 2 open checklist item(s) remain; sample: .agent/task/linear-1383a1c1-3937-4eb9-b205-050d299e85d5.md:19 - [ ] PR attached and ready-review drain completed before `In Review`.; reviewed 6 local packet/spec/mirror files for linear-1383a1c1-3937-4eb9-b205-050d299e85d5; keep status active and cadence_days 30 after evidence review for route co-429-completed-lane-registry-residue."
     },
     {
       "path": "docs/ACTION_PLAN-linear-156d7133-00ba-40be-bd35-67cd3ae46e21.md",
@@ -11024,9 +11086,12 @@
     {
       "path": "docs/ACTION_PLAN-linear-1856398b-7746-4d07-af6b-4ad207ffe2b9.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-26",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-31",
+      "cadence_days": 365,
+      "task_status": "done",
+      "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: task checklist records parent implementation, focused docs-hygiene coverage, full validation, review findings addressed, and no open local checklist obligations; reviewed 6 local packet/spec/mirror files for linear-1856398b-7746-4d07-af6b-4ad207ffe2b9; retain this row as terminal history for route co-429-completed-lane-registry-residue, not as active docs freshness debt.",
+      "retained_reason": "CO-588 2026-05-31 policy-over-budget cohort remediation: task checklist records parent implementation, focused docs-hygiene coverage, full validation, review findings addressed, and no open local checklist obligations; reviewed 6 local packet/spec/mirror files for linear-1856398b-7746-4d07-af6b-4ad207ffe2b9; retain this row as terminal history for route co-429-completed-lane-registry-residue, not as active docs freshness debt."
     },
     {
       "path": "docs/ACTION_PLAN-linear-1c101ebc-4b86-4c1f-b04d-0455e50fbacb.md",
@@ -11398,8 +11463,9 @@
       "path": "docs/ACTION_PLAN-linear-358ad1ac-46e4-4eaa-a610-b983dac28aba.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-04-26",
-      "cadence_days": 30
+      "last_review": "2026-05-31",
+      "cadence_days": 30,
+      "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: local packet remains non-terminal because 2 open checklist item(s) remain; sample: tasks/tasks-linear-358ad1ac-46e4-4eaa-a610-b983dac28aba.md:53 - [ ] Parent updates Linear workpad with current docs/implementation/validation status. Evidence: pending final parent refresh.; reviewed 6 local packet/spec/mirror files for linear-358ad1ac-46e4-4eaa-a610-b983dac28aba; keep status active and cadence_days 30 after evidence review for route co-429-completed-lane-registry-residue."
     },
     {
       "path": "docs/ACTION_PLAN-linear-37c1035e-d319-4306-8a41-648f2ab836e6.md",
@@ -11414,6 +11480,23 @@
       "status": "archived",
       "last_review": "2026-05-13",
       "cadence_days": 365
+    },
+    {
+      "path": "docs/ACTION_PLAN-linear-38f28b8d-bed2-42b8-b07c-d782c13da0c2.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-31",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "38f28b8d-bed2-42b8-b07c-d782c13da0c2",
+        "identifier": "CO-588",
+        "url": "https://linear.app/asabeko/issue/CO-588"
+      },
+      "doc_class": "task_packet",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-31",
+      "next_review": "2026-06-30",
+      "notes": "CO-588 consolidated control lane packet for reducing Linear/token fanout, preserving WIP under 4, keeping CO-579 passive non-terminal docs:freshness:maintain owner, keeping CO-490 blocked absent fresh cloud evidence, and delegating bounded execution streams."
     },
     {
       "path": "docs/ACTION_PLAN-linear-39a559e9-8da2-444d-93e6-2c3ad216f730.md",
@@ -11449,8 +11532,9 @@
       "path": "docs/ACTION_PLAN-linear-3b516fb7-dd94-4ca6-abb9-81edf906a1ba.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-04-27",
-      "cadence_days": 30
+      "last_review": "2026-05-31",
+      "cadence_days": 30,
+      "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: local packet remains non-terminal because 14 open checklist item(s) remain; sample: .agent/task/linear-3b516fb7-dd94-4ca6-abb9-81edf906a1ba.md:34 - [ ] Parent reconciles live CO-397 Linear issue context before implementation.; reviewed 6 local packet/spec/mirror files for linear-3b516fb7-dd94-4ca6-abb9-81edf906a1ba; keep status active and cadence_days 30 after evidence review for route co-429-completed-lane-registry-residue."
     },
     {
       "path": "docs/ACTION_PLAN-linear-3c52bf66-f805-4537-8671-ad1dec2f4623.md",
@@ -11597,8 +11681,9 @@
       "path": "docs/ACTION_PLAN-linear-488135bf-954e-4bd9-be7a-ad09d75f5f29.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-04-27",
-      "cadence_days": 30
+      "last_review": "2026-05-31",
+      "cadence_days": 30,
+      "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: local packet remains non-terminal because 2 open checklist item(s) remain; sample: .agent/task/linear-488135bf-954e-4bd9-be7a-ad09d75f5f29.md:10 - [ ] PR checks / ready-review quiet window green.; reviewed 6 local packet/spec/mirror files for linear-488135bf-954e-4bd9-be7a-ad09d75f5f29; keep status active and cadence_days 30 after evidence review for route co-429-completed-lane-registry-residue."
     },
     {
       "path": "docs/ACTION_PLAN-linear-49206921-3c8d-4db6-bfd9-62414509e96a.md",
@@ -11940,8 +12025,9 @@
       "path": "docs/ACTION_PLAN-linear-5ef45396-4546-4699-9d4a-c69fb9179868.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-04-27",
-      "cadence_days": 30
+      "last_review": "2026-05-31",
+      "cadence_days": 30,
+      "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: local packet remains non-terminal because 2 open checklist item(s) remain; sample: .agent/task/linear-5ef45396-4546-4699-9d4a-c69fb9179868.md:47 - [ ] PR checks and ready-review drain before Linear review handoff.; reviewed 6 local packet/spec/mirror files for linear-5ef45396-4546-4699-9d4a-c69fb9179868; keep status active and cadence_days 30 after evidence review for route co-429-completed-lane-registry-residue."
     },
     {
       "path": "docs/ACTION_PLAN-linear-5f2ebb52-e5f5-4367-84e2-4039ba031b26.md",
@@ -11970,8 +12056,9 @@
       "path": "docs/ACTION_PLAN-linear-612a3dc3-f66f-4ba3-aea9-1282b54d93fe.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-04-26",
-      "cadence_days": 30
+      "last_review": "2026-05-31",
+      "cadence_days": 30,
+      "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: local packet remains non-terminal because 4 open checklist item(s) remain; sample: .agent/task/linear-612a3dc3-f66f-4ba3-aea9-1282b54d93fe.md:28 - [ ] `codex-orchestrator co-status --format json` completes against authenticated `/ui/data.json` while provider workers are active. Evidence: source-level hot-path benchmark passes; live globally supervised after evidence is pending package rollout because the installed LaunchAgent still runs the global package.; reviewed 4 local packet/spec/mirror files for linear-612a3dc3-f66f-4ba3-aea9-1282b54d93fe; keep status active and cadence_days 30 after evidence review for route co-429-completed-lane-registry-residue."
     },
     {
       "path": "docs/ACTION_PLAN-linear-61ddd0d1-664b-4060-949b-33eb4e7255ac.md",
@@ -12074,8 +12161,9 @@
       "path": "docs/ACTION_PLAN-linear-67e2ffd2-a653-4d69-9241-5f32c459a682.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-04-26",
-      "cadence_days": 30
+      "last_review": "2026-05-31",
+      "cadence_days": 30,
+      "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: local packet remains non-terminal because 2 open checklist item(s) remain; sample: .agent/task/linear-67e2ffd2-a653-4d69-9241-5f32c459a682.md:42 - [ ] Parent owns PR lifecycle and Linear state.; reviewed 5 local packet/spec/mirror files for linear-67e2ffd2-a653-4d69-9241-5f32c459a682; keep status active and cadence_days 30 after evidence review for route co-429-completed-lane-registry-residue."
     },
     {
       "path": "docs/ACTION_PLAN-linear-69030f04-cfa5-491b-8928-8f325f00da8d.md",
@@ -12463,9 +12551,12 @@
     {
       "path": "docs/ACTION_PLAN-linear-7da2cd4d-977e-450a-b056-307edf560fe0.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-26",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-31",
+      "cadence_days": 365,
+      "task_status": "done",
+      "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: task checklist records docs hygiene/freshness validation, docs:freshness:maintain, spec-guard, standalone review, elegance review, and no open local checklist obligations; reviewed 6 local packet/spec/mirror files for linear-7da2cd4d-977e-450a-b056-307edf560fe0; retain this row as terminal history for route co-429-completed-lane-registry-residue, not as active docs freshness debt.",
+      "retained_reason": "CO-588 2026-05-31 policy-over-budget cohort remediation: task checklist records docs hygiene/freshness validation, docs:freshness:maintain, spec-guard, standalone review, elegance review, and no open local checklist obligations; reviewed 6 local packet/spec/mirror files for linear-7da2cd4d-977e-450a-b056-307edf560fe0; retain this row as terminal history for route co-429-completed-lane-registry-residue, not as active docs freshness debt."
     },
     {
       "path": "docs/ACTION_PLAN-linear-7e4ab467-3252-417b-8832-21d6f9b49b18.md",
@@ -12567,9 +12658,12 @@
     {
       "path": "docs/ACTION_PLAN-linear-86da539a-e106-44d9-87ea-759281a00a81.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-27",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-31",
+      "cadence_days": 365,
+      "task_status": "done",
+      "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: task spec declares status done and task checklist records validation floor, review gate, elegance pass, and no open local checklist obligations; reviewed 6 local packet/spec/mirror files for linear-86da539a-e106-44d9-87ea-759281a00a81; retain this row as terminal history for route co-429-completed-lane-registry-residue, not as active docs freshness debt.",
+      "retained_reason": "CO-588 2026-05-31 policy-over-budget cohort remediation: task spec declares status done and task checklist records validation floor, review gate, elegance pass, and no open local checklist obligations; reviewed 6 local packet/spec/mirror files for linear-86da539a-e106-44d9-87ea-759281a00a81; retain this row as terminal history for route co-429-completed-lane-registry-residue, not as active docs freshness debt."
     },
     {
       "path": "docs/ACTION_PLAN-linear-8720424f-56b0-4539-bebe-041c759fcb74.md",
@@ -12599,9 +12693,12 @@
     {
       "path": "docs/ACTION_PLAN-linear-88401e48-8112-4817-a7ee-dd4f23241a2b.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-26",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-31",
+      "cadence_days": 365,
+      "task_status": "done",
+      "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: task checklist records policy implementation, follow-up mapping, docs gates, standalone review, elegance review, and no open local checklist obligations; reviewed 6 local packet/spec/mirror files for linear-88401e48-8112-4817-a7ee-dd4f23241a2b; retain this row as terminal history for route co-429-completed-lane-registry-residue, not as active docs freshness debt.",
+      "retained_reason": "CO-588 2026-05-31 policy-over-budget cohort remediation: task checklist records policy implementation, follow-up mapping, docs gates, standalone review, elegance review, and no open local checklist obligations; reviewed 6 local packet/spec/mirror files for linear-88401e48-8112-4817-a7ee-dd4f23241a2b; retain this row as terminal history for route co-429-completed-lane-registry-residue, not as active docs freshness debt."
     },
     {
       "path": "docs/ACTION_PLAN-linear-88a7529f-c7fa-443d-8b64-87b6b45ef312.md",
@@ -12725,8 +12822,9 @@
       "path": "docs/ACTION_PLAN-linear-902025f4-f954-41e5-9dcb-9c3d2d12741f.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-04-26",
-      "cadence_days": 30
+      "last_review": "2026-05-31",
+      "cadence_days": 30,
+      "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: local packet remains non-terminal because 2 open checklist item(s) remain; sample: tasks/tasks-linear-902025f4-f954-41e5-9dcb-9c3d2d12741f.md:21 - [ ] Parent runs docs-review and records any packet findings before review handoff.; reviewed 4 local packet/spec/mirror files for linear-902025f4-f954-41e5-9dcb-9c3d2d12741f; keep status active and cadence_days 30 after evidence review for route co-429-completed-lane-registry-residue."
     },
     {
       "path": "docs/ACTION_PLAN-linear-904f74a5-e1b6-4740-a0df-8c92ec73314b.md",
@@ -12814,8 +12912,9 @@
       "path": "docs/ACTION_PLAN-linear-9473c8b2-3fcb-48e6-8fd1-d3993dd3caa7.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-04-26",
-      "cadence_days": 30
+      "last_review": "2026-05-31",
+      "cadence_days": 30,
+      "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: local packet remains non-terminal because 20 open checklist item(s) remain; sample: .agent/task/linear-9473c8b2-3fcb-48e6-8fd1-d3993dd3caa7.md:23 - [ ] Parent docs-review confirms the packet is not narrower than CO-381.; reviewed 6 local packet/spec/mirror files for linear-9473c8b2-3fcb-48e6-8fd1-d3993dd3caa7; keep status active and cadence_days 30 after evidence review for route co-429-completed-lane-registry-residue."
     },
     {
       "path": "docs/ACTION_PLAN-linear-94e9697f-2424-4883-b408-a83233e360fa.md",
@@ -12856,8 +12955,9 @@
       "path": "docs/ACTION_PLAN-linear-964ca955-cf9b-4d1b-887b-4d3bb49069d8.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-04-27",
-      "cadence_days": 30
+      "last_review": "2026-05-31",
+      "cadence_days": 30,
+      "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: local packet remains non-terminal because 6 open checklist item(s) remain; sample: .agent/task/linear-964ca955-cf9b-4d1b-887b-4d3bb49069d8.md:41 - [ ] Latest `origin/main` merged into the branch before review-state transition. Evidence: branch started from `origin/main` `49d888416`; pre-handoff merge still pending after implementation.; reviewed 6 local packet/spec/mirror files for linear-964ca955-cf9b-4d1b-887b-4d3bb49069d8; keep status active and cadence_days 30 after evidence review for route co-429-completed-lane-registry-residue."
     },
     {
       "path": "docs/ACTION_PLAN-linear-975669a4-3804-4b5b-9a7b-e1b7c77d3926.md",
@@ -13348,8 +13448,9 @@
       "path": "docs/ACTION_PLAN-linear-b131706d-e40f-42db-8f29-9f1ddd636187.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-04-26",
-      "cadence_days": 30
+      "last_review": "2026-05-31",
+      "cadence_days": 30,
+      "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: local packet remains non-terminal because 2 open checklist item(s) remain; sample: .agent/task/linear-b131706d-e40f-42db-8f29-9f1ddd636187.md:43 - [ ] PR attach and ready-review drain before review transition; reviewed 6 local packet/spec/mirror files for linear-b131706d-e40f-42db-8f29-9f1ddd636187; keep status active and cadence_days 30 after evidence review for route co-429-completed-lane-registry-residue."
     },
     {
       "path": "docs/ACTION_PLAN-linear-b1835ea5-3d28-493a-934e-1b38048270ce.md",
@@ -13407,8 +13508,9 @@
       "path": "docs/ACTION_PLAN-linear-b7074b86-3d38-4dfe-baa9-73b2cc8d686f.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-04-26",
-      "cadence_days": 30
+      "last_review": "2026-05-31",
+      "cadence_days": 30,
+      "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: local packet remains non-terminal because 4 open checklist item(s) remain; sample: .agent/task/linear-b7074b86-3d38-4dfe-baa9-73b2cc8d686f.md:36 - [ ] Parent reconciles against authoritative Linear issue/workpad state and CO-386 template. Evidence: pending parent lane.; reviewed 6 local packet/spec/mirror files for linear-b7074b86-3d38-4dfe-baa9-73b2cc8d686f; keep status active and cadence_days 30 after evidence review for route co-429-completed-lane-registry-residue."
     },
     {
       "path": "docs/ACTION_PLAN-linear-b7381274-d6eb-4886-86f4-3976b154c26d.md",
@@ -13679,8 +13781,9 @@
       "path": "docs/ACTION_PLAN-linear-c8e3a464-ec50-4fa4-aff5-d8a780626600.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-04-27",
-      "cadence_days": 30
+      "last_review": "2026-05-31",
+      "cadence_days": 30,
+      "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: local packet remains non-terminal because 17 open checklist item(s) remain; sample: .agent/task/linear-c8e3a464-ec50-4fa4-aff5-d8a780626600.md:18 - [ ] Standalone review approval captured - Parent lane owned.; reviewed 5 local packet/spec/mirror files for linear-c8e3a464-ec50-4fa4-aff5-d8a780626600; keep status active and cadence_days 30 after evidence review for route co-429-completed-lane-registry-residue."
     },
     {
       "path": "docs/ACTION_PLAN-linear-c8f25aac-5bc5-4210-8fc5-a143d6b14df0.md",
@@ -13945,8 +14048,9 @@
       "path": "docs/ACTION_PLAN-linear-d9cbfbc7-d653-463e-bf2a-878f0feac52f.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-04-26",
-      "cadence_days": 30
+      "last_review": "2026-05-31",
+      "cadence_days": 30,
+      "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: local packet remains non-terminal because 2 open checklist item(s) remain; sample: .agent/task/linear-d9cbfbc7-d653-463e-bf2a-878f0feac52f.md:20 - [ ] PR attached, automated feedback drain clean, and Linear moved to `In Review` only after required checks are green.; reviewed 6 local packet/spec/mirror files for linear-d9cbfbc7-d653-463e-bf2a-878f0feac52f; keep status active and cadence_days 30 after evidence review for route co-429-completed-lane-registry-residue."
     },
     {
       "path": "docs/ACTION_PLAN-linear-da009c42-d0fc-4834-be72-f977a778693c.md",
@@ -13966,8 +14070,9 @@
       "path": "docs/ACTION_PLAN-linear-da290822-55a2-4794-8caa-3a6f1d9c3eff.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-04-27",
-      "cadence_days": 30
+      "last_review": "2026-05-31",
+      "cadence_days": 30,
+      "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: local packet remains non-terminal because 4 open checklist item(s) remain; sample: .agent/task/linear-da290822-55a2-4794-8caa-3a6f1d9c3eff.md:11 - [ ] Address current PR feedback, rerun touched-surface validation, and regain a clean `pr ready-review` quiet window.; reviewed 6 local packet/spec/mirror files for linear-da290822-55a2-4794-8caa-3a6f1d9c3eff; keep status active and cadence_days 30 after evidence review for route co-429-completed-lane-registry-residue."
     },
     {
       "path": "docs/ACTION_PLAN-linear-dbddac50-c205-4402-a7a5-e2325a9c4373.md",
@@ -14053,8 +14158,9 @@
       "path": "docs/ACTION_PLAN-linear-df2bd49b-2dd6-413f-8d90-af40d033dace.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-04-26",
-      "cadence_days": 30
+      "last_review": "2026-05-31",
+      "cadence_days": 30,
+      "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: local packet remains non-terminal because 8 open checklist item(s) remain; sample: .agent/task/linear-df2bd49b-2dd6-413f-8d90-af40d033dace.md:37 - [ ] `npm run test`. Blocked by unrelated existing failures in `orchestrator/tests/Doctor.test.ts` and `orchestrator/tests/RuntimeProvider.test.ts`; the rerun still failed there while the focused Linear slice remained green.; reviewed 6 local packet/spec/mirror files for linear-df2bd49b-2dd6-413f-8d90-af40d033dace; keep status active and cadence_days 30 after evidence review for route co-429-completed-lane-registry-residue."
     },
     {
       "path": "docs/ACTION_PLAN-linear-df57f3cf-2e2e-4d29-a484-a8f3cd92e7c5.md",
@@ -14148,8 +14254,9 @@
       "path": "docs/ACTION_PLAN-linear-e6039710-4596-45b2-a268-53bfa3cb2ac9.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-04-27",
-      "cadence_days": 30
+      "last_review": "2026-05-31",
+      "cadence_days": 30,
+      "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: local packet remains non-terminal because 4 open checklist item(s) remain; sample: .agent/task/linear-e6039710-4596-45b2-a268-53bfa3cb2ac9.md:36 - [ ] Parent records terminal PR and ready-review handoff evidence.; reviewed 6 local packet/spec/mirror files for linear-e6039710-4596-45b2-a268-53bfa3cb2ac9; keep status active and cadence_days 30 after evidence review for route co-429-completed-lane-registry-residue."
     },
     {
       "path": "docs/ACTION_PLAN-linear-e8f55d3d-1975-4da0-9b33-4307f7d63a08.md",
@@ -14172,8 +14279,9 @@
       "path": "docs/ACTION_PLAN-linear-e913b2ab-2be9-4891-bf54-0ac4642ba012.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-04-27",
-      "cadence_days": 30
+      "last_review": "2026-05-31",
+      "cadence_days": 30,
+      "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: local packet remains non-terminal because 6 open checklist item(s) remain; sample: .agent/task/linear-e913b2ab-2be9-4891-bf54-0ac4642ba012.md:43 - [ ] Open PR for `CO-8`, attach it to Linear, handle feedback, and wait for required checks to reach terminal green.; reviewed 6 local packet/spec/mirror files for linear-e913b2ab-2be9-4891-bf54-0ac4642ba012; keep status active and cadence_days 30 after evidence review for route co-429-completed-lane-registry-residue."
     },
     {
       "path": "docs/ACTION_PLAN-linear-e934e6ea-8fdd-480c-9656-22c020cb19cf.md",
@@ -14247,8 +14355,9 @@
       "path": "docs/ACTION_PLAN-linear-f04ab1c2-79e6-4a98-84e1-85efb6583116.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-04-27",
-      "cadence_days": 30
+      "last_review": "2026-05-31",
+      "cadence_days": 30,
+      "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: local packet remains non-terminal because 2 open checklist item(s) remain; sample: .agent/task/linear-f04ab1c2-79e6-4a98-84e1-85efb6583116.md:41 - [ ] Parent records terminal PR and ready-review handoff evidence.; reviewed 6 local packet/spec/mirror files for linear-f04ab1c2-79e6-4a98-84e1-85efb6583116; keep status active and cadence_days 30 after evidence review for route co-429-completed-lane-registry-residue."
     },
     {
       "path": "docs/ACTION_PLAN-linear-f0d312eb-055f-4926-80df-8fcaaf56839c.md",
@@ -14373,8 +14482,9 @@
       "path": "docs/ACTION_PLAN-linear-f76b2a52-f0a5-4145-8d21-3e4f23a98d25.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-04-26",
-      "cadence_days": 30
+      "last_review": "2026-05-31",
+      "cadence_days": 30,
+      "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: local packet remains non-terminal because 2 open checklist item(s) remain; sample: .agent/task/linear-f76b2a52-f0a5-4145-8d21-3e4f23a98d25.md:36 - [ ] PR ready-review drain completes before review transition.; reviewed 6 local packet/spec/mirror files for linear-f76b2a52-f0a5-4145-8d21-3e4f23a98d25; keep status active and cadence_days 30 after evidence review for route co-429-completed-lane-registry-residue."
     },
     {
       "path": "docs/ACTION_PLAN-linear-f79825fb-1b0a-46a9-89ec-77738e8ae4c8.md",
@@ -14410,9 +14520,12 @@
     {
       "path": "docs/ACTION_PLAN-linear-f838cbde-8bb6-46de-bde2-b749f2e64422.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-26",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-31",
+      "cadence_days": 365,
+      "task_status": "done",
+      "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: task checklist records full validation chain, clean standalone review, elegance pass, and no open local checklist obligations; reviewed 6 local packet/spec/mirror files for linear-f838cbde-8bb6-46de-bde2-b749f2e64422; retain this row as terminal history for route co-429-completed-lane-registry-residue, not as active docs freshness debt.",
+      "retained_reason": "CO-588 2026-05-31 policy-over-budget cohort remediation: task checklist records full validation chain, clean standalone review, elegance pass, and no open local checklist obligations; reviewed 6 local packet/spec/mirror files for linear-f838cbde-8bb6-46de-bde2-b749f2e64422; retain this row as terminal history for route co-429-completed-lane-registry-residue, not as active docs freshness debt."
     },
     {
       "path": "docs/ACTION_PLAN-linear-f88846f3-24be-48b6-a983-087613fd8f82.md",
@@ -14439,8 +14552,9 @@
       "path": "docs/ACTION_PLAN-linear-fb31f0d5-56c4-4f56-8faa-1e4ef63a705a.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-04-26",
-      "cadence_days": 30
+      "last_review": "2026-05-31",
+      "cadence_days": 30,
+      "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: local packet remains non-terminal because 1 open checklist item(s) remain; sample: tasks/tasks-linear-fb31f0d5-56c4-4f56-8faa-1e4ef63a705a.md:43 - [ ] PR attached and `pr ready-review` drain clean before transition to `In Review`.; reviewed 6 local packet/spec/mirror files for linear-fb31f0d5-56c4-4f56-8faa-1e4ef63a705a; keep status active and cadence_days 30 after evidence review for route co-429-completed-lane-registry-residue."
     },
     {
       "path": "docs/ACTION_PLAN-linear-fb4c95d0-da68-4312-b3bb-3bd6282aa79f.md",
@@ -14470,8 +14584,9 @@
       "path": "docs/ACTION_PLAN-linear-fd05f8a0-420a-4313-a462-690881c0a45c.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-04-27",
-      "cadence_days": 30
+      "last_review": "2026-05-31",
+      "cadence_days": 30,
+      "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: local packet remains non-terminal because 4 open checklist item(s) remain; sample: .agent/task/linear-fd05f8a0-420a-4313-a462-690881c0a45c.md:57 - [ ] Parent reconciles live CO-399 Linear issue context before implementation.; reviewed 6 local packet/spec/mirror files for linear-fd05f8a0-420a-4313-a462-690881c0a45c; keep status active and cadence_days 30 after evidence review for route co-429-completed-lane-registry-residue."
     },
     {
       "path": "docs/ACTION_PLAN-linear-fd4bf705-11a9-4717-948c-addfb4fa3f83.md",
@@ -18002,8 +18117,9 @@
       "path": "docs/PRD-co-361-first-post-v0-2-0-release-prep.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-04-26",
-      "cadence_days": 30
+      "last_review": "2026-05-31",
+      "cadence_days": 30,
+      "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: local packet remains active because local metadata is not terminal (task spec status in_progress); reviewed 6 local packet/spec/mirror files for co-361-first-post-v0-2-0-release-prep; keep status active and cadence_days 30 after evidence review for route co-429-completed-lane-registry-residue."
     },
     {
       "path": "docs/PRD-co-codex-alpha-agent-first-policy.md",
@@ -21124,8 +21240,9 @@
       "path": "docs/PRD-linear-013cb593-b45d-4623-a75d-bc0945510518.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-04-26",
-      "cadence_days": 30
+      "last_review": "2026-05-31",
+      "cadence_days": 30,
+      "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: local packet remains non-terminal because 32 open checklist item(s) remain; sample: .agent/task/linear-013cb593-b45d-4623-a75d-bc0945510518.md:34 - [ ] Parent adds read-only advisory to the doctor checkout-posture surface, `co-status`, or shared equivalent. Evidence: parent-owned.; reviewed 6 local packet/spec/mirror files for linear-013cb593-b45d-4623-a75d-bc0945510518; keep status active and cadence_days 30 after evidence review for route co-429-completed-lane-registry-residue."
     },
     {
       "path": "docs/PRD-linear-01e21df6-6438-4246-a423-a686f6020c5e.md",
@@ -21161,8 +21278,9 @@
       "path": "docs/PRD-linear-0354e9d0-84ee-4340-b098-a9c685c191b5.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-04-27",
-      "cadence_days": 30
+      "last_review": "2026-05-31",
+      "cadence_days": 30,
+      "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: local packet remains non-terminal because 4 open checklist item(s) remain; sample: tasks/tasks-linear-0354e9d0-84ee-4340-b098-a9c685c191b5.md:20 - [ ] Docs freshness: unrelated March 28 baseline tracked by CO-410.; reviewed 6 local packet/spec/mirror files for linear-0354e9d0-84ee-4340-b098-a9c685c191b5; keep status active and cadence_days 30 after evidence review for route co-429-completed-lane-registry-residue."
     },
     {
       "path": "docs/PRD-linear-03561618-a006-41f3-808b-617e5562fe9b.md",
@@ -21279,8 +21397,9 @@
       "path": "docs/PRD-linear-0b2377a2-366f-4309-a508-610e524c9d94.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-04-26",
-      "cadence_days": 30
+      "last_review": "2026-05-31",
+      "cadence_days": 30,
+      "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: local packet remains non-terminal because 1 open checklist item(s) remain; sample: tasks/tasks-linear-0b2377a2-366f-4309-a508-610e524c9d94.md:23 - [ ] PR #698 ready-review drain clean.; reviewed 6 local packet/spec/mirror files for linear-0b2377a2-366f-4309-a508-610e524c9d94; keep status active and cadence_days 30 after evidence review for route co-429-completed-lane-registry-residue."
     },
     {
       "path": "docs/PRD-linear-0b49c08c-5cfc-46b5-b34c-ec7d3dece5e0.md",
@@ -21374,8 +21493,9 @@
       "path": "docs/PRD-linear-1383a1c1-3937-4eb9-b205-050d299e85d5.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-04-26",
-      "cadence_days": 30
+      "last_review": "2026-05-31",
+      "cadence_days": 30,
+      "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: local packet remains non-terminal because 2 open checklist item(s) remain; sample: .agent/task/linear-1383a1c1-3937-4eb9-b205-050d299e85d5.md:19 - [ ] PR attached and ready-review drain completed before `In Review`.; reviewed 6 local packet/spec/mirror files for linear-1383a1c1-3937-4eb9-b205-050d299e85d5; keep status active and cadence_days 30 after evidence review for route co-429-completed-lane-registry-residue."
     },
     {
       "path": "docs/PRD-linear-156d7133-00ba-40be-bd35-67cd3ae46e21.md",
@@ -21422,9 +21542,12 @@
     {
       "path": "docs/PRD-linear-1856398b-7746-4d07-af6b-4ad207ffe2b9.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-26",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-31",
+      "cadence_days": 365,
+      "task_status": "done",
+      "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: task checklist records parent implementation, focused docs-hygiene coverage, full validation, review findings addressed, and no open local checklist obligations; reviewed 6 local packet/spec/mirror files for linear-1856398b-7746-4d07-af6b-4ad207ffe2b9; retain this row as terminal history for route co-429-completed-lane-registry-residue, not as active docs freshness debt.",
+      "retained_reason": "CO-588 2026-05-31 policy-over-budget cohort remediation: task checklist records parent implementation, focused docs-hygiene coverage, full validation, review findings addressed, and no open local checklist obligations; reviewed 6 local packet/spec/mirror files for linear-1856398b-7746-4d07-af6b-4ad207ffe2b9; retain this row as terminal history for route co-429-completed-lane-registry-residue, not as active docs freshness debt."
     },
     {
       "path": "docs/PRD-linear-1c101ebc-4b86-4c1f-b04d-0455e50fbacb.md",
@@ -21796,8 +21919,9 @@
       "path": "docs/PRD-linear-358ad1ac-46e4-4eaa-a610-b983dac28aba.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-04-26",
-      "cadence_days": 30
+      "last_review": "2026-05-31",
+      "cadence_days": 30,
+      "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: local packet remains non-terminal because 2 open checklist item(s) remain; sample: tasks/tasks-linear-358ad1ac-46e4-4eaa-a610-b983dac28aba.md:53 - [ ] Parent updates Linear workpad with current docs/implementation/validation status. Evidence: pending final parent refresh.; reviewed 6 local packet/spec/mirror files for linear-358ad1ac-46e4-4eaa-a610-b983dac28aba; keep status active and cadence_days 30 after evidence review for route co-429-completed-lane-registry-residue."
     },
     {
       "path": "docs/PRD-linear-37c1035e-d319-4306-8a41-648f2ab836e6.md",
@@ -21812,6 +21936,23 @@
       "status": "archived",
       "last_review": "2026-05-13",
       "cadence_days": 365
+    },
+    {
+      "path": "docs/PRD-linear-38f28b8d-bed2-42b8-b07c-d782c13da0c2.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-31",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "38f28b8d-bed2-42b8-b07c-d782c13da0c2",
+        "identifier": "CO-588",
+        "url": "https://linear.app/asabeko/issue/CO-588"
+      },
+      "doc_class": "task_packet",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-31",
+      "next_review": "2026-06-30",
+      "notes": "CO-588 consolidated control lane packet for reducing Linear/token fanout, preserving WIP under 4, keeping CO-579 passive non-terminal docs:freshness:maintain owner, keeping CO-490 blocked absent fresh cloud evidence, and delegating bounded execution streams."
     },
     {
       "path": "docs/PRD-linear-39a559e9-8da2-444d-93e6-2c3ad216f730.md",
@@ -21847,8 +21988,9 @@
       "path": "docs/PRD-linear-3b516fb7-dd94-4ca6-abb9-81edf906a1ba.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-04-27",
-      "cadence_days": 30
+      "last_review": "2026-05-31",
+      "cadence_days": 30,
+      "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: local packet remains non-terminal because 14 open checklist item(s) remain; sample: .agent/task/linear-3b516fb7-dd94-4ca6-abb9-81edf906a1ba.md:34 - [ ] Parent reconciles live CO-397 Linear issue context before implementation.; reviewed 6 local packet/spec/mirror files for linear-3b516fb7-dd94-4ca6-abb9-81edf906a1ba; keep status active and cadence_days 30 after evidence review for route co-429-completed-lane-registry-residue."
     },
     {
       "path": "docs/PRD-linear-3c52bf66-f805-4537-8671-ad1dec2f4623.md",
@@ -21995,8 +22137,9 @@
       "path": "docs/PRD-linear-488135bf-954e-4bd9-be7a-ad09d75f5f29.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-04-27",
-      "cadence_days": 30
+      "last_review": "2026-05-31",
+      "cadence_days": 30,
+      "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: local packet remains non-terminal because 2 open checklist item(s) remain; sample: .agent/task/linear-488135bf-954e-4bd9-be7a-ad09d75f5f29.md:10 - [ ] PR checks / ready-review quiet window green.; reviewed 6 local packet/spec/mirror files for linear-488135bf-954e-4bd9-be7a-ad09d75f5f29; keep status active and cadence_days 30 after evidence review for route co-429-completed-lane-registry-residue."
     },
     {
       "path": "docs/PRD-linear-49206921-3c8d-4db6-bfd9-62414509e96a.md",
@@ -22338,8 +22481,9 @@
       "path": "docs/PRD-linear-5ef45396-4546-4699-9d4a-c69fb9179868.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-04-27",
-      "cadence_days": 30
+      "last_review": "2026-05-31",
+      "cadence_days": 30,
+      "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: local packet remains non-terminal because 2 open checklist item(s) remain; sample: .agent/task/linear-5ef45396-4546-4699-9d4a-c69fb9179868.md:47 - [ ] PR checks and ready-review drain before Linear review handoff.; reviewed 6 local packet/spec/mirror files for linear-5ef45396-4546-4699-9d4a-c69fb9179868; keep status active and cadence_days 30 after evidence review for route co-429-completed-lane-registry-residue."
     },
     {
       "path": "docs/PRD-linear-5f2ebb52-e5f5-4367-84e2-4039ba031b26.md",
@@ -22368,8 +22512,9 @@
       "path": "docs/PRD-linear-612a3dc3-f66f-4ba3-aea9-1282b54d93fe.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-04-26",
-      "cadence_days": 30
+      "last_review": "2026-05-31",
+      "cadence_days": 30,
+      "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: local packet remains non-terminal because 4 open checklist item(s) remain; sample: .agent/task/linear-612a3dc3-f66f-4ba3-aea9-1282b54d93fe.md:28 - [ ] `codex-orchestrator co-status --format json` completes against authenticated `/ui/data.json` while provider workers are active. Evidence: source-level hot-path benchmark passes; live globally supervised after evidence is pending package rollout because the installed LaunchAgent still runs the global package.; reviewed 4 local packet/spec/mirror files for linear-612a3dc3-f66f-4ba3-aea9-1282b54d93fe; keep status active and cadence_days 30 after evidence review for route co-429-completed-lane-registry-residue."
     },
     {
       "path": "docs/PRD-linear-61ddd0d1-664b-4060-949b-33eb4e7255ac.md",
@@ -22472,8 +22617,9 @@
       "path": "docs/PRD-linear-67e2ffd2-a653-4d69-9241-5f32c459a682.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-04-26",
-      "cadence_days": 30
+      "last_review": "2026-05-31",
+      "cadence_days": 30,
+      "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: local packet remains non-terminal because 2 open checklist item(s) remain; sample: .agent/task/linear-67e2ffd2-a653-4d69-9241-5f32c459a682.md:42 - [ ] Parent owns PR lifecycle and Linear state.; reviewed 5 local packet/spec/mirror files for linear-67e2ffd2-a653-4d69-9241-5f32c459a682; keep status active and cadence_days 30 after evidence review for route co-429-completed-lane-registry-residue."
     },
     {
       "path": "docs/PRD-linear-69030f04-cfa5-491b-8928-8f325f00da8d.md",
@@ -22861,9 +23007,12 @@
     {
       "path": "docs/PRD-linear-7da2cd4d-977e-450a-b056-307edf560fe0.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-26",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-31",
+      "cadence_days": 365,
+      "task_status": "done",
+      "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: task checklist records docs hygiene/freshness validation, docs:freshness:maintain, spec-guard, standalone review, elegance review, and no open local checklist obligations; reviewed 6 local packet/spec/mirror files for linear-7da2cd4d-977e-450a-b056-307edf560fe0; retain this row as terminal history for route co-429-completed-lane-registry-residue, not as active docs freshness debt.",
+      "retained_reason": "CO-588 2026-05-31 policy-over-budget cohort remediation: task checklist records docs hygiene/freshness validation, docs:freshness:maintain, spec-guard, standalone review, elegance review, and no open local checklist obligations; reviewed 6 local packet/spec/mirror files for linear-7da2cd4d-977e-450a-b056-307edf560fe0; retain this row as terminal history for route co-429-completed-lane-registry-residue, not as active docs freshness debt."
     },
     {
       "path": "docs/PRD-linear-7e4ab467-3252-417b-8832-21d6f9b49b18.md",
@@ -22965,9 +23114,12 @@
     {
       "path": "docs/PRD-linear-86da539a-e106-44d9-87ea-759281a00a81.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-27",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-31",
+      "cadence_days": 365,
+      "task_status": "done",
+      "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: task spec declares status done and task checklist records validation floor, review gate, elegance pass, and no open local checklist obligations; reviewed 6 local packet/spec/mirror files for linear-86da539a-e106-44d9-87ea-759281a00a81; retain this row as terminal history for route co-429-completed-lane-registry-residue, not as active docs freshness debt.",
+      "retained_reason": "CO-588 2026-05-31 policy-over-budget cohort remediation: task spec declares status done and task checklist records validation floor, review gate, elegance pass, and no open local checklist obligations; reviewed 6 local packet/spec/mirror files for linear-86da539a-e106-44d9-87ea-759281a00a81; retain this row as terminal history for route co-429-completed-lane-registry-residue, not as active docs freshness debt."
     },
     {
       "path": "docs/PRD-linear-8720424f-56b0-4539-bebe-041c759fcb74.md",
@@ -22997,9 +23149,12 @@
     {
       "path": "docs/PRD-linear-88401e48-8112-4817-a7ee-dd4f23241a2b.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-26",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-31",
+      "cadence_days": 365,
+      "task_status": "done",
+      "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: task checklist records policy implementation, follow-up mapping, docs gates, standalone review, elegance review, and no open local checklist obligations; reviewed 6 local packet/spec/mirror files for linear-88401e48-8112-4817-a7ee-dd4f23241a2b; retain this row as terminal history for route co-429-completed-lane-registry-residue, not as active docs freshness debt.",
+      "retained_reason": "CO-588 2026-05-31 policy-over-budget cohort remediation: task checklist records policy implementation, follow-up mapping, docs gates, standalone review, elegance review, and no open local checklist obligations; reviewed 6 local packet/spec/mirror files for linear-88401e48-8112-4817-a7ee-dd4f23241a2b; retain this row as terminal history for route co-429-completed-lane-registry-residue, not as active docs freshness debt."
     },
     {
       "path": "docs/PRD-linear-88a7529f-c7fa-443d-8b64-87b6b45ef312.md",
@@ -23123,8 +23278,9 @@
       "path": "docs/PRD-linear-902025f4-f954-41e5-9dcb-9c3d2d12741f.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-04-26",
-      "cadence_days": 30
+      "last_review": "2026-05-31",
+      "cadence_days": 30,
+      "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: local packet remains non-terminal because 2 open checklist item(s) remain; sample: tasks/tasks-linear-902025f4-f954-41e5-9dcb-9c3d2d12741f.md:21 - [ ] Parent runs docs-review and records any packet findings before review handoff.; reviewed 4 local packet/spec/mirror files for linear-902025f4-f954-41e5-9dcb-9c3d2d12741f; keep status active and cadence_days 30 after evidence review for route co-429-completed-lane-registry-residue."
     },
     {
       "path": "docs/PRD-linear-904f74a5-e1b6-4740-a0df-8c92ec73314b.md",
@@ -23212,8 +23368,9 @@
       "path": "docs/PRD-linear-9473c8b2-3fcb-48e6-8fd1-d3993dd3caa7.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-04-26",
-      "cadence_days": 30
+      "last_review": "2026-05-31",
+      "cadence_days": 30,
+      "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: local packet remains non-terminal because 20 open checklist item(s) remain; sample: .agent/task/linear-9473c8b2-3fcb-48e6-8fd1-d3993dd3caa7.md:23 - [ ] Parent docs-review confirms the packet is not narrower than CO-381.; reviewed 6 local packet/spec/mirror files for linear-9473c8b2-3fcb-48e6-8fd1-d3993dd3caa7; keep status active and cadence_days 30 after evidence review for route co-429-completed-lane-registry-residue."
     },
     {
       "path": "docs/PRD-linear-94e9697f-2424-4883-b408-a83233e360fa.md",
@@ -23254,8 +23411,9 @@
       "path": "docs/PRD-linear-964ca955-cf9b-4d1b-887b-4d3bb49069d8.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-04-27",
-      "cadence_days": 30
+      "last_review": "2026-05-31",
+      "cadence_days": 30,
+      "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: local packet remains non-terminal because 6 open checklist item(s) remain; sample: .agent/task/linear-964ca955-cf9b-4d1b-887b-4d3bb49069d8.md:41 - [ ] Latest `origin/main` merged into the branch before review-state transition. Evidence: branch started from `origin/main` `49d888416`; pre-handoff merge still pending after implementation.; reviewed 6 local packet/spec/mirror files for linear-964ca955-cf9b-4d1b-887b-4d3bb49069d8; keep status active and cadence_days 30 after evidence review for route co-429-completed-lane-registry-residue."
     },
     {
       "path": "docs/PRD-linear-975669a4-3804-4b5b-9a7b-e1b7c77d3926.md",
@@ -23741,8 +23899,9 @@
       "path": "docs/PRD-linear-b131706d-e40f-42db-8f29-9f1ddd636187.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-04-26",
-      "cadence_days": 30
+      "last_review": "2026-05-31",
+      "cadence_days": 30,
+      "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: local packet remains non-terminal because 2 open checklist item(s) remain; sample: .agent/task/linear-b131706d-e40f-42db-8f29-9f1ddd636187.md:43 - [ ] PR attach and ready-review drain before review transition; reviewed 6 local packet/spec/mirror files for linear-b131706d-e40f-42db-8f29-9f1ddd636187; keep status active and cadence_days 30 after evidence review for route co-429-completed-lane-registry-residue."
     },
     {
       "path": "docs/PRD-linear-b1835ea5-3d28-493a-934e-1b38048270ce.md",
@@ -23800,8 +23959,9 @@
       "path": "docs/PRD-linear-b7074b86-3d38-4dfe-baa9-73b2cc8d686f.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-04-26",
-      "cadence_days": 30
+      "last_review": "2026-05-31",
+      "cadence_days": 30,
+      "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: local packet remains non-terminal because 4 open checklist item(s) remain; sample: .agent/task/linear-b7074b86-3d38-4dfe-baa9-73b2cc8d686f.md:36 - [ ] Parent reconciles against authoritative Linear issue/workpad state and CO-386 template. Evidence: pending parent lane.; reviewed 6 local packet/spec/mirror files for linear-b7074b86-3d38-4dfe-baa9-73b2cc8d686f; keep status active and cadence_days 30 after evidence review for route co-429-completed-lane-registry-residue."
     },
     {
       "path": "docs/PRD-linear-b7381274-d6eb-4886-86f4-3976b154c26d.md",
@@ -24072,8 +24232,9 @@
       "path": "docs/PRD-linear-c8e3a464-ec50-4fa4-aff5-d8a780626600.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-04-27",
-      "cadence_days": 30
+      "last_review": "2026-05-31",
+      "cadence_days": 30,
+      "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: local packet remains non-terminal because 17 open checklist item(s) remain; sample: .agent/task/linear-c8e3a464-ec50-4fa4-aff5-d8a780626600.md:18 - [ ] Standalone review approval captured - Parent lane owned.; reviewed 5 local packet/spec/mirror files for linear-c8e3a464-ec50-4fa4-aff5-d8a780626600; keep status active and cadence_days 30 after evidence review for route co-429-completed-lane-registry-residue."
     },
     {
       "path": "docs/PRD-linear-c8f25aac-5bc5-4210-8fc5-a143d6b14df0.md",
@@ -24338,8 +24499,9 @@
       "path": "docs/PRD-linear-d9cbfbc7-d653-463e-bf2a-878f0feac52f.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-04-26",
-      "cadence_days": 30
+      "last_review": "2026-05-31",
+      "cadence_days": 30,
+      "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: local packet remains non-terminal because 2 open checklist item(s) remain; sample: .agent/task/linear-d9cbfbc7-d653-463e-bf2a-878f0feac52f.md:20 - [ ] PR attached, automated feedback drain clean, and Linear moved to `In Review` only after required checks are green.; reviewed 6 local packet/spec/mirror files for linear-d9cbfbc7-d653-463e-bf2a-878f0feac52f; keep status active and cadence_days 30 after evidence review for route co-429-completed-lane-registry-residue."
     },
     {
       "path": "docs/PRD-linear-da009c42-d0fc-4834-be72-f977a778693c.md",
@@ -24359,8 +24521,9 @@
       "path": "docs/PRD-linear-da290822-55a2-4794-8caa-3a6f1d9c3eff.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-04-27",
-      "cadence_days": 30
+      "last_review": "2026-05-31",
+      "cadence_days": 30,
+      "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: local packet remains non-terminal because 4 open checklist item(s) remain; sample: .agent/task/linear-da290822-55a2-4794-8caa-3a6f1d9c3eff.md:11 - [ ] Address current PR feedback, rerun touched-surface validation, and regain a clean `pr ready-review` quiet window.; reviewed 6 local packet/spec/mirror files for linear-da290822-55a2-4794-8caa-3a6f1d9c3eff; keep status active and cadence_days 30 after evidence review for route co-429-completed-lane-registry-residue."
     },
     {
       "path": "docs/PRD-linear-dbddac50-c205-4402-a7a5-e2325a9c4373.md",
@@ -24446,8 +24609,9 @@
       "path": "docs/PRD-linear-df2bd49b-2dd6-413f-8d90-af40d033dace.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-04-26",
-      "cadence_days": 30
+      "last_review": "2026-05-31",
+      "cadence_days": 30,
+      "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: local packet remains non-terminal because 8 open checklist item(s) remain; sample: .agent/task/linear-df2bd49b-2dd6-413f-8d90-af40d033dace.md:37 - [ ] `npm run test`. Blocked by unrelated existing failures in `orchestrator/tests/Doctor.test.ts` and `orchestrator/tests/RuntimeProvider.test.ts`; the rerun still failed there while the focused Linear slice remained green.; reviewed 6 local packet/spec/mirror files for linear-df2bd49b-2dd6-413f-8d90-af40d033dace; keep status active and cadence_days 30 after evidence review for route co-429-completed-lane-registry-residue."
     },
     {
       "path": "docs/PRD-linear-df57f3cf-2e2e-4d29-a484-a8f3cd92e7c5.md",
@@ -24541,8 +24705,9 @@
       "path": "docs/PRD-linear-e6039710-4596-45b2-a268-53bfa3cb2ac9.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-04-27",
-      "cadence_days": 30
+      "last_review": "2026-05-31",
+      "cadence_days": 30,
+      "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: local packet remains non-terminal because 4 open checklist item(s) remain; sample: .agent/task/linear-e6039710-4596-45b2-a268-53bfa3cb2ac9.md:36 - [ ] Parent records terminal PR and ready-review handoff evidence.; reviewed 6 local packet/spec/mirror files for linear-e6039710-4596-45b2-a268-53bfa3cb2ac9; keep status active and cadence_days 30 after evidence review for route co-429-completed-lane-registry-residue."
     },
     {
       "path": "docs/PRD-linear-e8f55d3d-1975-4da0-9b33-4307f7d63a08.md",
@@ -24565,8 +24730,9 @@
       "path": "docs/PRD-linear-e913b2ab-2be9-4891-bf54-0ac4642ba012.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-04-27",
-      "cadence_days": 30
+      "last_review": "2026-05-31",
+      "cadence_days": 30,
+      "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: local packet remains non-terminal because 6 open checklist item(s) remain; sample: .agent/task/linear-e913b2ab-2be9-4891-bf54-0ac4642ba012.md:43 - [ ] Open PR for `CO-8`, attach it to Linear, handle feedback, and wait for required checks to reach terminal green.; reviewed 6 local packet/spec/mirror files for linear-e913b2ab-2be9-4891-bf54-0ac4642ba012; keep status active and cadence_days 30 after evidence review for route co-429-completed-lane-registry-residue."
     },
     {
       "path": "docs/PRD-linear-e934e6ea-8fdd-480c-9656-22c020cb19cf.md",
@@ -24640,8 +24806,9 @@
       "path": "docs/PRD-linear-f04ab1c2-79e6-4a98-84e1-85efb6583116.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-04-27",
-      "cadence_days": 30
+      "last_review": "2026-05-31",
+      "cadence_days": 30,
+      "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: local packet remains non-terminal because 2 open checklist item(s) remain; sample: .agent/task/linear-f04ab1c2-79e6-4a98-84e1-85efb6583116.md:41 - [ ] Parent records terminal PR and ready-review handoff evidence.; reviewed 6 local packet/spec/mirror files for linear-f04ab1c2-79e6-4a98-84e1-85efb6583116; keep status active and cadence_days 30 after evidence review for route co-429-completed-lane-registry-residue."
     },
     {
       "path": "docs/PRD-linear-f0d312eb-055f-4926-80df-8fcaaf56839c.md",
@@ -24766,8 +24933,9 @@
       "path": "docs/PRD-linear-f76b2a52-f0a5-4145-8d21-3e4f23a98d25.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-04-26",
-      "cadence_days": 30
+      "last_review": "2026-05-31",
+      "cadence_days": 30,
+      "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: local packet remains non-terminal because 2 open checklist item(s) remain; sample: .agent/task/linear-f76b2a52-f0a5-4145-8d21-3e4f23a98d25.md:36 - [ ] PR ready-review drain completes before review transition.; reviewed 6 local packet/spec/mirror files for linear-f76b2a52-f0a5-4145-8d21-3e4f23a98d25; keep status active and cadence_days 30 after evidence review for route co-429-completed-lane-registry-residue."
     },
     {
       "path": "docs/PRD-linear-f79825fb-1b0a-46a9-89ec-77738e8ae4c8.md",
@@ -24803,9 +24971,12 @@
     {
       "path": "docs/PRD-linear-f838cbde-8bb6-46de-bde2-b749f2e64422.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-26",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-31",
+      "cadence_days": 365,
+      "task_status": "done",
+      "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: task checklist records full validation chain, clean standalone review, elegance pass, and no open local checklist obligations; reviewed 6 local packet/spec/mirror files for linear-f838cbde-8bb6-46de-bde2-b749f2e64422; retain this row as terminal history for route co-429-completed-lane-registry-residue, not as active docs freshness debt.",
+      "retained_reason": "CO-588 2026-05-31 policy-over-budget cohort remediation: task checklist records full validation chain, clean standalone review, elegance pass, and no open local checklist obligations; reviewed 6 local packet/spec/mirror files for linear-f838cbde-8bb6-46de-bde2-b749f2e64422; retain this row as terminal history for route co-429-completed-lane-registry-residue, not as active docs freshness debt."
     },
     {
       "path": "docs/PRD-linear-f88846f3-24be-48b6-a983-087613fd8f82.md",
@@ -24832,8 +25003,9 @@
       "path": "docs/PRD-linear-fb31f0d5-56c4-4f56-8faa-1e4ef63a705a.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-04-26",
-      "cadence_days": 30
+      "last_review": "2026-05-31",
+      "cadence_days": 30,
+      "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: local packet remains non-terminal because 1 open checklist item(s) remain; sample: tasks/tasks-linear-fb31f0d5-56c4-4f56-8faa-1e4ef63a705a.md:43 - [ ] PR attached and `pr ready-review` drain clean before transition to `In Review`.; reviewed 6 local packet/spec/mirror files for linear-fb31f0d5-56c4-4f56-8faa-1e4ef63a705a; keep status active and cadence_days 30 after evidence review for route co-429-completed-lane-registry-residue."
     },
     {
       "path": "docs/PRD-linear-fb4c95d0-da68-4312-b3bb-3bd6282aa79f.md",
@@ -24863,8 +25035,9 @@
       "path": "docs/PRD-linear-fd05f8a0-420a-4313-a462-690881c0a45c.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-04-27",
-      "cadence_days": 30
+      "last_review": "2026-05-31",
+      "cadence_days": 30,
+      "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: local packet remains non-terminal because 4 open checklist item(s) remain; sample: .agent/task/linear-fd05f8a0-420a-4313-a462-690881c0a45c.md:57 - [ ] Parent reconciles live CO-399 Linear issue context before implementation.; reviewed 6 local packet/spec/mirror files for linear-fd05f8a0-420a-4313-a462-690881c0a45c; keep status active and cadence_days 30 after evidence review for route co-429-completed-lane-registry-residue."
     },
     {
       "path": "docs/PRD-linear-fd4bf705-11a9-4717-948c-addfb4fa3f83.md",
@@ -25443,8 +25616,9 @@
       "path": "docs/TECH_SPEC-co-361-first-post-v0-2-0-release-prep.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-04-26",
-      "cadence_days": 30
+      "last_review": "2026-05-31",
+      "cadence_days": 30,
+      "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: local packet remains active because local metadata is not terminal (task spec status in_progress); reviewed 6 local packet/spec/mirror files for co-361-first-post-v0-2-0-release-prep; keep status active and cadence_days 30 after evidence review for route co-429-completed-lane-registry-residue."
     },
     {
       "path": "docs/TECH_SPEC-co-codex-alpha-agent-first-policy.md",
@@ -28549,8 +28723,9 @@
       "path": "docs/TECH_SPEC-linear-013cb593-b45d-4623-a75d-bc0945510518.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-04-26",
-      "cadence_days": 30
+      "last_review": "2026-05-31",
+      "cadence_days": 30,
+      "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: local packet remains non-terminal because 32 open checklist item(s) remain; sample: .agent/task/linear-013cb593-b45d-4623-a75d-bc0945510518.md:34 - [ ] Parent adds read-only advisory to the doctor checkout-posture surface, `co-status`, or shared equivalent. Evidence: parent-owned.; reviewed 6 local packet/spec/mirror files for linear-013cb593-b45d-4623-a75d-bc0945510518; keep status active and cadence_days 30 after evidence review for route co-429-completed-lane-registry-residue."
     },
     {
       "path": "docs/TECH_SPEC-linear-01e21df6-6438-4246-a423-a686f6020c5e.md",
@@ -28586,8 +28761,9 @@
       "path": "docs/TECH_SPEC-linear-0354e9d0-84ee-4340-b098-a9c685c191b5.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-04-27",
-      "cadence_days": 30
+      "last_review": "2026-05-31",
+      "cadence_days": 30,
+      "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: local packet remains non-terminal because 4 open checklist item(s) remain; sample: tasks/tasks-linear-0354e9d0-84ee-4340-b098-a9c685c191b5.md:20 - [ ] Docs freshness: unrelated March 28 baseline tracked by CO-410.; reviewed 6 local packet/spec/mirror files for linear-0354e9d0-84ee-4340-b098-a9c685c191b5; keep status active and cadence_days 30 after evidence review for route co-429-completed-lane-registry-residue."
     },
     {
       "path": "docs/TECH_SPEC-linear-03561618-a006-41f3-808b-617e5562fe9b.md",
@@ -28704,8 +28880,9 @@
       "path": "docs/TECH_SPEC-linear-0b2377a2-366f-4309-a508-610e524c9d94.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-04-26",
-      "cadence_days": 30
+      "last_review": "2026-05-31",
+      "cadence_days": 30,
+      "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: local packet remains non-terminal because 1 open checklist item(s) remain; sample: tasks/tasks-linear-0b2377a2-366f-4309-a508-610e524c9d94.md:23 - [ ] PR #698 ready-review drain clean.; reviewed 6 local packet/spec/mirror files for linear-0b2377a2-366f-4309-a508-610e524c9d94; keep status active and cadence_days 30 after evidence review for route co-429-completed-lane-registry-residue."
     },
     {
       "path": "docs/TECH_SPEC-linear-0b49c08c-5cfc-46b5-b34c-ec7d3dece5e0.md",
@@ -28799,8 +28976,9 @@
       "path": "docs/TECH_SPEC-linear-1383a1c1-3937-4eb9-b205-050d299e85d5.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-04-26",
-      "cadence_days": 30
+      "last_review": "2026-05-31",
+      "cadence_days": 30,
+      "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: local packet remains non-terminal because 2 open checklist item(s) remain; sample: .agent/task/linear-1383a1c1-3937-4eb9-b205-050d299e85d5.md:19 - [ ] PR attached and ready-review drain completed before `In Review`.; reviewed 6 local packet/spec/mirror files for linear-1383a1c1-3937-4eb9-b205-050d299e85d5; keep status active and cadence_days 30 after evidence review for route co-429-completed-lane-registry-residue."
     },
     {
       "path": "docs/TECH_SPEC-linear-156d7133-00ba-40be-bd35-67cd3ae46e21.md",
@@ -28847,9 +29025,12 @@
     {
       "path": "docs/TECH_SPEC-linear-1856398b-7746-4d07-af6b-4ad207ffe2b9.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-26",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-31",
+      "cadence_days": 365,
+      "task_status": "done",
+      "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: task checklist records parent implementation, focused docs-hygiene coverage, full validation, review findings addressed, and no open local checklist obligations; reviewed 6 local packet/spec/mirror files for linear-1856398b-7746-4d07-af6b-4ad207ffe2b9; retain this row as terminal history for route co-429-completed-lane-registry-residue, not as active docs freshness debt.",
+      "retained_reason": "CO-588 2026-05-31 policy-over-budget cohort remediation: task checklist records parent implementation, focused docs-hygiene coverage, full validation, review findings addressed, and no open local checklist obligations; reviewed 6 local packet/spec/mirror files for linear-1856398b-7746-4d07-af6b-4ad207ffe2b9; retain this row as terminal history for route co-429-completed-lane-registry-residue, not as active docs freshness debt."
     },
     {
       "path": "docs/TECH_SPEC-linear-1c101ebc-4b86-4c1f-b04d-0455e50fbacb.md",
@@ -29214,8 +29395,9 @@
       "path": "docs/TECH_SPEC-linear-358ad1ac-46e4-4eaa-a610-b983dac28aba.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-04-26",
-      "cadence_days": 30
+      "last_review": "2026-05-31",
+      "cadence_days": 30,
+      "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: local packet remains non-terminal because 2 open checklist item(s) remain; sample: tasks/tasks-linear-358ad1ac-46e4-4eaa-a610-b983dac28aba.md:53 - [ ] Parent updates Linear workpad with current docs/implementation/validation status. Evidence: pending final parent refresh.; reviewed 6 local packet/spec/mirror files for linear-358ad1ac-46e4-4eaa-a610-b983dac28aba; keep status active and cadence_days 30 after evidence review for route co-429-completed-lane-registry-residue."
     },
     {
       "path": "docs/TECH_SPEC-linear-37c1035e-d319-4306-8a41-648f2ab836e6.md",
@@ -29230,6 +29412,23 @@
       "status": "archived",
       "last_review": "2026-05-13",
       "cadence_days": 365
+    },
+    {
+      "path": "docs/TECH_SPEC-linear-38f28b8d-bed2-42b8-b07c-d782c13da0c2.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-31",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "38f28b8d-bed2-42b8-b07c-d782c13da0c2",
+        "identifier": "CO-588",
+        "url": "https://linear.app/asabeko/issue/CO-588"
+      },
+      "doc_class": "task_packet",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-31",
+      "next_review": "2026-06-30",
+      "notes": "CO-588 consolidated control lane packet for reducing Linear/token fanout, preserving WIP under 4, keeping CO-579 passive non-terminal docs:freshness:maintain owner, keeping CO-490 blocked absent fresh cloud evidence, and delegating bounded execution streams."
     },
     {
       "path": "docs/TECH_SPEC-linear-39a559e9-8da2-444d-93e6-2c3ad216f730.md",
@@ -29265,8 +29464,9 @@
       "path": "docs/TECH_SPEC-linear-3b516fb7-dd94-4ca6-abb9-81edf906a1ba.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-04-27",
-      "cadence_days": 30
+      "last_review": "2026-05-31",
+      "cadence_days": 30,
+      "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: local packet remains non-terminal because 14 open checklist item(s) remain; sample: .agent/task/linear-3b516fb7-dd94-4ca6-abb9-81edf906a1ba.md:34 - [ ] Parent reconciles live CO-397 Linear issue context before implementation.; reviewed 6 local packet/spec/mirror files for linear-3b516fb7-dd94-4ca6-abb9-81edf906a1ba; keep status active and cadence_days 30 after evidence review for route co-429-completed-lane-registry-residue."
     },
     {
       "path": "docs/TECH_SPEC-linear-3c52bf66-f805-4537-8671-ad1dec2f4623.md",
@@ -29413,8 +29613,9 @@
       "path": "docs/TECH_SPEC-linear-488135bf-954e-4bd9-be7a-ad09d75f5f29.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-04-27",
-      "cadence_days": 30
+      "last_review": "2026-05-31",
+      "cadence_days": 30,
+      "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: local packet remains non-terminal because 2 open checklist item(s) remain; sample: .agent/task/linear-488135bf-954e-4bd9-be7a-ad09d75f5f29.md:10 - [ ] PR checks / ready-review quiet window green.; reviewed 6 local packet/spec/mirror files for linear-488135bf-954e-4bd9-be7a-ad09d75f5f29; keep status active and cadence_days 30 after evidence review for route co-429-completed-lane-registry-residue."
     },
     {
       "path": "docs/TECH_SPEC-linear-49206921-3c8d-4db6-bfd9-62414509e96a.md",
@@ -29749,8 +29950,9 @@
       "path": "docs/TECH_SPEC-linear-5ef45396-4546-4699-9d4a-c69fb9179868.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-04-27",
-      "cadence_days": 30
+      "last_review": "2026-05-31",
+      "cadence_days": 30,
+      "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: local packet remains non-terminal because 2 open checklist item(s) remain; sample: .agent/task/linear-5ef45396-4546-4699-9d4a-c69fb9179868.md:47 - [ ] PR checks and ready-review drain before Linear review handoff.; reviewed 6 local packet/spec/mirror files for linear-5ef45396-4546-4699-9d4a-c69fb9179868; keep status active and cadence_days 30 after evidence review for route co-429-completed-lane-registry-residue."
     },
     {
       "path": "docs/TECH_SPEC-linear-5f2ebb52-e5f5-4367-84e2-4039ba031b26.md",
@@ -30249,9 +30451,12 @@
     {
       "path": "docs/TECH_SPEC-linear-7da2cd4d-977e-450a-b056-307edf560fe0.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-26",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-31",
+      "cadence_days": 365,
+      "task_status": "done",
+      "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: task checklist records docs hygiene/freshness validation, docs:freshness:maintain, spec-guard, standalone review, elegance review, and no open local checklist obligations; reviewed 6 local packet/spec/mirror files for linear-7da2cd4d-977e-450a-b056-307edf560fe0; retain this row as terminal history for route co-429-completed-lane-registry-residue, not as active docs freshness debt.",
+      "retained_reason": "CO-588 2026-05-31 policy-over-budget cohort remediation: task checklist records docs hygiene/freshness validation, docs:freshness:maintain, spec-guard, standalone review, elegance review, and no open local checklist obligations; reviewed 6 local packet/spec/mirror files for linear-7da2cd4d-977e-450a-b056-307edf560fe0; retain this row as terminal history for route co-429-completed-lane-registry-residue, not as active docs freshness debt."
     },
     {
       "path": "docs/TECH_SPEC-linear-7e4ab467-3252-417b-8832-21d6f9b49b18.md",
@@ -30353,9 +30558,12 @@
     {
       "path": "docs/TECH_SPEC-linear-86da539a-e106-44d9-87ea-759281a00a81.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-27",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-31",
+      "cadence_days": 365,
+      "task_status": "done",
+      "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: task spec declares status done and task checklist records validation floor, review gate, elegance pass, and no open local checklist obligations; reviewed 6 local packet/spec/mirror files for linear-86da539a-e106-44d9-87ea-759281a00a81; retain this row as terminal history for route co-429-completed-lane-registry-residue, not as active docs freshness debt.",
+      "retained_reason": "CO-588 2026-05-31 policy-over-budget cohort remediation: task spec declares status done and task checklist records validation floor, review gate, elegance pass, and no open local checklist obligations; reviewed 6 local packet/spec/mirror files for linear-86da539a-e106-44d9-87ea-759281a00a81; retain this row as terminal history for route co-429-completed-lane-registry-residue, not as active docs freshness debt."
     },
     {
       "path": "docs/TECH_SPEC-linear-8720424f-56b0-4539-bebe-041c759fcb74.md",
@@ -30385,9 +30593,12 @@
     {
       "path": "docs/TECH_SPEC-linear-88401e48-8112-4817-a7ee-dd4f23241a2b.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-26",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-31",
+      "cadence_days": 365,
+      "task_status": "done",
+      "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: task checklist records policy implementation, follow-up mapping, docs gates, standalone review, elegance review, and no open local checklist obligations; reviewed 6 local packet/spec/mirror files for linear-88401e48-8112-4817-a7ee-dd4f23241a2b; retain this row as terminal history for route co-429-completed-lane-registry-residue, not as active docs freshness debt.",
+      "retained_reason": "CO-588 2026-05-31 policy-over-budget cohort remediation: task checklist records policy implementation, follow-up mapping, docs gates, standalone review, elegance review, and no open local checklist obligations; reviewed 6 local packet/spec/mirror files for linear-88401e48-8112-4817-a7ee-dd4f23241a2b; retain this row as terminal history for route co-429-completed-lane-registry-residue, not as active docs freshness debt."
     },
     {
       "path": "docs/TECH_SPEC-linear-88a7529f-c7fa-443d-8b64-87b6b45ef312.md",
@@ -30593,8 +30804,9 @@
       "path": "docs/TECH_SPEC-linear-9473c8b2-3fcb-48e6-8fd1-d3993dd3caa7.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-04-26",
-      "cadence_days": 30
+      "last_review": "2026-05-31",
+      "cadence_days": 30,
+      "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: local packet remains non-terminal because 20 open checklist item(s) remain; sample: .agent/task/linear-9473c8b2-3fcb-48e6-8fd1-d3993dd3caa7.md:23 - [ ] Parent docs-review confirms the packet is not narrower than CO-381.; reviewed 6 local packet/spec/mirror files for linear-9473c8b2-3fcb-48e6-8fd1-d3993dd3caa7; keep status active and cadence_days 30 after evidence review for route co-429-completed-lane-registry-residue."
     },
     {
       "path": "docs/TECH_SPEC-linear-94e9697f-2424-4883-b408-a83233e360fa.md",
@@ -30635,8 +30847,9 @@
       "path": "docs/TECH_SPEC-linear-964ca955-cf9b-4d1b-887b-4d3bb49069d8.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-04-27",
-      "cadence_days": 30
+      "last_review": "2026-05-31",
+      "cadence_days": 30,
+      "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: local packet remains non-terminal because 6 open checklist item(s) remain; sample: .agent/task/linear-964ca955-cf9b-4d1b-887b-4d3bb49069d8.md:41 - [ ] Latest `origin/main` merged into the branch before review-state transition. Evidence: branch started from `origin/main` `49d888416`; pre-handoff merge still pending after implementation.; reviewed 6 local packet/spec/mirror files for linear-964ca955-cf9b-4d1b-887b-4d3bb49069d8; keep status active and cadence_days 30 after evidence review for route co-429-completed-lane-registry-residue."
     },
     {
       "path": "docs/TECH_SPEC-linear-975669a4-3804-4b5b-9a7b-e1b7c77d3926.md",
@@ -31127,8 +31340,9 @@
       "path": "docs/TECH_SPEC-linear-b131706d-e40f-42db-8f29-9f1ddd636187.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-04-26",
-      "cadence_days": 30
+      "last_review": "2026-05-31",
+      "cadence_days": 30,
+      "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: local packet remains non-terminal because 2 open checklist item(s) remain; sample: .agent/task/linear-b131706d-e40f-42db-8f29-9f1ddd636187.md:43 - [ ] PR attach and ready-review drain before review transition; reviewed 6 local packet/spec/mirror files for linear-b131706d-e40f-42db-8f29-9f1ddd636187; keep status active and cadence_days 30 after evidence review for route co-429-completed-lane-registry-residue."
     },
     {
       "path": "docs/TECH_SPEC-linear-b1835ea5-3d28-493a-934e-1b38048270ce.md",
@@ -31186,8 +31400,9 @@
       "path": "docs/TECH_SPEC-linear-b7074b86-3d38-4dfe-baa9-73b2cc8d686f.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-04-26",
-      "cadence_days": 30
+      "last_review": "2026-05-31",
+      "cadence_days": 30,
+      "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: local packet remains non-terminal because 4 open checklist item(s) remain; sample: .agent/task/linear-b7074b86-3d38-4dfe-baa9-73b2cc8d686f.md:36 - [ ] Parent reconciles against authoritative Linear issue/workpad state and CO-386 template. Evidence: pending parent lane.; reviewed 6 local packet/spec/mirror files for linear-b7074b86-3d38-4dfe-baa9-73b2cc8d686f; keep status active and cadence_days 30 after evidence review for route co-429-completed-lane-registry-residue."
     },
     {
       "path": "docs/TECH_SPEC-linear-b7381274-d6eb-4886-86f4-3976b154c26d.md",
@@ -31694,8 +31909,9 @@
       "path": "docs/TECH_SPEC-linear-d9cbfbc7-d653-463e-bf2a-878f0feac52f.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-04-26",
-      "cadence_days": 30
+      "last_review": "2026-05-31",
+      "cadence_days": 30,
+      "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: local packet remains non-terminal because 2 open checklist item(s) remain; sample: .agent/task/linear-d9cbfbc7-d653-463e-bf2a-878f0feac52f.md:20 - [ ] PR attached, automated feedback drain clean, and Linear moved to `In Review` only after required checks are green.; reviewed 6 local packet/spec/mirror files for linear-d9cbfbc7-d653-463e-bf2a-878f0feac52f; keep status active and cadence_days 30 after evidence review for route co-429-completed-lane-registry-residue."
     },
     {
       "path": "docs/TECH_SPEC-linear-da009c42-d0fc-4834-be72-f977a778693c.md",
@@ -31715,8 +31931,9 @@
       "path": "docs/TECH_SPEC-linear-da290822-55a2-4794-8caa-3a6f1d9c3eff.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-04-27",
-      "cadence_days": 30
+      "last_review": "2026-05-31",
+      "cadence_days": 30,
+      "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: local packet remains non-terminal because 4 open checklist item(s) remain; sample: .agent/task/linear-da290822-55a2-4794-8caa-3a6f1d9c3eff.md:11 - [ ] Address current PR feedback, rerun touched-surface validation, and regain a clean `pr ready-review` quiet window.; reviewed 6 local packet/spec/mirror files for linear-da290822-55a2-4794-8caa-3a6f1d9c3eff; keep status active and cadence_days 30 after evidence review for route co-429-completed-lane-registry-residue."
     },
     {
       "path": "docs/TECH_SPEC-linear-dbddac50-c205-4402-a7a5-e2325a9c4373.md",
@@ -31802,8 +32019,9 @@
       "path": "docs/TECH_SPEC-linear-df2bd49b-2dd6-413f-8d90-af40d033dace.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-04-26",
-      "cadence_days": 30
+      "last_review": "2026-05-31",
+      "cadence_days": 30,
+      "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: local packet remains non-terminal because 8 open checklist item(s) remain; sample: .agent/task/linear-df2bd49b-2dd6-413f-8d90-af40d033dace.md:37 - [ ] `npm run test`. Blocked by unrelated existing failures in `orchestrator/tests/Doctor.test.ts` and `orchestrator/tests/RuntimeProvider.test.ts`; the rerun still failed there while the focused Linear slice remained green.; reviewed 6 local packet/spec/mirror files for linear-df2bd49b-2dd6-413f-8d90-af40d033dace; keep status active and cadence_days 30 after evidence review for route co-429-completed-lane-registry-residue."
     },
     {
       "path": "docs/TECH_SPEC-linear-df57f3cf-2e2e-4d29-a484-a8f3cd92e7c5.md",
@@ -31890,8 +32108,9 @@
       "path": "docs/TECH_SPEC-linear-e6039710-4596-45b2-a268-53bfa3cb2ac9.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-04-27",
-      "cadence_days": 30
+      "last_review": "2026-05-31",
+      "cadence_days": 30,
+      "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: local packet remains non-terminal because 4 open checklist item(s) remain; sample: .agent/task/linear-e6039710-4596-45b2-a268-53bfa3cb2ac9.md:36 - [ ] Parent records terminal PR and ready-review handoff evidence.; reviewed 6 local packet/spec/mirror files for linear-e6039710-4596-45b2-a268-53bfa3cb2ac9; keep status active and cadence_days 30 after evidence review for route co-429-completed-lane-registry-residue."
     },
     {
       "path": "docs/TECH_SPEC-linear-e8f55d3d-1975-4da0-9b33-4307f7d63a08.md",
@@ -31914,8 +32133,9 @@
       "path": "docs/TECH_SPEC-linear-e913b2ab-2be9-4891-bf54-0ac4642ba012.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-04-27",
-      "cadence_days": 30
+      "last_review": "2026-05-31",
+      "cadence_days": 30,
+      "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: local packet remains non-terminal because 6 open checklist item(s) remain; sample: .agent/task/linear-e913b2ab-2be9-4891-bf54-0ac4642ba012.md:43 - [ ] Open PR for `CO-8`, attach it to Linear, handle feedback, and wait for required checks to reach terminal green.; reviewed 6 local packet/spec/mirror files for linear-e913b2ab-2be9-4891-bf54-0ac4642ba012; keep status active and cadence_days 30 after evidence review for route co-429-completed-lane-registry-residue."
     },
     {
       "path": "docs/TECH_SPEC-linear-e934e6ea-8fdd-480c-9656-22c020cb19cf.md",
@@ -31982,8 +32202,9 @@
       "path": "docs/TECH_SPEC-linear-f04ab1c2-79e6-4a98-84e1-85efb6583116.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-04-27",
-      "cadence_days": 30
+      "last_review": "2026-05-31",
+      "cadence_days": 30,
+      "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: local packet remains non-terminal because 2 open checklist item(s) remain; sample: .agent/task/linear-f04ab1c2-79e6-4a98-84e1-85efb6583116.md:41 - [ ] Parent records terminal PR and ready-review handoff evidence.; reviewed 6 local packet/spec/mirror files for linear-f04ab1c2-79e6-4a98-84e1-85efb6583116; keep status active and cadence_days 30 after evidence review for route co-429-completed-lane-registry-residue."
     },
     {
       "path": "docs/TECH_SPEC-linear-f0d312eb-055f-4926-80df-8fcaaf56839c.md",
@@ -32108,8 +32329,9 @@
       "path": "docs/TECH_SPEC-linear-f76b2a52-f0a5-4145-8d21-3e4f23a98d25.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-04-26",
-      "cadence_days": 30
+      "last_review": "2026-05-31",
+      "cadence_days": 30,
+      "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: local packet remains non-terminal because 2 open checklist item(s) remain; sample: .agent/task/linear-f76b2a52-f0a5-4145-8d21-3e4f23a98d25.md:36 - [ ] PR ready-review drain completes before review transition.; reviewed 6 local packet/spec/mirror files for linear-f76b2a52-f0a5-4145-8d21-3e4f23a98d25; keep status active and cadence_days 30 after evidence review for route co-429-completed-lane-registry-residue."
     },
     {
       "path": "docs/TECH_SPEC-linear-f79825fb-1b0a-46a9-89ec-77738e8ae4c8.md",
@@ -32145,9 +32367,12 @@
     {
       "path": "docs/TECH_SPEC-linear-f838cbde-8bb6-46de-bde2-b749f2e64422.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-26",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-31",
+      "cadence_days": 365,
+      "task_status": "done",
+      "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: task checklist records full validation chain, clean standalone review, elegance pass, and no open local checklist obligations; reviewed 6 local packet/spec/mirror files for linear-f838cbde-8bb6-46de-bde2-b749f2e64422; retain this row as terminal history for route co-429-completed-lane-registry-residue, not as active docs freshness debt.",
+      "retained_reason": "CO-588 2026-05-31 policy-over-budget cohort remediation: task checklist records full validation chain, clean standalone review, elegance pass, and no open local checklist obligations; reviewed 6 local packet/spec/mirror files for linear-f838cbde-8bb6-46de-bde2-b749f2e64422; retain this row as terminal history for route co-429-completed-lane-registry-residue, not as active docs freshness debt."
     },
     {
       "path": "docs/TECH_SPEC-linear-f88846f3-24be-48b6-a983-087613fd8f82.md",
@@ -32174,8 +32399,9 @@
       "path": "docs/TECH_SPEC-linear-fb31f0d5-56c4-4f56-8faa-1e4ef63a705a.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-04-26",
-      "cadence_days": 30
+      "last_review": "2026-05-31",
+      "cadence_days": 30,
+      "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: local packet remains non-terminal because 1 open checklist item(s) remain; sample: tasks/tasks-linear-fb31f0d5-56c4-4f56-8faa-1e4ef63a705a.md:43 - [ ] PR attached and `pr ready-review` drain clean before transition to `In Review`.; reviewed 6 local packet/spec/mirror files for linear-fb31f0d5-56c4-4f56-8faa-1e4ef63a705a; keep status active and cadence_days 30 after evidence review for route co-429-completed-lane-registry-residue."
     },
     {
       "path": "docs/TECH_SPEC-linear-fb4c95d0-da68-4312-b3bb-3bd6282aa79f.md",
@@ -32205,8 +32431,9 @@
       "path": "docs/TECH_SPEC-linear-fd05f8a0-420a-4313-a462-690881c0a45c.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-04-27",
-      "cadence_days": 30
+      "last_review": "2026-05-31",
+      "cadence_days": 30,
+      "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: local packet remains non-terminal because 4 open checklist item(s) remain; sample: .agent/task/linear-fd05f8a0-420a-4313-a462-690881c0a45c.md:57 - [ ] Parent reconciles live CO-399 Linear issue context before implementation.; reviewed 6 local packet/spec/mirror files for linear-fd05f8a0-420a-4313-a462-690881c0a45c; keep status active and cadence_days 30 after evidence review for route co-429-completed-lane-registry-residue."
     },
     {
       "path": "docs/TECH_SPEC-linear-fd4bf705-11a9-4717-948c-addfb4fa3f83.md",
@@ -32883,7 +33110,7 @@
       "path": "tasks/specs/0105-rlm-orchestrator.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-05-06",
+      "last_review": "2026-05-31",
       "cadence_days": 90
     },
     {
@@ -36320,7 +36547,7 @@
       "path": "tasks/specs/linear-0394e0bd-c929-4bb5-9dac-12e22080dfbd.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-05-05",
+      "last_review": "2026-05-31",
       "cadence_days": 30
     },
     {
@@ -36358,14 +36585,14 @@
       "path": "tasks/specs/linear-07d1fdee-8a77-4a7f-90fc-0a13fd96c675.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-05-08",
+      "last_review": "2026-05-31",
       "cadence_days": 30
     },
     {
       "path": "tasks/specs/linear-07fdd989-5c10-4b24-ab5d-10fa9bf3732f.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-05-05",
+      "last_review": "2026-05-31",
       "cadence_days": 30
     },
     {
@@ -36590,7 +36817,7 @@
       "path": "tasks/specs/linear-1d32d63d-a4f1-4817-82e4-8dc90c26074d.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-05-06",
+      "last_review": "2026-05-31",
       "cadence_days": 30
     },
     {
@@ -36644,7 +36871,7 @@
       "path": "tasks/specs/linear-203c5fad-698f-4094-970c-06de5743d94c.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-05-07",
+      "last_review": "2026-05-31",
       "cadence_days": 30
     },
     {
@@ -36677,7 +36904,7 @@
       "path": "tasks/specs/linear-217c6584-bb47-486a-9765-f24e8ed84fc0.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-05-05",
+      "last_review": "2026-05-31",
       "cadence_days": 30
     },
     {
@@ -36948,6 +37175,23 @@
       "status": "archived",
       "last_review": "2026-05-12",
       "cadence_days": 365
+    },
+    {
+      "path": "tasks/specs/linear-38f28b8d-bed2-42b8-b07c-d782c13da0c2-co-consolidated-orchestration-for-co-backlog-completion.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-31",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "38f28b8d-bed2-42b8-b07c-d782c13da0c2",
+        "identifier": "CO-588",
+        "url": "https://linear.app/asabeko/issue/CO-588"
+      },
+      "doc_class": "task_packet",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-31",
+      "next_review": "2026-06-30",
+      "notes": "CO-588 consolidated control lane packet for reducing Linear/token fanout, preserving WIP under 4, keeping CO-579 passive non-terminal docs:freshness:maintain owner, keeping CO-490 blocked absent fresh cloud evidence, and delegating bounded execution streams."
     },
     {
       "path": "tasks/specs/linear-39a559e9-8da2-444d-93e6-2c3ad216f730.md",
@@ -37241,7 +37485,7 @@
       "path": "tasks/specs/linear-4f1c9a00-e231-4cc1-a7a3-28081ef1abd5.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-05-06",
+      "last_review": "2026-05-31",
       "cadence_days": 30
     },
     {
@@ -37550,7 +37794,7 @@
       "path": "tasks/specs/linear-62d5261d-b0ee-4988-9f02-43b3e1c85bde.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-05-05",
+      "last_review": "2026-05-31",
       "cadence_days": 30
     },
     {
@@ -37574,7 +37818,7 @@
       "path": "tasks/specs/linear-63b806b8-2a46-48ff-b330-eeee2f0038dd.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-05-07",
+      "last_review": "2026-05-31",
       "cadence_days": 30
     },
     {
@@ -37640,7 +37884,7 @@
       "path": "tasks/specs/linear-6a0e9f8a-80e2-4513-a2e9-13493c19c0c8.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-05-05",
+      "last_review": "2026-05-31",
       "cadence_days": 30
     },
     {
@@ -37860,7 +38104,7 @@
       "path": "tasks/specs/linear-74fe39e5-8c8e-445c-8f24-486446521f72.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-05-05",
+      "last_review": "2026-05-31",
       "cadence_days": 30
     },
     {
@@ -37888,7 +38132,7 @@
       "path": "tasks/specs/linear-779bc931-f6b4-4a1c-b16f-145d500aca73.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-05-07",
+      "last_review": "2026-05-31",
       "cadence_days": 30
     },
     {
@@ -37980,7 +38224,7 @@
       "path": "tasks/specs/linear-7b8e48c8-3971-42ab-b779-949d810d4e6c.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-05-05",
+      "last_review": "2026-05-31",
       "cadence_days": 30
     },
     {
@@ -38016,7 +38260,7 @@
       "path": "tasks/specs/linear-7e4ab467-3252-417b-8832-21d6f9b49b18.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-05-05",
+      "last_review": "2026-05-31",
       "cadence_days": 30
     },
     {
@@ -38340,7 +38584,7 @@
       "path": "tasks/specs/linear-937a5264-87ce-47fa-a932-f940d70c6600.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-05-05",
+      "last_review": "2026-05-31",
       "cadence_days": 30
     },
     {
@@ -38354,7 +38598,7 @@
       "path": "tasks/specs/linear-93f80950-06e5-41f2-9186-f4877e69f563.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-05-07",
+      "last_review": "2026-05-31",
       "cadence_days": 30
     },
     {
@@ -38397,7 +38641,7 @@
       "path": "tasks/specs/linear-95f1c334-e623-471e-a013-d7019feed423.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-05-08",
+      "last_review": "2026-05-31",
       "cadence_days": 30
     },
     {
@@ -38436,7 +38680,7 @@
       "path": "tasks/specs/linear-9801241f-83b0-4f73-93f4-43eb62e3fe36.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-05-05",
+      "last_review": "2026-05-31",
       "cadence_days": 30
     },
     {
@@ -38630,7 +38874,7 @@
       "path": "tasks/specs/linear-a243025f-d1e4-4960-ac11-ddc1b9806ffe.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-05-05",
+      "last_review": "2026-05-31",
       "cadence_days": 30
     },
     {
@@ -39572,7 +39816,7 @@
       "path": "tasks/specs/linear-dd2af462-08ae-4ea2-aa53-92000f06952a.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-05-05",
+      "last_review": "2026-05-31",
       "cadence_days": 30
     },
     {
@@ -39608,7 +39852,7 @@
       "path": "tasks/specs/linear-df57f3cf-2e2e-4d29-a484-a8f3cd92e7c5.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-05-07",
+      "last_review": "2026-05-31",
       "cadence_days": 30
     },
     {
@@ -39625,7 +39869,7 @@
       "path": "tasks/specs/linear-e09ce1db-e2f8-4fe7-9509-9f61a02f4844.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-05-08",
+      "last_review": "2026-05-31",
       "cadence_days": 30
     },
     {
@@ -39848,7 +40092,7 @@
       "path": "tasks/specs/linear-f3aec8da-23c6-459e-acba-a5045b404c7f.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-05-06",
+      "last_review": "2026-05-31",
       "cadence_days": 30
     },
     {
@@ -39917,7 +40161,7 @@
       "path": "tasks/specs/linear-f71992e3-ddda-4198-b43c-97ccb36908cf.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-05-08",
+      "last_review": "2026-05-31",
       "cadence_days": 30
     },
     {
@@ -39971,7 +40215,7 @@
       "path": "tasks/specs/linear-f88846f3-24be-48b6-a983-087613fd8f82.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-05-05",
+      "last_review": "2026-05-31",
       "cadence_days": 30
     },
     {
@@ -43634,8 +43878,9 @@
       "path": "tasks/tasks-co-361-first-post-v0-2-0-release-prep.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-04-26",
-      "cadence_days": 30
+      "last_review": "2026-05-31",
+      "cadence_days": 30,
+      "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: local packet remains active because local metadata is not terminal (task spec status in_progress); reviewed 6 local packet/spec/mirror files for co-361-first-post-v0-2-0-release-prep; keep status active and cadence_days 30 after evidence review for route co-429-completed-lane-registry-residue."
     },
     {
       "path": "tasks/tasks-linear-0001b15c-e8cc-4ce9-ad45-c898e326420e.md",
@@ -43664,8 +43909,9 @@
       "path": "tasks/tasks-linear-013cb593-b45d-4623-a75d-bc0945510518.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-04-26",
-      "cadence_days": 30
+      "last_review": "2026-05-31",
+      "cadence_days": 30,
+      "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: local packet remains non-terminal because 32 open checklist item(s) remain; sample: .agent/task/linear-013cb593-b45d-4623-a75d-bc0945510518.md:34 - [ ] Parent adds read-only advisory to the doctor checkout-posture surface, `co-status`, or shared equivalent. Evidence: parent-owned.; reviewed 6 local packet/spec/mirror files for linear-013cb593-b45d-4623-a75d-bc0945510518; keep status active and cadence_days 30 after evidence review for route co-429-completed-lane-registry-residue."
     },
     {
       "path": "tasks/tasks-linear-01e21df6-6438-4246-a423-a686f6020c5e.md",
@@ -43701,8 +43947,9 @@
       "path": "tasks/tasks-linear-0354e9d0-84ee-4340-b098-a9c685c191b5.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-04-27",
-      "cadence_days": 30
+      "last_review": "2026-05-31",
+      "cadence_days": 30,
+      "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: local packet remains non-terminal because 4 open checklist item(s) remain; sample: tasks/tasks-linear-0354e9d0-84ee-4340-b098-a9c685c191b5.md:20 - [ ] Docs freshness: unrelated March 28 baseline tracked by CO-410.; reviewed 6 local packet/spec/mirror files for linear-0354e9d0-84ee-4340-b098-a9c685c191b5; keep status active and cadence_days 30 after evidence review for route co-429-completed-lane-registry-residue."
     },
     {
       "path": "tasks/tasks-linear-03561618-a006-41f3-808b-617e5562fe9b.md",
@@ -43819,8 +44066,9 @@
       "path": "tasks/tasks-linear-0b2377a2-366f-4309-a508-610e524c9d94.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-04-26",
-      "cadence_days": 30
+      "last_review": "2026-05-31",
+      "cadence_days": 30,
+      "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: local packet remains non-terminal because 1 open checklist item(s) remain; sample: tasks/tasks-linear-0b2377a2-366f-4309-a508-610e524c9d94.md:23 - [ ] PR #698 ready-review drain clean.; reviewed 6 local packet/spec/mirror files for linear-0b2377a2-366f-4309-a508-610e524c9d94; keep status active and cadence_days 30 after evidence review for route co-429-completed-lane-registry-residue."
     },
     {
       "path": "tasks/tasks-linear-0b49c08c-5cfc-46b5-b34c-ec7d3dece5e0.md",
@@ -43912,8 +44160,9 @@
       "path": "tasks/tasks-linear-1383a1c1-3937-4eb9-b205-050d299e85d5.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-04-26",
-      "cadence_days": 30
+      "last_review": "2026-05-31",
+      "cadence_days": 30,
+      "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: local packet remains non-terminal because 2 open checklist item(s) remain; sample: .agent/task/linear-1383a1c1-3937-4eb9-b205-050d299e85d5.md:19 - [ ] PR attached and ready-review drain completed before `In Review`.; reviewed 6 local packet/spec/mirror files for linear-1383a1c1-3937-4eb9-b205-050d299e85d5; keep status active and cadence_days 30 after evidence review for route co-429-completed-lane-registry-residue."
     },
     {
       "path": "tasks/tasks-linear-156d7133-00ba-40be-bd35-67cd3ae46e21.md",
@@ -43960,9 +44209,12 @@
     {
       "path": "tasks/tasks-linear-1856398b-7746-4d07-af6b-4ad207ffe2b9.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-26",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-31",
+      "cadence_days": 365,
+      "task_status": "done",
+      "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: task checklist records parent implementation, focused docs-hygiene coverage, full validation, review findings addressed, and no open local checklist obligations; reviewed 6 local packet/spec/mirror files for linear-1856398b-7746-4d07-af6b-4ad207ffe2b9; retain this row as terminal history for route co-429-completed-lane-registry-residue, not as active docs freshness debt.",
+      "retained_reason": "CO-588 2026-05-31 policy-over-budget cohort remediation: task checklist records parent implementation, focused docs-hygiene coverage, full validation, review findings addressed, and no open local checklist obligations; reviewed 6 local packet/spec/mirror files for linear-1856398b-7746-4d07-af6b-4ad207ffe2b9; retain this row as terminal history for route co-429-completed-lane-registry-residue, not as active docs freshness debt."
     },
     {
       "path": "tasks/tasks-linear-1c101ebc-4b86-4c1f-b04d-0455e50fbacb.md",
@@ -44330,8 +44582,9 @@
       "path": "tasks/tasks-linear-358ad1ac-46e4-4eaa-a610-b983dac28aba.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-04-26",
-      "cadence_days": 30
+      "last_review": "2026-05-31",
+      "cadence_days": 30,
+      "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: local packet remains non-terminal because 2 open checklist item(s) remain; sample: tasks/tasks-linear-358ad1ac-46e4-4eaa-a610-b983dac28aba.md:53 - [ ] Parent updates Linear workpad with current docs/implementation/validation status. Evidence: pending final parent refresh.; reviewed 6 local packet/spec/mirror files for linear-358ad1ac-46e4-4eaa-a610-b983dac28aba; keep status active and cadence_days 30 after evidence review for route co-429-completed-lane-registry-residue."
     },
     {
       "path": "tasks/tasks-linear-37c1035e-d319-4306-8a41-648f2ab836e6.md",
@@ -44346,6 +44599,23 @@
       "status": "archived",
       "last_review": "2026-05-13",
       "cadence_days": 365
+    },
+    {
+      "path": "tasks/tasks-linear-38f28b8d-bed2-42b8-b07c-d782c13da0c2.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-31",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "38f28b8d-bed2-42b8-b07c-d782c13da0c2",
+        "identifier": "CO-588",
+        "url": "https://linear.app/asabeko/issue/CO-588"
+      },
+      "doc_class": "task_mirror",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-31",
+      "next_review": "2026-06-30",
+      "notes": "CO-588 consolidated control lane packet for reducing Linear/token fanout, preserving WIP under 4, keeping CO-579 passive non-terminal docs:freshness:maintain owner, keeping CO-490 blocked absent fresh cloud evidence, and delegating bounded execution streams."
     },
     {
       "path": "tasks/tasks-linear-39a559e9-8da2-444d-93e6-2c3ad216f730.md",
@@ -44381,8 +44651,9 @@
       "path": "tasks/tasks-linear-3b516fb7-dd94-4ca6-abb9-81edf906a1ba.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-04-27",
-      "cadence_days": 30
+      "last_review": "2026-05-31",
+      "cadence_days": 30,
+      "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: local packet remains non-terminal because 14 open checklist item(s) remain; sample: .agent/task/linear-3b516fb7-dd94-4ca6-abb9-81edf906a1ba.md:34 - [ ] Parent reconciles live CO-397 Linear issue context before implementation.; reviewed 6 local packet/spec/mirror files for linear-3b516fb7-dd94-4ca6-abb9-81edf906a1ba; keep status active and cadence_days 30 after evidence review for route co-429-completed-lane-registry-residue."
     },
     {
       "path": "tasks/tasks-linear-3c52bf66-f805-4537-8671-ad1dec2f4623.md",
@@ -44527,8 +44798,9 @@
       "path": "tasks/tasks-linear-488135bf-954e-4bd9-be7a-ad09d75f5f29.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-04-27",
-      "cadence_days": 30
+      "last_review": "2026-05-31",
+      "cadence_days": 30,
+      "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: local packet remains non-terminal because 2 open checklist item(s) remain; sample: .agent/task/linear-488135bf-954e-4bd9-be7a-ad09d75f5f29.md:10 - [ ] PR checks / ready-review quiet window green.; reviewed 6 local packet/spec/mirror files for linear-488135bf-954e-4bd9-be7a-ad09d75f5f29; keep status active and cadence_days 30 after evidence review for route co-429-completed-lane-registry-residue."
     },
     {
       "path": "tasks/tasks-linear-49206921-3c8d-4db6-bfd9-62414509e96a.md",
@@ -44876,8 +45148,9 @@
       "path": "tasks/tasks-linear-5ef45396-4546-4699-9d4a-c69fb9179868.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-04-27",
-      "cadence_days": 30
+      "last_review": "2026-05-31",
+      "cadence_days": 30,
+      "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: local packet remains non-terminal because 2 open checklist item(s) remain; sample: .agent/task/linear-5ef45396-4546-4699-9d4a-c69fb9179868.md:47 - [ ] PR checks and ready-review drain before Linear review handoff.; reviewed 6 local packet/spec/mirror files for linear-5ef45396-4546-4699-9d4a-c69fb9179868; keep status active and cadence_days 30 after evidence review for route co-429-completed-lane-registry-residue."
     },
     {
       "path": "tasks/tasks-linear-5f2ebb52-e5f5-4367-84e2-4039ba031b26.md",
@@ -44906,8 +45179,9 @@
       "path": "tasks/tasks-linear-612a3dc3-f66f-4ba3-aea9-1282b54d93fe.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-04-26",
-      "cadence_days": 30
+      "last_review": "2026-05-31",
+      "cadence_days": 30,
+      "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: local packet remains non-terminal because 4 open checklist item(s) remain; sample: .agent/task/linear-612a3dc3-f66f-4ba3-aea9-1282b54d93fe.md:28 - [ ] `codex-orchestrator co-status --format json` completes against authenticated `/ui/data.json` while provider workers are active. Evidence: source-level hot-path benchmark passes; live globally supervised after evidence is pending package rollout because the installed LaunchAgent still runs the global package.; reviewed 4 local packet/spec/mirror files for linear-612a3dc3-f66f-4ba3-aea9-1282b54d93fe; keep status active and cadence_days 30 after evidence review for route co-429-completed-lane-registry-residue."
     },
     {
       "path": "tasks/tasks-linear-61ddd0d1-664b-4060-949b-33eb4e7255ac.md",
@@ -45010,8 +45284,9 @@
       "path": "tasks/tasks-linear-67e2ffd2-a653-4d69-9241-5f32c459a682.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-04-26",
-      "cadence_days": 30
+      "last_review": "2026-05-31",
+      "cadence_days": 30,
+      "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: local packet remains non-terminal because 2 open checklist item(s) remain; sample: .agent/task/linear-67e2ffd2-a653-4d69-9241-5f32c459a682.md:42 - [ ] Parent owns PR lifecycle and Linear state.; reviewed 5 local packet/spec/mirror files for linear-67e2ffd2-a653-4d69-9241-5f32c459a682; keep status active and cadence_days 30 after evidence review for route co-429-completed-lane-registry-residue."
     },
     {
       "path": "tasks/tasks-linear-69030f04-cfa5-491b-8928-8f325f00da8d.md",
@@ -45399,9 +45674,12 @@
     {
       "path": "tasks/tasks-linear-7da2cd4d-977e-450a-b056-307edf560fe0.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-26",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-31",
+      "cadence_days": 365,
+      "task_status": "done",
+      "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: task checklist records docs hygiene/freshness validation, docs:freshness:maintain, spec-guard, standalone review, elegance review, and no open local checklist obligations; reviewed 6 local packet/spec/mirror files for linear-7da2cd4d-977e-450a-b056-307edf560fe0; retain this row as terminal history for route co-429-completed-lane-registry-residue, not as active docs freshness debt.",
+      "retained_reason": "CO-588 2026-05-31 policy-over-budget cohort remediation: task checklist records docs hygiene/freshness validation, docs:freshness:maintain, spec-guard, standalone review, elegance review, and no open local checklist obligations; reviewed 6 local packet/spec/mirror files for linear-7da2cd4d-977e-450a-b056-307edf560fe0; retain this row as terminal history for route co-429-completed-lane-registry-residue, not as active docs freshness debt."
     },
     {
       "path": "tasks/tasks-linear-7e4ab467-3252-417b-8832-21d6f9b49b18.md",
@@ -45503,9 +45781,12 @@
     {
       "path": "tasks/tasks-linear-86da539a-e106-44d9-87ea-759281a00a81.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-27",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-31",
+      "cadence_days": 365,
+      "task_status": "done",
+      "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: task spec declares status done and task checklist records validation floor, review gate, elegance pass, and no open local checklist obligations; reviewed 6 local packet/spec/mirror files for linear-86da539a-e106-44d9-87ea-759281a00a81; retain this row as terminal history for route co-429-completed-lane-registry-residue, not as active docs freshness debt.",
+      "retained_reason": "CO-588 2026-05-31 policy-over-budget cohort remediation: task spec declares status done and task checklist records validation floor, review gate, elegance pass, and no open local checklist obligations; reviewed 6 local packet/spec/mirror files for linear-86da539a-e106-44d9-87ea-759281a00a81; retain this row as terminal history for route co-429-completed-lane-registry-residue, not as active docs freshness debt."
     },
     {
       "path": "tasks/tasks-linear-8720424f-56b0-4539-bebe-041c759fcb74.md",
@@ -45533,9 +45814,12 @@
     {
       "path": "tasks/tasks-linear-88401e48-8112-4817-a7ee-dd4f23241a2b.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-26",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-31",
+      "cadence_days": 365,
+      "task_status": "done",
+      "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: task checklist records policy implementation, follow-up mapping, docs gates, standalone review, elegance review, and no open local checklist obligations; reviewed 6 local packet/spec/mirror files for linear-88401e48-8112-4817-a7ee-dd4f23241a2b; retain this row as terminal history for route co-429-completed-lane-registry-residue, not as active docs freshness debt.",
+      "retained_reason": "CO-588 2026-05-31 policy-over-budget cohort remediation: task checklist records policy implementation, follow-up mapping, docs gates, standalone review, elegance review, and no open local checklist obligations; reviewed 6 local packet/spec/mirror files for linear-88401e48-8112-4817-a7ee-dd4f23241a2b; retain this row as terminal history for route co-429-completed-lane-registry-residue, not as active docs freshness debt."
     },
     {
       "path": "tasks/tasks-linear-88a7529f-c7fa-443d-8b64-87b6b45ef312.md",
@@ -45659,8 +45943,9 @@
       "path": "tasks/tasks-linear-902025f4-f954-41e5-9dcb-9c3d2d12741f.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-04-26",
-      "cadence_days": 30
+      "last_review": "2026-05-31",
+      "cadence_days": 30,
+      "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: local packet remains non-terminal because 2 open checklist item(s) remain; sample: tasks/tasks-linear-902025f4-f954-41e5-9dcb-9c3d2d12741f.md:21 - [ ] Parent runs docs-review and records any packet findings before review handoff.; reviewed 4 local packet/spec/mirror files for linear-902025f4-f954-41e5-9dcb-9c3d2d12741f; keep status active and cadence_days 30 after evidence review for route co-429-completed-lane-registry-residue."
     },
     {
       "path": "tasks/tasks-linear-904f74a5-e1b6-4740-a0df-8c92ec73314b.md",
@@ -45748,8 +46033,9 @@
       "path": "tasks/tasks-linear-9473c8b2-3fcb-48e6-8fd1-d3993dd3caa7.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-04-26",
-      "cadence_days": 30
+      "last_review": "2026-05-31",
+      "cadence_days": 30,
+      "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: local packet remains non-terminal because 20 open checklist item(s) remain; sample: .agent/task/linear-9473c8b2-3fcb-48e6-8fd1-d3993dd3caa7.md:23 - [ ] Parent docs-review confirms the packet is not narrower than CO-381.; reviewed 6 local packet/spec/mirror files for linear-9473c8b2-3fcb-48e6-8fd1-d3993dd3caa7; keep status active and cadence_days 30 after evidence review for route co-429-completed-lane-registry-residue."
     },
     {
       "path": "tasks/tasks-linear-94e9697f-2424-4883-b408-a83233e360fa.md",
@@ -45790,8 +46076,9 @@
       "path": "tasks/tasks-linear-964ca955-cf9b-4d1b-887b-4d3bb49069d8.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-04-27",
-      "cadence_days": 30
+      "last_review": "2026-05-31",
+      "cadence_days": 30,
+      "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: local packet remains non-terminal because 6 open checklist item(s) remain; sample: .agent/task/linear-964ca955-cf9b-4d1b-887b-4d3bb49069d8.md:41 - [ ] Latest `origin/main` merged into the branch before review-state transition. Evidence: branch started from `origin/main` `49d888416`; pre-handoff merge still pending after implementation.; reviewed 6 local packet/spec/mirror files for linear-964ca955-cf9b-4d1b-887b-4d3bb49069d8; keep status active and cadence_days 30 after evidence review for route co-429-completed-lane-registry-residue."
     },
     {
       "path": "tasks/tasks-linear-975669a4-3804-4b5b-9a7b-e1b7c77d3926.md",
@@ -46272,8 +46559,9 @@
       "path": "tasks/tasks-linear-b131706d-e40f-42db-8f29-9f1ddd636187.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-04-26",
-      "cadence_days": 30
+      "last_review": "2026-05-31",
+      "cadence_days": 30,
+      "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: local packet remains non-terminal because 2 open checklist item(s) remain; sample: .agent/task/linear-b131706d-e40f-42db-8f29-9f1ddd636187.md:43 - [ ] PR attach and ready-review drain before review transition; reviewed 6 local packet/spec/mirror files for linear-b131706d-e40f-42db-8f29-9f1ddd636187; keep status active and cadence_days 30 after evidence review for route co-429-completed-lane-registry-residue."
     },
     {
       "path": "tasks/tasks-linear-b1835ea5-3d28-493a-934e-1b38048270ce.md",
@@ -46331,8 +46619,9 @@
       "path": "tasks/tasks-linear-b7074b86-3d38-4dfe-baa9-73b2cc8d686f.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-04-26",
-      "cadence_days": 30
+      "last_review": "2026-05-31",
+      "cadence_days": 30,
+      "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: local packet remains non-terminal because 4 open checklist item(s) remain; sample: .agent/task/linear-b7074b86-3d38-4dfe-baa9-73b2cc8d686f.md:36 - [ ] Parent reconciles against authoritative Linear issue/workpad state and CO-386 template. Evidence: pending parent lane.; reviewed 6 local packet/spec/mirror files for linear-b7074b86-3d38-4dfe-baa9-73b2cc8d686f; keep status active and cadence_days 30 after evidence review for route co-429-completed-lane-registry-residue."
     },
     {
       "path": "tasks/tasks-linear-b7381274-d6eb-4886-86f4-3976b154c26d.md",
@@ -46601,8 +46890,9 @@
       "path": "tasks/tasks-linear-c8e3a464-ec50-4fa4-aff5-d8a780626600.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-04-27",
-      "cadence_days": 30
+      "last_review": "2026-05-31",
+      "cadence_days": 30,
+      "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: local packet remains non-terminal because 17 open checklist item(s) remain; sample: .agent/task/linear-c8e3a464-ec50-4fa4-aff5-d8a780626600.md:18 - [ ] Standalone review approval captured - Parent lane owned.; reviewed 5 local packet/spec/mirror files for linear-c8e3a464-ec50-4fa4-aff5-d8a780626600; keep status active and cadence_days 30 after evidence review for route co-429-completed-lane-registry-residue."
     },
     {
       "path": "tasks/tasks-linear-c8f25aac-5bc5-4210-8fc5-a143d6b14df0.md",
@@ -46874,8 +47164,9 @@
       "path": "tasks/tasks-linear-d9cbfbc7-d653-463e-bf2a-878f0feac52f.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-04-26",
-      "cadence_days": 30
+      "last_review": "2026-05-31",
+      "cadence_days": 30,
+      "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: local packet remains non-terminal because 2 open checklist item(s) remain; sample: .agent/task/linear-d9cbfbc7-d653-463e-bf2a-878f0feac52f.md:20 - [ ] PR attached, automated feedback drain clean, and Linear moved to `In Review` only after required checks are green.; reviewed 6 local packet/spec/mirror files for linear-d9cbfbc7-d653-463e-bf2a-878f0feac52f; keep status active and cadence_days 30 after evidence review for route co-429-completed-lane-registry-residue."
     },
     {
       "path": "tasks/tasks-linear-da009c42-d0fc-4834-be72-f977a778693c.md",
@@ -46895,8 +47186,9 @@
       "path": "tasks/tasks-linear-da290822-55a2-4794-8caa-3a6f1d9c3eff.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-04-27",
-      "cadence_days": 30
+      "last_review": "2026-05-31",
+      "cadence_days": 30,
+      "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: local packet remains non-terminal because 4 open checklist item(s) remain; sample: .agent/task/linear-da290822-55a2-4794-8caa-3a6f1d9c3eff.md:11 - [ ] Address current PR feedback, rerun touched-surface validation, and regain a clean `pr ready-review` quiet window.; reviewed 6 local packet/spec/mirror files for linear-da290822-55a2-4794-8caa-3a6f1d9c3eff; keep status active and cadence_days 30 after evidence review for route co-429-completed-lane-registry-residue."
     },
     {
       "path": "tasks/tasks-linear-dbddac50-c205-4402-a7a5-e2325a9c4373.md",
@@ -46982,8 +47274,9 @@
       "path": "tasks/tasks-linear-df2bd49b-2dd6-413f-8d90-af40d033dace.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-04-26",
-      "cadence_days": 30
+      "last_review": "2026-05-31",
+      "cadence_days": 30,
+      "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: local packet remains non-terminal because 8 open checklist item(s) remain; sample: .agent/task/linear-df2bd49b-2dd6-413f-8d90-af40d033dace.md:37 - [ ] `npm run test`. Blocked by unrelated existing failures in `orchestrator/tests/Doctor.test.ts` and `orchestrator/tests/RuntimeProvider.test.ts`; the rerun still failed there while the focused Linear slice remained green.; reviewed 6 local packet/spec/mirror files for linear-df2bd49b-2dd6-413f-8d90-af40d033dace; keep status active and cadence_days 30 after evidence review for route co-429-completed-lane-registry-residue."
     },
     {
       "path": "tasks/tasks-linear-df57f3cf-2e2e-4d29-a484-a8f3cd92e7c5.md",
@@ -47073,8 +47366,9 @@
       "path": "tasks/tasks-linear-e6039710-4596-45b2-a268-53bfa3cb2ac9.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-04-27",
-      "cadence_days": 30
+      "last_review": "2026-05-31",
+      "cadence_days": 30,
+      "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: local packet remains non-terminal because 4 open checklist item(s) remain; sample: .agent/task/linear-e6039710-4596-45b2-a268-53bfa3cb2ac9.md:36 - [ ] Parent records terminal PR and ready-review handoff evidence.; reviewed 6 local packet/spec/mirror files for linear-e6039710-4596-45b2-a268-53bfa3cb2ac9; keep status active and cadence_days 30 after evidence review for route co-429-completed-lane-registry-residue."
     },
     {
       "path": "tasks/tasks-linear-e8f55d3d-1975-4da0-9b33-4307f7d63a08.md",
@@ -47097,8 +47391,9 @@
       "path": "tasks/tasks-linear-e913b2ab-2be9-4891-bf54-0ac4642ba012.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-04-27",
-      "cadence_days": 30
+      "last_review": "2026-05-31",
+      "cadence_days": 30,
+      "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: local packet remains non-terminal because 6 open checklist item(s) remain; sample: .agent/task/linear-e913b2ab-2be9-4891-bf54-0ac4642ba012.md:43 - [ ] Open PR for `CO-8`, attach it to Linear, handle feedback, and wait for required checks to reach terminal green.; reviewed 6 local packet/spec/mirror files for linear-e913b2ab-2be9-4891-bf54-0ac4642ba012; keep status active and cadence_days 30 after evidence review for route co-429-completed-lane-registry-residue."
     },
     {
       "path": "tasks/tasks-linear-e934e6ea-8fdd-480c-9656-22c020cb19cf.md",
@@ -47172,8 +47467,9 @@
       "path": "tasks/tasks-linear-f04ab1c2-79e6-4a98-84e1-85efb6583116.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-04-27",
-      "cadence_days": 30
+      "last_review": "2026-05-31",
+      "cadence_days": 30,
+      "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: local packet remains non-terminal because 2 open checklist item(s) remain; sample: .agent/task/linear-f04ab1c2-79e6-4a98-84e1-85efb6583116.md:41 - [ ] Parent records terminal PR and ready-review handoff evidence.; reviewed 6 local packet/spec/mirror files for linear-f04ab1c2-79e6-4a98-84e1-85efb6583116; keep status active and cadence_days 30 after evidence review for route co-429-completed-lane-registry-residue."
     },
     {
       "path": "tasks/tasks-linear-f0d312eb-055f-4926-80df-8fcaaf56839c.md",
@@ -47305,8 +47601,9 @@
       "path": "tasks/tasks-linear-f76b2a52-f0a5-4145-8d21-3e4f23a98d25.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-04-26",
-      "cadence_days": 30
+      "last_review": "2026-05-31",
+      "cadence_days": 30,
+      "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: local packet remains non-terminal because 2 open checklist item(s) remain; sample: .agent/task/linear-f76b2a52-f0a5-4145-8d21-3e4f23a98d25.md:36 - [ ] PR ready-review drain completes before review transition.; reviewed 6 local packet/spec/mirror files for linear-f76b2a52-f0a5-4145-8d21-3e4f23a98d25; keep status active and cadence_days 30 after evidence review for route co-429-completed-lane-registry-residue."
     },
     {
       "path": "tasks/tasks-linear-f79825fb-1b0a-46a9-89ec-77738e8ae4c8.md",
@@ -47342,9 +47639,12 @@
     {
       "path": "tasks/tasks-linear-f838cbde-8bb6-46de-bde2-b749f2e64422.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-26",
-      "cadence_days": 30
+      "status": "retained_terminal_packet",
+      "last_review": "2026-05-31",
+      "cadence_days": 365,
+      "task_status": "done",
+      "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: task checklist records full validation chain, clean standalone review, elegance pass, and no open local checklist obligations; reviewed 6 local packet/spec/mirror files for linear-f838cbde-8bb6-46de-bde2-b749f2e64422; retain this row as terminal history for route co-429-completed-lane-registry-residue, not as active docs freshness debt.",
+      "retained_reason": "CO-588 2026-05-31 policy-over-budget cohort remediation: task checklist records full validation chain, clean standalone review, elegance pass, and no open local checklist obligations; reviewed 6 local packet/spec/mirror files for linear-f838cbde-8bb6-46de-bde2-b749f2e64422; retain this row as terminal history for route co-429-completed-lane-registry-residue, not as active docs freshness debt."
     },
     {
       "path": "tasks/tasks-linear-f88846f3-24be-48b6-a983-087613fd8f82.md",
@@ -47371,8 +47671,9 @@
       "path": "tasks/tasks-linear-fb31f0d5-56c4-4f56-8faa-1e4ef63a705a.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-04-26",
-      "cadence_days": 30
+      "last_review": "2026-05-31",
+      "cadence_days": 30,
+      "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: local packet remains non-terminal because 1 open checklist item(s) remain; sample: tasks/tasks-linear-fb31f0d5-56c4-4f56-8faa-1e4ef63a705a.md:43 - [ ] PR attached and `pr ready-review` drain clean before transition to `In Review`.; reviewed 6 local packet/spec/mirror files for linear-fb31f0d5-56c4-4f56-8faa-1e4ef63a705a; keep status active and cadence_days 30 after evidence review for route co-429-completed-lane-registry-residue."
     },
     {
       "path": "tasks/tasks-linear-fb4c95d0-da68-4312-b3bb-3bd6282aa79f.md",
@@ -47402,8 +47703,9 @@
       "path": "tasks/tasks-linear-fd05f8a0-420a-4313-a462-690881c0a45c.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-04-27",
-      "cadence_days": 30
+      "last_review": "2026-05-31",
+      "cadence_days": 30,
+      "notes": "CO-588 2026-05-31 policy-over-budget cohort remediation: local packet remains non-terminal because 4 open checklist item(s) remain; sample: .agent/task/linear-fd05f8a0-420a-4313-a462-690881c0a45c.md:57 - [ ] Parent reconciles live CO-399 Linear issue context before implementation.; reviewed 6 local packet/spec/mirror files for linear-fd05f8a0-420a-4313-a462-690881c0a45c; keep status active and cadence_days 30 after evidence review for route co-429-completed-lane-registry-residue."
     },
     {
       "path": "tasks/tasks-linear-fd4bf705-11a9-4717-948c-addfb4fa3f83.md",

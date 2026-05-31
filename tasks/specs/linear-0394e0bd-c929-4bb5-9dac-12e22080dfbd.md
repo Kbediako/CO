@@ -1,5 +1,5 @@
 # TECH SPEC - CO-424 Provider-Worker Closeout Invariants
-last_review: 2026-05-05
+last_review: 2026-05-31
 ## Source / Intent
 Linear `CO-424`; implementation `orchestrator/src/cli/providerLinearWorkerRunner.ts`; diagnostics `orchestrator/src/cli/services/commandRunner.ts`; tests `ProviderLinearWorkerRunner.test.ts` and `CommandRunnerReviewEvidenceConsistency.test.ts`. Prevent `provider-linear-worker` from false-failing after `review handoff`, `merge handoff`, or post-merge/Done closeout because stale implementation-turn proof is applied to lifecycle bookkeeping, while preserving fail-closed current-turn enforcement.
 ## Protected Terms
