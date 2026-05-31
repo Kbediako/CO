@@ -1,4 +1,4 @@
-<!-- codex:instruction-stamp e7973a7ef8df6286847cdb5856c70304a6d4c3b88324c2581df433ef6ab0bd41 -->
+<!-- codex:instruction-stamp c55a57c808a1e4014d53fc2eb715eff796e44625b15474f04c7e2f93a20960e2 -->
 # Repository Agent Guidance
 
 Task-specific historical project blocks were removed from this file in `CO-88`. Use the active task packet under `.agent/task/**` for lane-scoped instructions instead of treating old project ids as repo-wide defaults.
@@ -31,7 +31,7 @@ Task-specific historical project blocks were removed from this file in `CO-88`. 
 - Keep mode semantics explicit and orthogonal: `executionMode=mcp|cloud` and `runtimeMode=cli|appserver` are separate controls.
 - Local default runtime remains `appserver`, with `--runtime-mode cli` preserved as break-glass.
 - `executionMode=cloud` with explicit `runtimeMode=appserver` is unsupported and must fail fast with actionable errors.
-- Upstream `rust-v0.128.0` removed `js_repl` and `js_repl_tools_only`, and current local `0.130.0` still reports both as removed; do not set `CODEX_CLOUD_ENABLE_FEATURES` / `CODEX_CLOUD_DISABLE_FEATURES` to either `js_repl` or `js_repl_tools_only`, or run `codex features enable/disable js_repl` / `codex features enable/disable js_repl_tools_only`. Use `CODEX_CLOUD_ENABLE_FEATURES` / `CODEX_CLOUD_DISABLE_FEATURES` only for active non-removed feature names after checking `codex features list`.
+- Upstream `rust-v0.128.0` removed `js_repl` and `js_repl_tools_only`, and current local `0.135.0` still reports both as removed; do not set `CODEX_CLOUD_ENABLE_FEATURES` / `CODEX_CLOUD_DISABLE_FEATURES` to either `js_repl` or `js_repl_tools_only`, or run `codex features enable/disable js_repl` / `codex features enable/disable js_repl_tools_only`. Use `CODEX_CLOUD_ENABLE_FEATURES` / `CODEX_CLOUD_DISABLE_FEATURES` only for active non-removed feature names after checking `codex features list`. `goals` is stable on current local `0.135.0`.
 - Keep `memories` scoped to explicit eval lanes until promoted by evidence (legacy alias `memory_tool` is compatibility-only).
 - Before implementation, run a standalone review of the task/spec against the user’s intent and record the approval in the spec + checklist notes. If anything is vague, infer with a subagent and self-approve or offer options; only ask the user when truly blocked.
 - Delegation is mandatory for top-level tasks once a task id exists: spawn at least one subagent run using `MCP_RUNNER_TASK_ID=<task-id>-<stream>`, capture manifest evidence, and summarize in the main run. Use `DELEGATION_GUARD_OVERRIDE_REASON` only when delegation is impossible and record the justification.
@@ -42,7 +42,7 @@ Task-specific historical project blocks were removed from this file in `CO-88`. 
 - Follow `.agent/SOPs/oracle-usage.md` for Oracle runs (tool cap: 11 attachments; unique basenames; attachments-first workflow).
 
 ## Codex Version Policy (Execution)
-- Current CO-local ChatGPT-auth/appserver model posture is `gpt-5.5` / `xhigh` on Codex CLI `0.130.0` when live access smoke passes; release-facing package/downstream-smoke pins intentionally hold at Codex CLI `0.125.0`, and `cloud-canary` intentionally holds at Codex CLI `0.124.0`, as recorded in `docs/guides/codex-version-policy.md`.
+- Current CO-local ChatGPT-auth/appserver model posture is `gpt-5.5` / `xhigh` on Codex CLI `0.135.0` when live access smoke passes; release-facing package/downstream-smoke pins intentionally hold at Codex CLI `0.125.0`, and `cloud-canary` intentionally holds at Codex CLI `0.124.0`, as recorded in `docs/guides/codex-version-policy.md`.
 - Current `0.124.0` CO-local posture evidence confirmed `codex exec` prompt-plus-stdin support, `codex login --device-auth`, `codex review --help` exposing `[PROMPT]` alongside scoped review flags, live `gpt-5.5` `xhigh` availability, and a post-build runtime-mode canary pass (`20/20` per scenario, `ready_for_default_flip=true`).
 - Release-facing downstream-smoke workflows intentionally pin `@openai/codex@0.125.0`, and `cloud-canary` intentionally pins `@openai/codex@0.124.0` until the required gates in `docs/guides/codex-version-policy.md` pass.
 - Current model posture is `gpt-5.5` / `xhigh` when available in ChatGPT-auth Codex sessions; keep `explorer_fast` on `gpt-5.3-codex-spark` for file/codebase search only.
@@ -52,7 +52,7 @@ Task-specific historical project blocks were removed from this file in `CO-88`. 
 - CO-352 catalog caveat: local `0.125.0` live catalog lists `gpt-5.3-codex-spark`, but bundled `0.125.0` catalog does not, so downstream/no-network `explorer_fast` file/codebase-search-only posture remains unchanged.
 - Treat residual plugin warnings from CO-341 as local temporary plugin cache warnings unless evidence maps them to CO-owned plugin manifests.
 - CO may run newer stable/prerelease Codex builds in explicit task-scoped canary lanes only; do not treat them as automatic global defaults.
-- App-server remains the normal local runtime path, but provider workers still stay on `codex exec` / `codex exec resume` supervision until a separate app-server control seam lands with explicit authority guardrails.
+- App-server remains the normal local runtime path and provider-worker control authority when selected by the runtime provider. `codex exec` / `codex exec resume` are preserved as explicitly labeled break-glass or legacy CLI fallback when app-server authority is unavailable or intentionally bypassed.
 - Required policy checks for newer-version lanes:
   - `scripts/runtime-mode-canary.mjs`
   - Required cloud contract run: `CODEX_CLOUD_ENV_ID=<env-id> CODEX_CLOUD_CANARY_REQUIRED=1 npm run ci:cloud-canary`

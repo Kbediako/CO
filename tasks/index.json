@@ -1,6 +1,106 @@
 {
   "items": [
     {
+      "id": "20260531-linear-a146d642-3c07-4c89-8263-2a316d952ba3",
+      "title": "CO-590 Codex CLI 0.135.0 release-intake",
+      "relates_to": "tasks/tasks-linear-a146d642-3c07-4c89-8263-2a316d952ba3.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "status": "in_progress",
+      "last_review": "2026-05-31",
+      "evidence": [
+        "docs/PRD-linear-a146d642-3c07-4c89-8263-2a316d952ba3.md",
+        "docs/TECH_SPEC-linear-a146d642-3c07-4c89-8263-2a316d952ba3.md",
+        "docs/ACTION_PLAN-linear-a146d642-3c07-4c89-8263-2a316d952ba3.md",
+        "tasks/specs/linear-a146d642-3c07-4c89-8263-2a316d952ba3.md",
+        "tasks/tasks-linear-a146d642-3c07-4c89-8263-2a316d952ba3.md",
+        ".agent/task/linear-a146d642-3c07-4c89-8263-2a316d952ba3.md",
+        "tasks/index.json",
+        "docs/TASKS.md",
+        "docs/docs-freshness-registry.json",
+        "docs/guides/codex-version-policy.md",
+        "docs/codex-posture-matrix.json",
+        ".runs/linear-a146d642-3c07-4c89-8263-2a316d952ba3-template-axis-inventory/cli/2026-05-31T11-35-41-942Z-82401c2a/manifest.json",
+        ".runs/linear-a146d642-3c07-4c89-8263-2a316d952ba3/cli/2026-05-31T11-30-03-138Z-298e003f/manifest.json",
+        ".runs/linear-a146d642-3c07-4c89-8263-2a316d952ba3/cli/2026-05-31T11-30-03-138Z-298e003f/memory/source-0/source.txt",
+        "out/linear-a146d642-3c07-4c89-8263-2a316d952ba3/manual/release-intake-0135/github-release-0135.json",
+        "out/linear-a146d642-3c07-4c89-8263-2a316d952ba3/manual/release-intake-0135/npm-codex.json",
+        "out/linear-a146d642-3c07-4c89-8263-2a316d952ba3/manual/runtime-mode-canary-0135/runtime-canary-summary.json",
+        ".runs/linear-a146d642-3c07-4c89-8263-2a316d952ba3-cloud-required-0135/cli/2026-05-31T11-42-17-949Z-579bb19b/manifest.json",
+        ".runs/linear-a146d642-3c07-4c89-8263-2a316d952ba3-cloud-fallback-0135/cli/2026-05-31T11-44-47-694Z-a6b527a6/manifest.json",
+        ".runs/linear-a146d642-3c07-4c89-8263-2a316d952ba3/cli/2026-05-31T11-30-03-138Z-298e003f/review/telemetry.json",
+        ".runs/linear-a146d642-3c07-4c89-8263-2a316d952ba3/cli/2026-05-31T11-30-03-138Z-298e003f/review/contract.json"
+      ],
+      "approvals": {
+        "child_lane_recovery": {
+          "reviewer": "CO-590 parent provider worker",
+          "date": "2026-05-31",
+          "status": "recovered_with_replacement_child_lane",
+          "invalidated_manifest": ".runs/linear-a146d642-3c07-4c89-8263-2a316d952ba3-release-evidence-inventory/cli/2026-05-31T11-32-53-559Z-5eb2d973/manifest.json",
+          "accepted_manifest": ".runs/linear-a146d642-3c07-4c89-8263-2a316d952ba3-template-axis-inventory/cli/2026-05-31T11-35-41-942Z-82401c2a/manifest.json",
+          "summary": "Initial release-evidence-inventory child drifted into parent-owned GitHub release work and was invalidated. Replacement template-axis-inventory completed local-file-only release-axis inventory for parent integration."
+        },
+        "release_intake_parent_closeout": {
+          "reviewer": "CO-590 parent provider worker",
+          "date": "2026-05-31",
+          "status": "validated_pending_pr_handoff",
+          "canonical_owner_key": "codex-cli-release-intake:stable:0.135.0",
+          "summary": "Parent release-intake evidence adopts 0.135.0 for local ChatGPT-auth/appserver command/runtime posture, latest upstream/npm marker, package command-surface evidence, current docs, and goals stable posture; intentionally holds release-facing 0.125.0 pins, cloud-canary 0.124.0, cloud execution, and unchanged model posture until required cloud canary is green. Standalone review P2 drift was fixed, final enforced review is clean, and elegance pass removed stale provider-worker runtime wording from current-facing docs."
+        }
+      },
+      "validation": {
+        "status": "validated_pending_pr_handoff",
+        "passed": [
+          "template-axis-inventory child lane completed successfully",
+          "GitHub release and npm dist-tag/time evidence captured",
+          "local CLI/help/features/model/doctor evidence captured",
+          "isolated package smoke for @openai/codex@0.135.0",
+          "runtime-mode canary 20/20 passed",
+          "required cloud canary classified as environment_not_found hold",
+          "blank-env fallback cloud contract passed expected missing_environment MCP fallback",
+          "workflow pins audited and intentionally held",
+          "protected-term scan passed",
+          "JSON parse checks passed",
+          "delegation guard passed",
+          "spec guard passed",
+          "build passed",
+          "lint passed",
+          "test passed",
+          "docs:check passed",
+          "docs:freshness passed",
+          "repo:stewardship passed",
+          "diff-budget passed",
+          "manifest-backed standalone review clean after P2 drift fix",
+          "explicit elegance/minimality pass recorded"
+        ],
+        "blockers_or_holds": [
+          "required cloud canary failed environment_not_found for configured env id",
+          "release-facing workflow pins remain held pending CO-490-class cloud evidence"
+        ],
+        "pending": [
+          "PR feedback drain",
+          "Linear review-state handoff"
+        ]
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-a146d642-3c07-4c89-8263-2a316d952ba3.md",
+        "task": "tasks/tasks-linear-a146d642-3c07-4c89-8263-2a316d952ba3.md",
+        "agent_task": ".agent/task/linear-a146d642-3c07-4c89-8263-2a316d952ba3.md",
+        "prd": "docs/PRD-linear-a146d642-3c07-4c89-8263-2a316d952ba3.md",
+        "docs": "docs/TECH_SPEC-linear-a146d642-3c07-4c89-8263-2a316d952ba3.md",
+        "action_plan": "docs/ACTION_PLAN-linear-a146d642-3c07-4c89-8263-2a316d952ba3.md"
+      },
+      "source_issue": {
+        "id": "a146d642-3c07-4c89-8263-2a316d952ba3",
+        "identifier": "CO-590",
+        "url": "https://linear.app/asabeko/issue/CO-590/co-codex-cli-01350-release-intake-and-posture-audit"
+      },
+      "canonical_owner_key": "codex-cli-release-intake:stable:0.135.0",
+      "canonical_owner_marker": "codex-orchestrator:canonical-owner-key=codex-cli-release-intake:stable:0.135.0"
+    },
+    {
       "id": "20260524-linear-43b226d3-abcc-42e8-a873-a1372d0ac128",
       "title": "CO-569 preserve CO-558 May 20 retained docs freshness cohort owner",
       "relates_to": "tasks/tasks-linear-43b226d3-abcc-42e8-a873-a1372d0ac128.md",
