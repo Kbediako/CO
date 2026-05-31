@@ -1554,9 +1554,14 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
       workpadBody: revisedWorkpad,
       previousIntent: intent
     });
-    expect(workpadChanged.spec_checksum).toBe(intent.spec_checksum);
-    expect(workpadChanged.goal_key).toBe(intent.goal_key);
+    expect(workpadChanged.spec_checksum).not.toBe(intent.spec_checksum);
+    expect(workpadChanged.goal_key).not.toBe(intent.goal_key);
     expect(workpadChanged.objective).toContain('Use active workpad plan evidence in the objective.');
+    expect(workpadChanged.supersedes).toMatchObject({
+      goal_key: intent.goal_key,
+      spec_checksum: intent.spec_checksum,
+      reason: 'spec_checksum_changed'
+    });
 
     await writeFile(
       canonicalSpecPath,

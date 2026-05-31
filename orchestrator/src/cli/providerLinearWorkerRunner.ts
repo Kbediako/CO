@@ -1953,6 +1953,8 @@ export async function deriveProviderWorkerGoalIntentFromSpecPacket(input: {
   hash.update(canonicalSpec.relativePath);
   hash.update('\0');
   hash.update(normalizeProviderLinearGoalPacketText(canonicalSpec.content));
+  hash.update('\0');
+  hash.update(normalizeProviderLinearGoalPacketText(workpadPlan));
   const specChecksum = hash.digest('hex');
   const goalKey = `provider-worker-goals:${taskKey}:${specChecksum.slice(0, 16)}`;
   const acceptanceBoundary =
