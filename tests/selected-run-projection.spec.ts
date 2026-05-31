@@ -918,7 +918,7 @@ describe('createSelectedRunProjectionReader', () => {
     expect(reconciliation.summary).toContain('failed outer provider wrapper');
   });
 
-  it('keeps failed owner proof visible even with terminal Linear state and no retry metadata', async () => {
+  it('suppresses failed owner proof from current status when terminal released Linear truth supersedes it', async () => {
     const sandbox = await makeSandbox();
     const taskId = 'linear-aa075f78-940e-423b-a886-6f0f8012ae18';
     const runId = '2026-05-19T04-04-49-244Z-failed-proof';
@@ -957,6 +957,123 @@ describe('createSelectedRunProjectionReader', () => {
         issue_identifier: 'CO-562',
         issue_state: 'Done',
         issue_state_type: 'completed',
+        state: 'released',
+        reason: 'provider_issue_released:not_active',
+        updated_at: '2026-05-19T07:33:21.789Z',
+        retry_queued: null,
+        retry_attempt: null,
+        retry_due_at: null,
+        retry_error: null
+      })
+    ]);
+
+    const collection = await discoverCompatibilityCollectionContexts(
+      buildProjectionContext({
+        manifestPath: controlManifestPath,
+        runId: controlRunId,
+        providerIntakeState
+      })
+    );
+
+    expect(collection.running).toHaveLength(0);
+    expect(collection.retrying).toHaveLength(0);
+    expect(collection.all).toHaveLength(1);
+    expect(collection.all[0]).toMatchObject({
+      issueIdentifier: 'CO-562',
+      rawStatus: 'succeeded',
+      displayStatus: 'succeeded',
+      statusReason: 'provider_claim_released',
+      lastError: null,
+      providerDebugSnapshot: {
+        worker: {
+          owner_phase: 'ended',
+          owner_status: 'failed'
+        }
+      }
+    });
+    expect(collection.all[0]?.summary).toContain('provider claim is released');
+
+    const statusProjection = buildCompatibilityProjectionSnapshot({
+      selected: collection.all[0] ?? null,
+      running: collection.running,
+      retrying: collection.retrying,
+      codexTotals: {
+        input_tokens: 0,
+        output_tokens: 0,
+        reasoning_output_tokens: 0,
+        total_tokens: 0,
+        seconds_running: 0
+      },
+      rateLimits: null,
+      dispatchPilot: null,
+      tracked: null,
+      providerIntake: null,
+      providerWorkflow: null,
+      polling: null
+    });
+    expect(statusProjection.selected).toBeNull();
+    expect(statusProjection.issues).toHaveLength(0);
+
+    const reconciliation = JSON.parse(
+      await readFile(join(dirname(manifestPath), 'provider-linear-worker-reconciliation.json'), 'utf8')
+    );
+    expect(reconciliation).toMatchObject({
+      status: 'reconciled',
+      reconciled_status: 'succeeded',
+      reason: 'provider_claim_released',
+      manifest: {
+        status: 'failed',
+        run_id: runId,
+        task_id: taskId
+      },
+      provider_claim: {
+        state: 'released',
+        reason: 'provider_issue_released:not_active',
+        issue_state: 'Done',
+        issue_state_type: 'completed'
+      }
+    });
+  });
+
+  it('keeps released non-terminal failed owner proof visible without active retry metadata', async () => {
+    const sandbox = await makeSandbox();
+    const taskId = 'linear-aa075f78-940e-423b-a886-6f0f8012ae18';
+    const runId = '2026-05-19T04-04-49-244Z-failed-proof-active';
+    const controlRunId = 'control-host';
+    const issueId = 'aa075f78-940e-423b-a886-6f0f8012ae18';
+    const manifestPath = await writeRunManifest(
+      sandbox,
+      taskId,
+      runId,
+      buildProviderWorkerManifest(taskId, runId, {
+        issue_id: issueId,
+        issue_identifier: 'CO-562',
+        status: 'failed',
+        completed_at: '2026-05-19T07:10:47.354Z',
+        updated_at: '2026-05-19T07:10:47.389Z',
+        summary:
+          "Configuration mode: repo-authoritative.\nStage 'Run provider linear worker' failed with exit code 1."
+      })
+    );
+    await writeProviderLinearWorkerProof(manifestPath, buildIssueReviewHandoffProof(issueId, {
+      owner_phase: 'ended',
+      owner_status: 'failed',
+      end_reason: 'implementation_failed'
+    }));
+    const controlManifestPath = await writeRunManifest(sandbox, 'local-mcp', controlRunId, {
+      task_id: 'local-mcp',
+      run_id: controlRunId,
+      status: 'in_progress',
+      started_at: '2026-05-19T07:30:00.000Z',
+      updated_at: '2026-05-19T07:35:00.000Z'
+    });
+    const providerIntakeState = buildProviderIntakeState([
+      buildProviderIntakeClaim(taskId, runId, manifestPath, {
+        provider_key: `linear:${issueId}`,
+        issue_id: issueId,
+        issue_identifier: 'CO-562',
+        issue_state: 'In Progress',
+        issue_state_type: 'started',
         state: 'released',
         reason: 'provider_issue_released:not_active',
         updated_at: '2026-05-19T07:33:21.789Z',
@@ -1063,7 +1180,7 @@ describe('createSelectedRunProjectionReader', () => {
     });
   });
 
-  it('requires fresh successful handoff proof and completed claim authority', async () => {
+  it('separates successful handoff proof from terminal released claim reconciliation', async () => {
     const cases = [
       {
         name: 'custom completed issue label',
@@ -1088,9 +1205,9 @@ describe('createSelectedRunProjectionReader', () => {
           merge_closeout: buildMergedPrCloseout()
         },
         expected: {
-          rawStatus: 'failed',
-          displayStatus: 'failed',
-          statusReason: null
+          rawStatus: 'cancelled',
+          displayStatus: 'cancelled',
+          statusReason: 'provider_claim_released'
         }
       },
       {
@@ -1102,9 +1219,9 @@ describe('createSelectedRunProjectionReader', () => {
           merge_closeout: buildMergedPrCloseout()
         },
         expected: {
-          rawStatus: 'failed',
-          displayStatus: 'failed',
-          statusReason: null
+          rawStatus: 'cancelled',
+          displayStatus: 'cancelled',
+          statusReason: 'provider_claim_released'
         }
       },
       {
@@ -1116,9 +1233,9 @@ describe('createSelectedRunProjectionReader', () => {
           merge_closeout: null
         },
         expected: {
-          rawStatus: 'failed',
-          displayStatus: 'failed',
-          statusReason: null
+          rawStatus: 'succeeded',
+          displayStatus: 'succeeded',
+          statusReason: 'provider_claim_released'
         }
       },
       {
@@ -1131,9 +1248,9 @@ describe('createSelectedRunProjectionReader', () => {
           merge_closeout: buildMergedPrCloseout()
         },
         expected: {
-          rawStatus: 'failed',
-          displayStatus: 'failed',
-          statusReason: null
+          rawStatus: 'succeeded',
+          displayStatus: 'succeeded',
+          statusReason: 'provider_claim_released'
         }
       },
       {

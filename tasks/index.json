@@ -29552,6 +29552,57 @@
         "parallelization_decision": "parallelize_now/independent_scope_available",
         "low_token_linear_policy": "Use full issue-context only for CO-588 or mutation-required issues; prefer list/search summaries, local co-status, GitHub PR state, and repo artifacts."
       }
+    },
+    {
+      "id": "20260531-linear-92f35fe0-35cb-4d84-851b-e1603aa9d97c",
+      "title": "CO-589 suppress released terminal failed proofs from current status",
+      "relates_to": "tasks/tasks-linear-92f35fe0-35cb-4d84-851b-e1603aa9d97c.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "status": "in_progress",
+      "last_review": "2026-05-31",
+      "canonical_owner_key": "control-host-status:released-terminal-failed-proof-suppression",
+      "canonical_owner_marker": "codex-orchestrator:canonical-owner-key=control-host-status:released-terminal-failed-proof-suppression",
+      "evidence": [
+        "docs/PRD-linear-92f35fe0-35cb-4d84-851b-e1603aa9d97c.md",
+        "docs/TECH_SPEC-linear-92f35fe0-35cb-4d84-851b-e1603aa9d97c.md",
+        "docs/ACTION_PLAN-linear-92f35fe0-35cb-4d84-851b-e1603aa9d97c.md",
+        "tasks/specs/linear-92f35fe0-35cb-4d84-851b-e1603aa9d97c-co-suppress-released-terminal-failed-proofs-from-current-status.md",
+        "tasks/tasks-linear-92f35fe0-35cb-4d84-851b-e1603aa9d97c.md",
+        ".agent/task/linear-92f35fe0-35cb-4d84-851b-e1603aa9d97c.md",
+        "tasks/index.json",
+        "docs/TASKS.md",
+        "docs/docs-freshness-registry.json"
+      ],
+      "approvals": {
+        "issue_quality_review": {
+          "reviewer": "parent CO orchestrator",
+          "date": "2026-05-31",
+          "status": "approved_for_implementation",
+          "summary": "Live CO-589 context, CO-555 Done duplicate check, CO-582 Done stale failed dashboard reproduction, quota hygiene zero, and gpt-5.5/xhigh RCA confirm this is a selected-run status authority bug rather than provider-intake cleanup."
+        }
+      },
+      "paths": {
+        "agent_task": ".agent/task/linear-92f35fe0-35cb-4d84-851b-e1603aa9d97c.md",
+        "prd": "docs/PRD-linear-92f35fe0-35cb-4d84-851b-e1603aa9d97c.md",
+        "docs": "docs/TECH_SPEC-linear-92f35fe0-35cb-4d84-851b-e1603aa9d97c.md",
+        "tech_spec_mirror": "docs/TECH_SPEC-linear-92f35fe0-35cb-4d84-851b-e1603aa9d97c.md",
+        "action_plan": "docs/ACTION_PLAN-linear-92f35fe0-35cb-4d84-851b-e1603aa9d97c.md",
+        "spec": "tasks/specs/linear-92f35fe0-35cb-4d84-851b-e1603aa9d97c-co-suppress-released-terminal-failed-proofs-from-current-status.md",
+        "task": "tasks/tasks-linear-92f35fe0-35cb-4d84-851b-e1603aa9d97c.md"
+      },
+      "source_issue": {
+        "id": "92f35fe0-35cb-4d84-851b-e1603aa9d97c",
+        "identifier": "CO-589",
+        "url": "https://linear.app/asabeko/issue/CO-589/co-suppress-released-terminal-failed-proofs-from-current-status"
+      },
+      "notes": {
+        "protected_terms": "co-status --format json; co-status --format json --dashboard; /ui/data.json; selected; selected_issue_identifier; issues[]; display_status=failed; provider_linear_worker_proof; provider_debug_snapshot.claim; released; provider_issue_released:not_active; issue_state=Done; issue_state_type=completed; compatibility issue projection fallback; selectedRunProjection.ts; CO-398; CO-582.",
+        "parallelization_decision": "stay_serial/single_bounded_change",
+        "root_cause": "Failed retained provider-worker proof was reconciled only for active-looking, passive Backlog, or successful handoff cases; terminal Done/completed released claims leaked through selected-run projection."
+      }
     }
   ]
 }
