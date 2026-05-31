@@ -2672,16 +2672,52 @@ export function createProviderIssueHandoffService(
     return runIdMatches || manifestMatches;
   };
 
+  const claimCanAdoptActiveRunLaunchProvenance = (
+    claim: ProviderIntakeClaimRecord,
+    activeRun: ProviderIssueRunRecord
+  ): boolean => {
+    const claimRunId = normalizeOptionalString(claim.run_id);
+    const claimManifestPath = normalizeOptionalString(claim.run_manifest_path);
+    if (
+      claim.state !== 'starting' ||
+      claim.mapping_source !== 'provider_id_fallback' ||
+      claimRunId !== null ||
+      claimManifestPath !== null
+    ) {
+      return false;
+    }
+
+    const claimIssueId = normalizeOptionalString(claim.issue_id);
+    const activeIssueId = normalizeOptionalString(activeRun.issueId);
+    const claimIssueIdentifier = normalizeOptionalString(claim.issue_identifier);
+    const activeIssueIdentifier =
+      normalizeOptionalString(activeRun.manifest.issue_identifier) ??
+      normalizeOptionalString(activeRun.manifest.issueIdentifier);
+    return (
+      claim.provider === activeRun.provider &&
+      claim.task_id === activeRun.taskId &&
+      claimIssueId !== null &&
+      claimIssueId === activeIssueId &&
+      (
+        activeIssueIdentifier === null ||
+        claimIssueIdentifier === activeIssueIdentifier
+      )
+    );
+  };
+
   const resolveRehydratedActiveRunLaunchProvenance = (input: {
     claim: ProviderIntakeClaimRecord;
     activeRun: ProviderIssueRunRecord;
   }): ProviderRehydratedLaunchProvenanceFields => {
     const launchToken = normalizeOptionalString(input.claim.launch_token);
+    const claimMatchesActiveRun =
+      claimIdentifiesActiveRun(input.claim, input.activeRun) ||
+      claimCanAdoptActiveRunLaunchProvenance(input.claim, input.activeRun);
     if (
       input.claim.launch_source !== PROVIDER_LAUNCH_SOURCE ||
       !launchToken ||
       input.claim.state === 'resumable' ||
-      !claimIdentifiesActiveRun(input.claim, input.activeRun)
+      !claimMatchesActiveRun
     ) {
       return buildClearedRehydratedLaunchProvenance();
     }

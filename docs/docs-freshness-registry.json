@@ -48045,6 +48045,102 @@
       "lifecycle_state": "active",
       "created_at": "2026-05-31",
       "next_review": "2026-06-30"
+    },
+    {
+      "path": ".agent/task/linear-5404ace3-9fa9-4dce-b0b8-0196aa6a4ce1.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-31",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "5404ace3-9fa9-4dce-b0b8-0196aa6a4ce1",
+        "identifier": "CO-592",
+        "url": "https://linear.app/asabeko/issue/CO-592/co-preserve-sanctioned-provider-parent-proof-for-rehydrated-active"
+      },
+      "lifecycle_state": "active",
+      "created_at": "2026-05-31",
+      "next_review": "2026-06-30",
+      "doc_class": "task_mirror"
+    },
+    {
+      "path": "docs/ACTION_PLAN-linear-5404ace3-9fa9-4dce-b0b8-0196aa6a4ce1.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-31",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "5404ace3-9fa9-4dce-b0b8-0196aa6a4ce1",
+        "identifier": "CO-592",
+        "url": "https://linear.app/asabeko/issue/CO-592/co-preserve-sanctioned-provider-parent-proof-for-rehydrated-active"
+      },
+      "lifecycle_state": "active",
+      "created_at": "2026-05-31",
+      "next_review": "2026-06-30",
+      "doc_class": "task_packet"
+    },
+    {
+      "path": "docs/PRD-linear-5404ace3-9fa9-4dce-b0b8-0196aa6a4ce1.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-31",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "5404ace3-9fa9-4dce-b0b8-0196aa6a4ce1",
+        "identifier": "CO-592",
+        "url": "https://linear.app/asabeko/issue/CO-592/co-preserve-sanctioned-provider-parent-proof-for-rehydrated-active"
+      },
+      "lifecycle_state": "active",
+      "created_at": "2026-05-31",
+      "next_review": "2026-06-30",
+      "doc_class": "task_packet"
+    },
+    {
+      "path": "docs/TECH_SPEC-linear-5404ace3-9fa9-4dce-b0b8-0196aa6a4ce1.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-31",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "5404ace3-9fa9-4dce-b0b8-0196aa6a4ce1",
+        "identifier": "CO-592",
+        "url": "https://linear.app/asabeko/issue/CO-592/co-preserve-sanctioned-provider-parent-proof-for-rehydrated-active"
+      },
+      "lifecycle_state": "active",
+      "created_at": "2026-05-31",
+      "next_review": "2026-06-30",
+      "doc_class": "task_packet"
+    },
+    {
+      "path": "tasks/specs/linear-5404ace3-9fa9-4dce-b0b8-0196aa6a4ce1.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-31",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "5404ace3-9fa9-4dce-b0b8-0196aa6a4ce1",
+        "identifier": "CO-592",
+        "url": "https://linear.app/asabeko/issue/CO-592/co-preserve-sanctioned-provider-parent-proof-for-rehydrated-active"
+      },
+      "lifecycle_state": "active",
+      "created_at": "2026-05-31",
+      "next_review": "2026-06-30",
+      "doc_class": "active_spec"
+    },
+    {
+      "path": "tasks/tasks-linear-5404ace3-9fa9-4dce-b0b8-0196aa6a4ce1.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-31",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "5404ace3-9fa9-4dce-b0b8-0196aa6a4ce1",
+        "identifier": "CO-592",
+        "url": "https://linear.app/asabeko/issue/CO-592/co-preserve-sanctioned-provider-parent-proof-for-rehydrated-active"
+      },
+      "lifecycle_state": "active",
+      "created_at": "2026-05-31",
+      "next_review": "2026-06-30",
+      "doc_class": "task_mirror"
     }
   ]
 }

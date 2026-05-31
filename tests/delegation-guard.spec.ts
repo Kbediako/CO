@@ -579,6 +579,30 @@ describe('delegation-guard script', () => {
     expect(stdout).toContain('Delegation guard: OK (subagent runs are exempt).');
   });
 
+  it('rejects provider docs-review parent_run_id-only proof when the parent claim lacks launch provenance', async () => {
+    const fixture = await createProviderDocsReviewChildFixture({
+      registeredParentKey: 'linear-lin-issue-1',
+      claimLaunchSource: null,
+      claimLaunchToken: null
+    });
+    tempDir = fixture.dir;
+
+    const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
+      cwd: fixture.dir,
+      env: cleanGuardOverrideEnv({
+        MCP_RUNNER_TASK_ID: fixture.taskId,
+        CODEX_ORCHESTRATOR_ROOT: fixture.dir,
+        CODEX_ORCHESTRATOR_MANIFEST_PATH: fixture.manifestPath,
+        CODEX_ORCHESTRATOR_PIPELINE_ID: 'docs-review'
+      })
+    });
+
+    expect(stdout).toContain(
+      `Provider docs-review task id '${fixture.taskId}' requires sanctioned provider parent proof for registered parent task '${fixture.parentTaskId}'`
+    );
+    expect(stdout).not.toContain('Delegation guard: OK (subagent runs are exempt).');
+  });
+
   it('rejects provider-child parent proof from a foreign workspace root', async () => {
     tempDir = await mkdtemp(join(tmpdir(), 'delegation-guard-provider-child-foreign-root-'));
     const parentTaskId = 'linear-lin-issue-1';

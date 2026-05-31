@@ -1,6 +1,88 @@
 {
   "items": [
     {
+      "id": "20260531-linear-5404ace3-9fa9-4dce-b0b8-0196aa6a4ce1",
+      "title": "CO-592 provider parent-proof rehydration",
+      "relates_to": "tasks/tasks-linear-5404ace3-9fa9-4dce-b0b8-0196aa6a4ce1.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "status": "in_progress",
+      "last_review": "2026-05-31",
+      "evidence": [
+        "docs/PRD-linear-5404ace3-9fa9-4dce-b0b8-0196aa6a4ce1.md",
+        "docs/TECH_SPEC-linear-5404ace3-9fa9-4dce-b0b8-0196aa6a4ce1.md",
+        "docs/ACTION_PLAN-linear-5404ace3-9fa9-4dce-b0b8-0196aa6a4ce1.md",
+        "tasks/specs/linear-5404ace3-9fa9-4dce-b0b8-0196aa6a4ce1.md",
+        "tasks/tasks-linear-5404ace3-9fa9-4dce-b0b8-0196aa6a4ce1.md",
+        ".agent/task/linear-5404ace3-9fa9-4dce-b0b8-0196aa6a4ce1.md",
+        "tasks/index.json",
+        "docs/TASKS.md"
+      ],
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue docs child lane",
+          "date": "2026-05-31",
+          "status": "created_for_parent_import",
+          "source_anchor": "ctx:sha256:82b6890ddb28df5fdb3ee033ffaeefd5d64ff61a39c34fe6c0fd1119ab0d1b87#chunk:c000001",
+          "source_payload": ".runs/linear-5404ace3-9fa9-4dce-b0b8-0196aa6a4ce1-docs-packet/cli/2026-05-31T20-41-25-661Z-619c35c5/memory/source-0/source.txt",
+          "summary": "Docs-first packet frames CO-592 as a provider parent-proof rehydration fix. The packet preserves rehydrated active provider claims, sanctioned provider parent proof, provider docs-review children, delegation-guard, CO-461, and CO-557; it rejects parent_run_id alone, stale, foreign, released, and unrelated claims as guard authority."
+        },
+        "parent_standalone_review": {
+          "reviewer": "codex-orchestrator review",
+          "date": "2026-05-31",
+          "status": "clean",
+          "telemetry": ".runs/linear-5404ace3-9fa9-4dce-b0b8-0196aa6a4ce1/cli/2026-05-31T20-30-39-013Z-6a672379/review/telemetry.json",
+          "contract": ".runs/linear-5404ace3-9fa9-4dce-b0b8-0196aa6a4ce1/cli/2026-05-31T20-30-39-013Z-6a672379/review/contract.json"
+        },
+        "parent_elegance_review": {
+          "reviewer": "parent worker",
+          "date": "2026-05-31",
+          "status": "clean",
+          "summary": "One local predicate plus focused regressions is the smallest safe solution; no simplification found that preserves fail-closed provenance checks."
+        }
+      },
+      "validation": {
+        "status": "parent_validation_passed_pr_pending",
+        "passed": [
+          "docs-first packet drafted and accepted from scoped child lane",
+          "pre-implementation issue-quality note captured",
+          "fallback and strict-proof decision captured",
+          "task registry, docs task snapshot, and docs freshness registry updated",
+          "rehydrated active parent launch-provenance adoption implemented in provider handoff",
+          "focused and full provider handoff and delegation guard regressions passed",
+          "required validation floor passed through pack smoke",
+          "manifest-backed standalone review clean with enforce contract valid",
+          "elegance/minimality pass completed with no simplification needed"
+        ],
+        "pending": [
+          "PR creation and Linear attachment",
+          "PR checks and ready-review drain",
+          "Linear review handoff"
+        ]
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-5404ace3-9fa9-4dce-b0b8-0196aa6a4ce1.md",
+        "task": "tasks/tasks-linear-5404ace3-9fa9-4dce-b0b8-0196aa6a4ce1.md",
+        "agent_task": ".agent/task/linear-5404ace3-9fa9-4dce-b0b8-0196aa6a4ce1.md",
+        "prd": "docs/PRD-linear-5404ace3-9fa9-4dce-b0b8-0196aa6a4ce1.md",
+        "docs": "docs/TECH_SPEC-linear-5404ace3-9fa9-4dce-b0b8-0196aa6a4ce1.md",
+        "action_plan": "docs/ACTION_PLAN-linear-5404ace3-9fa9-4dce-b0b8-0196aa6a4ce1.md"
+      },
+      "source_issue": {
+        "id": "5404ace3-9fa9-4dce-b0b8-0196aa6a4ce1",
+        "identifier": "CO-592",
+        "url": "https://linear.app/asabeko/issue/CO-592"
+      },
+      "notes": {
+        "provider_issue_task_key": "linear-5404ace3-9fa9-4dce-b0b8-0196aa6a4ce1",
+        "protected_terms": "rehydrated active provider claims; sanctioned provider parent proof; provider docs-review children; delegation-guard; CO-461; CO-557; parent_run_id alone; stale; foreign; released; unrelated claims.",
+        "parent_owned": "Parent owns authoritative issue workspace, Linear state, workpad mutation, docs-review, implementation, validation, PR lifecycle, and final handoff.",
+        "scope_note": "docs/docs-freshness-registry.json is outside this child lane's declared file scope."
+      }
+    },
+    {
       "id": "20260531-linear-0d975e30-67a5-4ea4-992a-61576c89d913",
       "title": "CO-524 review_intent_matrix",
       "relates_to": "tasks/tasks-linear-0d975e30-67a5-4ea4-992a-61576c89d913.md",
