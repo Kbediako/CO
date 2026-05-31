@@ -1,8 +1,8 @@
 {
   "version": 1,
   "current": {
-    "codex_cli_version": "0.130.0",
-    "latest_audited_candidate_cli_version": "0.130.0",
+    "codex_cli_version": "0.135.0",
+    "latest_audited_candidate_cli_version": "0.135.0",
     "marketplace_smoke_cli_version": "0.125.0",
     "cloud_canary_cli_version": "0.124.0",
     "model": "gpt-5.5",
