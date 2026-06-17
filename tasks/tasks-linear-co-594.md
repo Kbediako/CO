@@ -43,6 +43,7 @@
 - [x] `npm run repo:stewardship`. Evidence: passed with 6870 tracked files and 0 action-required.
 - [x] `node scripts/diff-budget.mjs`. Evidence: passed with explicit override for user-authorized CO-579 freshness remediation plus CO-594 provenance/refactor scope; changed-file count is docs-registry/spec dominated, not validation deletion.
 - [x] `codex-orchestrator review` or `npm run review`. Evidence: final enforce-mode standalone review passed clean with valid contract and 0 findings; telemetry `.runs/20260617-linear-co-594-co-594-consolidation-docs-review/cli/2026-06-17T03-22-35-783Z-398da307/review/telemetry.json`.
+- [x] PR Codex-review quota waiver recorded for merge policy. Evidence: PR #909 comment `https://github.com/Kbediako/CO/pull/909#issuecomment-4726530015` reports Codex review usage limits; required GitHub checks were green, CodeRabbit latest review reported no actionable comments, and review threads were resolved before merge consideration.
 - [x] `npm run pack:smoke` if CLI/package/skills/review-wrapper surfaces are touched. Evidence: passed after the final telemetry fix.
 - [x] Elegance review completed. Evidence: subagent `019ed3d0-3c38-7801-a08c-fad3599a0b56` rechecked the command-intent telemetry fix and reported no findings.
 
