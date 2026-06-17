@@ -20,6 +20,7 @@ last_review: 2026-06-17
 - Explicit non-goals carried forward: no cloud environment repair, no broad backlog implementation, no public contract removal, no validation weakening.
 
 ## Parity / Alignment Matrix
+
 | Surface | Current truth | Reference truth | Target truth / intended delta | Explicitly out-of-scope differences |
 | --- | --- | --- | --- | --- |
 | Linear packet | `CO-594` exists and relates source issues. | Linear read inventory and `CO-594` description. | Tracked docs-first packet mirrors source inventory and provenance. | Bulk status changes. |
@@ -57,6 +58,12 @@ last_review: 2026-06-17
 | Current-facing Codex posture docs | Local `0.140.0` evidence is newer than canonical CO-590 `0.135.0` policy, but release-intake gates have not promoted it. | justify retaining fallback | CO-594 / CO-590 | Touched docs/specs discuss current CLI posture. | 2026-06-17 | 2026-06-17 | 30 days | A release-intake lane promotes `0.140.0`, or touched docs stop naming observed smoke as current adopted posture. | CLI feature commands and docs-review. |
 | Delegation config TOML parsing | Missing `@iarna/toml` dependency triggered a custom subset parser fallback in `orchestrator/src/cli/config/delegationConfig.ts`. | remove fallback | CO-594 | Repo already declares `@iarna/toml`, and peer TOML consumers fail fast when it cannot load. | 2026-06-17 | 2026-06-17 | Immediate | Custom subset parser deleted; supported installs parse through declared dependency. | `npx vitest run --config vitest.config.core.ts orchestrator/tests/DelegationConfig.test.ts`; required checks. |
 | Review wrapper command-intent recovery | Expired CO-485 legacy `sandbox_mode="read-only"` retry after `default_permissions=":read-only"` rejection. | remove fallback | CO-594 / CO-485 | `codex review` command-intent retry is blocked because the active CLI rejects `default_permissions`. | 2026-05-02 | 2026-06-17 | Expired 2026-06-01 | No third legacy sandbox retry is attempted; wrapper fails closed with no new `legacy_fallback_*` launch context while preserving the original command-intent termination boundary. | `npx vitest run --config vitest.config.core.ts tests/review-launch-attempt.spec.ts`; `npx vitest run --config vitest.config.core.ts tests/run-review.spec.ts`; final standalone review and pack smoke. |
+
+- Contract name: local Codex posture evidence boundary.
+- Owning surface: CO-594 docs packet and CO-590 version policy.
+- Steady-state proof: touched docs distinguish observed local `0.140.0` smoke from canonical public `0.135.0` policy.
+- Tests/docs: `codex --version`, `codex features list`, CO-594 docs-review, and CO-590 policy references.
+- Non-expiring rationale: the posture boundary is a documented release-intake contract, not a temporary runtime fallback; promotion requires a separate release-intake lane.
 
 ## Architecture & Data
 - Architecture / design adjustments: none before docs-review. Implementation must be a small deletion/shrink, not a new layer.

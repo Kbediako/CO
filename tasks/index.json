@@ -2,6 +2,7 @@
   "items": [
     {
       "id": "20260617-linear-co-594",
+      "task_key": "linear-co-594",
       "slug": "co-594-consolidation",
       "title": "CO-594 consolidate Linear backlog and Ponytail refactor",
       "relates_to": "tasks/tasks-linear-co-594.md",

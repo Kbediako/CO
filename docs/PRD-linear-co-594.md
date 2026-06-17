@@ -87,9 +87,14 @@
 
 | Surface | Fallback / seam | Decision | Owner | Trigger | Introduced date | Review date | Maximum lifetime | Removal condition | Validation |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| CO issue orchestration | Separate backlog lanes remain as context after `CO-594` becomes canonical owner for this refactor. | justify retaining fallback | CO-594 | Source issues preserve provenance and future ownership boundaries. | 2026-06-17 | 2026-06-17 | Not expiring; historical source truth. | None; source issues are not an implementation fallback. | Linear inventory plus `CO-594` related issue links. |
 | Local Codex posture docs | This run observed local `codex-cli 0.140.0`, but canonical public posture remains CO-590 `0.135.0` until release-intake gates promote a newer CLI. | justify retaining fallback | CO-594 / CO-590 | Touched docs/spec posture must distinguish observed local smoke from adopted policy. | 2026-06-17 | 2026-06-17 | 30 days | A release-intake lane promotes `0.140.0`, or touched docs stop naming observed smoke as current adopted posture. | `codex --version`, `codex features list`, docs-review. |
 | Implementation seams from audit | Candidate stale fallback/seam behavior to be selected after Ponytail audit. | remove fallback | CO-594 | Audit identifies a safe redundant seam. | 2026-06-17 | 2026-06-17 | Immediate for selected target. | Selected stale seam is deleted or collapsed with tests proving preserved behavior. | Focused runnable validation plus required checks. |
+
+- Contract name: local Codex posture evidence boundary.
+- Owning surface: CO-594 docs packet and CO-590 version policy.
+- Steady-state proof: touched docs distinguish observed local `0.140.0` smoke from canonical public `0.135.0` policy.
+- Tests/docs: `codex --version`, `codex features list`, CO-594 docs-review, and CO-590 policy references.
+- Non-expiring rationale: the posture boundary is a documented release-intake contract, not a temporary runtime fallback; promotion requires a separate release-intake lane.
 
 ## Open Questions
 - Which Ponytail audit finding is safest to implement in one reviewable slice after docs-review?
