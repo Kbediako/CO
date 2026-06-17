@@ -1,6 +1,102 @@
 {
   "items": [
     {
+      "id": "20260617-linear-co-594",
+      "task_key": "linear-co-594",
+      "slug": "co-594-consolidation",
+      "title": "CO-594 consolidate Linear backlog and Ponytail refactor",
+      "relates_to": "tasks/tasks-linear-co-594.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "status": "in_progress",
+      "last_review": "2026-06-17",
+      "canonical_owner_key": "co:linear-consolidation-ponytail-refactor:2026-06-17",
+      "canonical_owner_marker": "codex-orchestrator:canonical-owner-key=co:linear-consolidation-ponytail-refactor:2026-06-17",
+      "evidence": [
+        "docs/PRD-linear-co-594.md",
+        "docs/TECH_SPEC-linear-co-594.md",
+        "docs/ACTION_PLAN-linear-co-594.md",
+        "tasks/specs/linear-co-594.md",
+        "tasks/tasks-linear-co-594.md",
+        ".agent/task/linear-co-594.md",
+        "tasks/index.json",
+        "docs/TASKS.md",
+        "docs/docs-freshness-registry.json"
+      ],
+      "approvals": {
+        "issue_quality_review": {
+          "reviewer": "parent CO implementation orchestrator",
+          "date": "2026-06-17",
+          "status": "approved_for_docs_review",
+          "summary": "Linear access was enabled and verified; CO-594 is the canonical owner for the current consolidation/refactor lane; source issues remain provenance-linked and are not bulk-closed."
+        },
+        "docs_review": {
+          "reviewer": "codex-orchestrator docs-review",
+          "date": "2026-06-17",
+          "status": "passed",
+          "manifest": ".runs/20260617-linear-co-594-co-594-consolidation-docs-review/cli/2026-06-17T03-22-35-783Z-398da307/manifest.json",
+          "summary": "Docs-review passed after CO-579 freshness remediation and posture wording alignment; implementation may proceed under the CO-594 Ponytail refactor plan."
+        },
+        "implementation_stream": {
+          "reviewer": "CO-594 implementation subagent",
+          "date": "2026-06-17",
+          "status": "implemented",
+          "agent_id": "019ed3a7-43f9-7391-86c0-7bae4b18cf4b",
+          "validation": "npx vitest run --config vitest.config.core.ts orchestrator/tests/DelegationConfig.test.ts",
+          "summary": "Removed the dependency-missing custom TOML subset fallback from delegation config parsing; supported installs now rely on the declared @iarna/toml dependency."
+        },
+        "review_wrapper_fallback_removal_stream": {
+          "reviewer": "CO-594 implementation subagent",
+          "date": "2026-06-17",
+          "status": "implemented",
+          "agent_id": "019ed3b1-868f-7703-8fa9-2da304881b66",
+          "validation": "npx vitest run --config vitest.config.core.ts tests/review-launch-attempt.spec.ts; npx vitest run --config vitest.config.core.ts tests/run-review.spec.ts; npm run test",
+          "summary": "Removed the expired CO-485 legacy sandbox_mode read-only retry after default_permissions rejection; the review wrapper now fails closed without new legacy_fallback launch-context metadata."
+        },
+        "final_validation": {
+          "reviewer": "parent CO implementation orchestrator",
+          "date": "2026-06-17",
+          "status": "passed",
+          "validation": "node scripts/delegation-guard.mjs; node scripts/spec-guard.mjs --dry-run; npm run build; npm run lint; npm run test; npm run docs:check; npm run docs:freshness; npm run repo:stewardship; node scripts/diff-budget.mjs with explicit CO-579/CO-594 override; npm run pack:smoke",
+          "summary": "Required validation passed after the final review-wrapper telemetry fix; diff-budget required an explicit override because the user-authorized CO-579 freshness remediation dominates changed files."
+        },
+        "standalone_review": {
+          "reviewer": "codex-orchestrator review",
+          "date": "2026-06-17",
+          "status": "passed",
+          "telemetry": ".runs/20260617-linear-co-594-co-594-consolidation-docs-review/cli/2026-06-17T03-22-35-783Z-398da307/review/telemetry.json",
+          "summary": "Final enforce-mode review passed clean with a valid contract, overall=clean, and 0 findings after the telemetry classification fix."
+        },
+        "elegance_review": {
+          "reviewer": "CO-594 elegance subagent",
+          "date": "2026-06-17",
+          "status": "passed",
+          "agent_id": "019ed3d0-3c38-7801-a08c-fad3599a0b56",
+          "summary": "Read-only recheck confirmed the default_permissions rejection path preserves command-intent failed-boundary telemetry and does not emit legacy_fallback metadata."
+        }
+      },
+      "paths": {
+        "agent_task": ".agent/task/linear-co-594.md",
+        "prd": "docs/PRD-linear-co-594.md",
+        "docs": "docs/TECH_SPEC-linear-co-594.md",
+        "tech_spec_mirror": "docs/TECH_SPEC-linear-co-594.md",
+        "action_plan": "docs/ACTION_PLAN-linear-co-594.md",
+        "spec": "tasks/specs/linear-co-594.md",
+        "task": "tasks/tasks-linear-co-594.md"
+      },
+      "source_issue": {
+        "id": "CO-594",
+        "identifier": "CO-594",
+        "url": "https://linear.app/asabeko/issue/CO-594/co-consolidate-linear-backlog-and-ponytail-refactor"
+      },
+      "notes": {
+        "protected_terms": "docs-first; behavior-preserving; Linear access; canonical issue/spec packet; Ponytail full; smallest reviewable changes; subagents; docs-review; codex-cli 0.140.0 local evidence; canonical Codex CLI 0.135.0 policy; gpt-5.5.",
+        "source_issues": "CO-593, CO-490, CO-521, CO-591, CO-528, CO-537, CO-561, CO-519, CO-579, CO-547, CO-564, CO-531, CO-541, CO-550, CO-540, CO-539, CO-517, CO-588, CO-590, CO-518"
+      }
+    },
+    {
       "id": "20260531-linear-5404ace3-9fa9-4dce-b0b8-0196aa6a4ce1",
       "title": "CO-592 provider parent-proof rehydration",
       "relates_to": "tasks/tasks-linear-5404ace3-9fa9-4dce-b0b8-0196aa6a4ce1.md",
@@ -1029,8 +1125,8 @@
       "owners": [
         "Codex"
       ],
-      "status": "in_progress",
-      "last_review": "2026-05-26",
+      "status": "backlog",
+      "last_review": "2026-06-17",
       "canonical_owner_key": "docs:freshness:maintain",
       "canonical_owner_marker": "codex-orchestrator:canonical-owner-key=docs:freshness:maintain",
       "evidence": [
@@ -1073,6 +1169,19 @@
             "docs/findings/linear-7f6b0776-51b8-4f54-b330-b4e359afe829-elegance-review.md"
           ],
           "summary": "Live Linear issue-context verified CO-364 is Done/completed, PR #643 is merged, and the archived task-index lifecycle audit had zero unchecked items; the report-only elegance review is retained as terminal history instead of active docs freshness debt."
+        },
+        "docs_freshness_remediation_20260617": {
+          "reviewer": "CO-579 docs freshness worker stream",
+          "date": "2026-06-17",
+          "status": "reviewed_current",
+          "evidence": [
+            "out/20260617-linear-co-594-co-594-consolidation-docs-review/current-docs-freshness-after-spec.json",
+            "docs/docs-freshness-registry.json",
+            "codex --version: codex-cli 0.140.0",
+            "codex features list: goals, multi_agent, in_app_browser, hooks stable true; js_repl removed",
+            "out/20260617-linear-co-594-co-594-consolidation-docs-review/docs-freshness-maintenance-worker.json"
+          ],
+          "summary": "CO-579 remains the live non-terminal Backlog owner for repo-wide docs freshness remediation; refreshed stale task packet/mirror, current-doc, and active spec pre-expiry review evidence without deleting historical packets, treating CO-575 as live governance, or weakening docs/spec gates."
         }
       },
       "validation": {
@@ -1134,7 +1243,8 @@
         "admission_recheck": "Shared-root co-status after owner verification reports running=0, retrying=1, issues=1, max_allowed=3, with only CO-555 active-like in Rework on PR #834; CO-527 is Backlog with no PR and is not consuming active WIP.",
         "quota_hygiene_20260524": "Zero-model quota hygiene initially found six unowned quota-burning codex exec audit processes under /Users/kbediako/Code/CO; parent terminated the stale process groups and reran hygiene with quota_burning_count=0 and unowned_quota_burning_count=0.",
         "pre_expiry_recurrence_20260526": "Current-main docs:freshness:maintain reported block_spec_guard_pre_expiry for CO-498, CO-442, CO-460, and CO-453; live Linear issue-context verified all four Done/completed. CO-498 rows are retained terminal packet history; CO-442, CO-460, and CO-453 stay active-reviewed until open local checklist obligations are resolved.",
-        "report_only_recurrence_20260526": "Live CO-364 is Done/completed and PR #643 is merged; report-only elegance review row retained as terminal history with registry task_status=done."
+        "report_only_recurrence_20260526": "Live CO-364 is Done/completed and PR #643 is merged; report-only elegance review row retained as terminal history with registry task_status=done.",
+        "docs_freshness_remediation_20260617": "Parent Linear evidence verified CO-579 Backlog/statusType=backlog in CO Control and Advisory; row-level registry notes and spec frontmatter keep active-reviewed packets/specs current until terminal/archive evidence is proven."
       }
     },
     {

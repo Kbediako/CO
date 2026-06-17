@@ -5,10 +5,12 @@ relates_to: docs/PRD-linear-cd213b8a-5bc4-46d1-88ec-f99e5ca2c7b6.md
 risk: high
 owners:
   - Codex
-last_review: 2026-05-17
+last_review: 2026-06-17
 related_action_plan: docs/ACTION_PLAN-linear-cd213b8a-5bc4-46d1-88ec-f99e5ca2c7b6.md
 task_checklists:
   - tasks/tasks-linear-cd213b8a-5bc4-46d1-88ec-f99e5ca2c7b6.md
+review_notes:
+  - 2026-06-17: Reviewed during the hard spec-guard freshness tranche; kept active because this file did not contain terminal evidence sufficient for archival or inactive reclassification.
 ---
 
 # TECH_SPEC - CO-548 decouple targeted provider-worker nudge from broad dispatch pilot

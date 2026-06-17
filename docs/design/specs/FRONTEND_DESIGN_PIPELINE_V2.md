@@ -1,7 +1,8 @@
 ---
-last_review: 2026-05-18
+last_review: 2026-06-17
 status: active
 review_notes:
+  - 2026-06-17: CO-579 pre-expiry review kept this spec active-current; no verified terminal/archive evidence was established in this stream, CO-579 is the live non-terminal docs-freshness owner, and docs/spec gates remain unchanged.
   - 2026-05-18: CO-522 active-spec audit reviewed this standalone design spec as still normative frontend design-pipeline guidance; it has no terminal task packet to archive, so it remains active. Evidence: `out/linear-b642e879-ba50-45ef-b0d9-b059afa9e932-recovery/spec-preexpiry-local-classification.json`.
 ---
 

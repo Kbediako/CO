@@ -4,7 +4,7 @@ title: CO-352 Codex 0.125 Model-Catalog Posture
 status: in_progress
 owner: Codex
 created: 2026-04-24
-last_review: 2026-05-18
+last_review: 2026-06-17
 review_cadence_days: 30
 risk_level: high
 related_prd: docs/PRD-codex-0125-model-catalog-posture.md
@@ -12,6 +12,7 @@ related_action_plan: docs/ACTION_PLAN-codex-0125-model-catalog-posture.md
 related_tasks:
   - tasks/tasks-linear-f4469614-cfdf-49a6-a7ff-366f58229816.md
 review_notes:
+  - 2026-06-17: CO-579 pre-expiry review kept this spec active-current; no verified terminal/archive evidence was established in this stream, CO-579 is the live non-terminal docs-freshness owner, and docs/spec gates remain unchanged.
   - 2026-04-24: Docs-first child lane created the CO-352 packet from the parent run source anchor and the lane prompt. Scope is docs-only; parent owns current canary evidence, Linear state, implementation, PR lifecycle, and final reconciliation.
   - 2026-04-24: Issue-quality review approves CO-352 as a posture/alignment lane, not a blind model-catalog or default bump. Required evidence includes top-level, delegated/provider-worker, standalone review, cloud/fallback, and downstream/no-network explorer_fast checks.
   - 2026-05-18: CO-522 active-spec audit found 4 unchecked task checklist items, so this spec remains active and was reviewed for current lifecycle ownership rather than archived. Evidence: `out/linear-b642e879-ba50-45ef-b0d9-b059afa9e932-recovery/spec-preexpiry-local-classification.json`.

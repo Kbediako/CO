@@ -4,7 +4,7 @@ title: Control host / CO STATUS: prevent top-level tracked.linear from leaking s
 status: in_progress
 owner: Codex
 created: 2026-04-18
-last_review: 2026-05-18
+last_review: 2026-06-17
 review_cadence_days: 30
 risk_level: high
 related_prd: docs/PRD-linear-fb4c95d0-da68-4312-b3bb-3bd6282aa79f.md
@@ -12,6 +12,7 @@ related_action_plan: docs/ACTION_PLAN-linear-fb4c95d0-da68-4312-b3bb-3bd6282aa79
 related_tasks:
   - tasks/tasks-linear-fb4c95d0-da68-4312-b3bb-3bd6282aa79f.md
 review_notes:
+  - 2026-06-17: CO-579 pre-expiry review kept this spec active-current; no verified terminal/archive evidence was established in this stream, CO-579 is the live non-terminal docs-freshness owner, and docs/spec gates remain unchanged.
   - 2026-04-18: Opened from bounded same-issue docs child lane for `CO-223` with source anchor `ctx:sha256:ff78d09226d759620c87d1f1ae2de5782e81e7eda07b01112ef35807344be9b1#chunk:c000001` and origin manifest `.runs/linear-fb4c95d0-da68-4312-b3bb-3bd6282aa79f-co223-docs-packet/cli/2026-04-17T18-00-08-729Z-4c76d75d/manifest.json`.
   - 2026-04-18: The expected shared source payload path is absent in this child checkout, so the packet preserves the verbatim CO-223 issue prompt recovered via read-only Linear fetch plus direct repo inspection of `controlRuntime.ts`, `selectedRunProjection.ts`, and `observabilityReadModel.ts`.
   - 2026-04-18: The docs child lane left `docs/TASKS.md` untouched because that checkout reported a `450`-line cap constraint.

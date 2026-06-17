@@ -4,7 +4,7 @@ title: CO Tighten Symphony-style Linear Workpad Structure and Milestone Refresh 
 status: in_progress
 owner: Codex
 created: 2026-03-26
-last_review: 2026-05-19
+last_review: 2026-06-17
 review_cadence_days: 30
 risk_level: high
 related_prd: docs/PRD-linear-df2bd49b-2dd6-413f-8d90-af40d033dace.md
@@ -12,6 +12,7 @@ related_action_plan: docs/ACTION_PLAN-linear-df2bd49b-2dd6-413f-8d90-af40d033dac
 related_tasks:
   - tasks/tasks-linear-df2bd49b-2dd6-413f-8d90-af40d033dace.md
 review_notes:
+  - 2026-06-17: CO-579 pre-expiry review kept this spec active-current; no verified terminal/archive evidence was established in this stream, CO-579 is the live non-terminal docs-freshness owner, and docs/spec gates remain unchanged.
   - 2026-03-26: Opened from Linear issue `CO-21` after confirming the live team workflow state is `Ready`, transitioning it to `In Progress`, and creating the bootstrap workpad comment in the same issue.
   - 2026-03-26: Symphony audit across `SPEC.md`, `elixir/WORKFLOW.md`, `elixir/README.md`, `elixir/lib/symphony_elixir/workflow.ex`, `elixir/lib/symphony_elixir/tracker.ex`, and `elixir/lib/symphony_elixir/linear/adapter.ex` confirmed the remaining CO gap is not state semantics or PR linkage; it is the missing repo-level workpad body and milestone-refresh contract.
   - 2026-03-26: Current CO already supports one persistent workpad comment, review alias handling, PR attachment, `Rework`, and `Merging`; the open gap is that helper enforcement is still marker-only and prompt/skill guidance is still too free-form about refresh timing.

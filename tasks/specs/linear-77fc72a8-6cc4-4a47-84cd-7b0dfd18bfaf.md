@@ -1,11 +1,14 @@
 ---
 id: 20260502-linear-77fc72a8-6cc4-4a47-84cd-7b0dfd18bfaf
 title: "CO-485 Codex CLI 0.128 permission-profile/trust-flow rebaseline"
+status: done
 relates_to: docs/PRD-linear-77fc72a8-6cc4-4a47-84cd-7b0dfd18bfaf.md
 risk: high
 owners:
   - Codex
-last_review: 2026-05-25
+last_review: 2026-06-17
+review_notes:
+  - 2026-06-17: Live Linear issue-context verified the source issue is Done/completed; reclassified this spec inactive `done` instead of refreshing stale fallback metadata.
 related_action_plan: docs/ACTION_PLAN-linear-77fc72a8-6cc4-4a47-84cd-7b0dfd18bfaf.md
 task_checklists:
   - tasks/tasks-linear-77fc72a8-6cc4-4a47-84cd-7b0dfd18bfaf.md

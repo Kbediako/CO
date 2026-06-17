@@ -4,7 +4,7 @@ title: CO: promote resident app-server seam to authoritative provider-worker con
 status: in_progress
 owner: Codex
 created: 2026-04-26
-last_review: 2026-05-19
+last_review: 2026-06-17
 review_cadence_days: 30
 risk_level: high
 related_prd: docs/PRD-linear-358ad1ac-46e4-4eaa-a610-b983dac28aba.md
@@ -12,6 +12,7 @@ related_action_plan: docs/ACTION_PLAN-linear-358ad1ac-46e4-4eaa-a610-b983dac28ab
 related_tasks:
   - tasks/tasks-linear-358ad1ac-46e4-4eaa-a610-b983dac28aba.md
 review_notes:
+  - 2026-06-17: CO-579 pre-expiry review kept this spec active-current; no verified terminal/archive evidence was established in this stream, CO-579 is the live non-terminal docs-freshness owner, and docs/spec gates remain unchanged.
   - 2026-04-26: Opened from bounded same-issue docs child lane for `CO-389`; parent reconciled the accepted packet to shared source anchor `ctx:sha256:1d9326aedeb79238be318d1be827130d7e533ba7c4b559c24f7f31873770193c#chunk:c000001` and origin manifest `../../.runs/linear-358ad1ac-46e4-4eaa-a610-b983dac28aba/cli/2026-04-26T03-48-02-269Z-9be693a5/manifest.json`.
   - 2026-04-26: Parent verified the shared source payload at `../../.runs/linear-358ad1ac-46e4-4eaa-a610-b983dac28aba/cli/2026-04-26T03-48-02-269Z-9be693a5/memory/source-0/source.txt`, so the packet is anchored on that payload, the parent-provided issue-shaping prompt, and protected terms.
   - 2026-04-26: Child lane owns only the docs packet files and `tasks/index.json`; parent owns implementation, tests, docs-review, Linear/workpad state, PR lifecycle, and wider mirrors outside child file scope.

@@ -5,10 +5,12 @@ relates_to: docs/PRD-linear-29b67d32-a612-489f-a1ac-8fd9cc4a9b5d.md
 risk: high
 owners:
   - Codex
-last_review: 2026-05-16
+last_review: 2026-06-17
 related_action_plan: docs/ACTION_PLAN-linear-29b67d32-a612-489f-a1ac-8fd9cc4a9b5d.md
 task_checklists:
   - tasks/tasks-linear-29b67d32-a612-489f-a1ac-8fd9cc4a9b5d.md
+review_notes:
+  - 2026-06-17: Reviewed during the hard spec-guard freshness tranche; kept active because this file did not contain terminal evidence sufficient for archival or inactive reclassification.
 ---
 
 # TECH_SPEC - CO-546 attach live Linear state to rehydrated pending-claim revalidation

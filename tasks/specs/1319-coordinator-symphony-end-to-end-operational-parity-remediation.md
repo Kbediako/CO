@@ -4,7 +4,7 @@ title: Coordinator Symphony End-to-End Operational Parity Remediation
 status: in_progress
 owner: Codex
 created: 2026-03-23
-last_review: 2026-05-18
+last_review: 2026-06-17
 review_cadence_days: 30
 risk_level: high
 related_prd: docs/PRD-coordinator-symphony-end-to-end-operational-parity-remediation.md
@@ -12,6 +12,7 @@ related_action_plan: docs/ACTION_PLAN-coordinator-symphony-end-to-end-operationa
 related_tasks:
   - tasks/tasks-1319-coordinator-symphony-end-to-end-operational-parity-remediation.md
 review_notes:
+  - 2026-06-17: CO-579 pre-expiry review kept this spec active-current; no verified terminal/archive evidence was established in this stream, CO-579 is the live non-terminal docs-freshness owner, and docs/spec gates remain unchanged.
   - 2026-03-23: Opened after live CO investigation proved `CO-2` stopped at `In Review`, leaving PR `#285` open with unresolved feedback and merge conflicts, which is inconsistent with current Symphony end-to-end operational behavior.
   - 2026-03-23: `1319` docs-review approved the docs-first remediation packet before implementation work resumed; evidence: `.runs/1319-coordinator-symphony-end-to-end-operational-parity-remediation/cli/2026-03-22T22-49-07-295Z-b0f31229/manifest.json`.
   - 2026-03-23: Current Symphony repo was reverified locally and remotely at `a164593aacb3db4d6808adc5a87173d906726406`; the packet therefore audits against current source rather than earlier summaries alone.

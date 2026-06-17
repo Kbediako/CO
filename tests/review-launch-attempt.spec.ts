@@ -43,10 +43,9 @@ function reviewLaunchContext(
   options: {
     reviewerVisibleContextTransport?: 'inline-prompt' | 'scoped-title' | 'artifact-only';
     reviewerVisibleTitleSource?: 'user' | 'notes-surface' | null;
-    legacyFallback?: boolean;
   } = {}
 ) {
-  const context = {
+  return {
     scope_flag_mode: scopeFlagMode,
     prompt_delivery: promptDelivery,
     reviewer_visible_context_transport:
@@ -54,20 +53,6 @@ function reviewLaunchContext(
       (scopeFlagMode === null ? 'inline-prompt' : 'artifact-only'),
     reviewer_visible_title_source: options.reviewerVisibleTitleSource ?? null
   };
-  if (!options.legacyFallback) {
-    return context;
-  }
-  return {
-    ...context,
-    legacy_fallback_attempt: 'review-wrapper-read-only-sandbox-compatibility',
-    legacy_fallback_owner: 'CO-485',
-    legacy_fallback_trigger: 'active Codex CLI rejects default_permissions',
-    legacy_fallback_introduced_at: '2026-05-02',
-    legacy_fallback_review_at: '2026-05-02',
-    legacy_fallback_expires_at: '2026-06-01',
-    legacy_fallback_removal_condition:
-      'release-facing Codex CLI pins move beyond 0.125 or the pinned CLI accepts default_permissions'
-  } as const;
 }
 
 describe('review-launch-attempt', () => {
@@ -425,13 +410,12 @@ describe('review-launch-attempt', () => {
     expect(logTerminationBoundaryFallback).not.toHaveBeenCalled();
   });
 
-  it('falls back to legacy read-only sandbox retry when Codex rejects default_permissions', async () => {
+  it('fails closed without legacy read-only sandbox retry when Codex rejects default_permissions', async () => {
     const sandbox = await makeSandbox();
     const manifestPath = await makeManifest(sandbox);
     const artifactPaths = await prepareReviewArtifacts(manifestPath, 'Prompt body', sandbox);
     const launchArgs: string[][] = [];
     const commandIntentFailureState = makeState(sandbox);
-    const successState = makeState(sandbox);
     const commandIntentBoundary = {
       kind: 'command-intent',
       provenance: 'validation-suite',
@@ -445,36 +429,36 @@ describe('review-launch-attempt', () => {
     vi.spyOn(console, 'log').mockImplementation(() => {});
     vi.spyOn(console, 'warn').mockImplementation(() => {});
 
-    await runReviewLaunchAttemptShell({
-      cliOptions: { task: 'sample-task', uncommitted: true },
-      prompt: 'Prompt body',
-      retryWithoutScopeFlagsGateError:
-        'explicit `--uncommitted` review scope must remain auditable; rerun without that flag only if you intentionally want the wrapper default working-tree review.',
-      runtimeContext: {} as any,
-      repoRoot: sandbox,
-      manifestPath,
-      artifactPaths,
-      autoIssueLogEnabled: false,
-      telemetryDebugEnabled: false,
-      telemetryDebugEnvKey: 'CODEX_REVIEW_DEBUG_TELEMETRY',
-      ensureReviewCommandAvailableFn: async () => {},
-      resolveReviewCommandFn: (reviewArgs) => ({ command: 'codex', args: reviewArgs }),
-      runReview: async (resolved) => {
-        launchArgs.push(resolved.args);
-        if (launchArgs.length === 1) {
-          throw new CodexReviewError(
-            'codex review crossed the bounded command-intent boundary (validation suite launch).',
-            {
-              exitCode: null,
-              signal: 'SIGTERM',
-              timedOut: false,
-              outputPreview: 'npm run test',
-              reviewState: commandIntentFailureState,
-              terminationBoundary: commandIntentBoundary
-            }
-          );
-        }
-        if (launchArgs.length === 2) {
+    await expect(
+      runReviewLaunchAttemptShell({
+        cliOptions: { task: 'sample-task', uncommitted: true },
+        prompt: 'Prompt body',
+        retryWithoutScopeFlagsGateError:
+          'explicit `--uncommitted` review scope must remain auditable; rerun without that flag only if you intentionally want the wrapper default working-tree review.',
+        runtimeContext: {} as any,
+        repoRoot: sandbox,
+        manifestPath,
+        artifactPaths,
+        autoIssueLogEnabled: false,
+        telemetryDebugEnabled: false,
+        telemetryDebugEnvKey: 'CODEX_REVIEW_DEBUG_TELEMETRY',
+        ensureReviewCommandAvailableFn: async () => {},
+        resolveReviewCommandFn: (reviewArgs) => ({ command: 'codex', args: reviewArgs }),
+        runReview: async (resolved) => {
+          launchArgs.push(resolved.args);
+          if (launchArgs.length === 1) {
+            throw new CodexReviewError(
+              'codex review crossed the bounded command-intent boundary (validation suite launch).',
+              {
+                exitCode: null,
+                signal: 'SIGTERM',
+                timedOut: false,
+                outputPreview: 'npm run test',
+                reviewState: commandIntentFailureState,
+                terminationBoundary: commandIntentBoundary
+              }
+            );
+          }
           throw new CodexReviewError('default_permissions requires a `[permissions]` table', {
             exitCode: 1,
             signal: null,
@@ -482,52 +466,37 @@ describe('review-launch-attempt', () => {
             outputPreview: 'Error: default_permissions requires a `[permissions]` table',
             reviewState: null
           });
-        }
-        return {
-          preview: 'stdout-ok',
-          state: successState,
-          terminationBoundary: null
-        };
-      },
-      writeTelemetry,
-      logTelemetrySummary: () => {
-        throw new Error('telemetry summary should not run when telemetry persistence returns null');
-      },
-      logTerminationBoundaryFallback
-    });
+        },
+        writeTelemetry,
+        logTelemetrySummary: () => {
+          throw new Error('telemetry summary should not run when telemetry persistence returns null');
+        },
+        logTerminationBoundaryFallback
+      })
+    ).rejects.toThrow(
+      'legacy sandbox_mode="read-only" compatibility fallback expired after 2026-06-01 and is no longer attempted or available'
+    );
 
-    expect(launchArgs).toHaveLength(3);
+    expect(launchArgs).toHaveLength(2);
     expect(launchArgs[0]).toEqual(['review', '--uncommitted']);
     expect(launchArgs[1]?.slice(0, 3)).toEqual(['-c', 'default_permissions=":read-only"', 'review']);
-    expect(launchArgs[2]?.slice(0, 3)).toEqual(['-c', 'sandbox_mode="read-only"', 'review']);
-    expect(launchArgs[2]?.[3]).toContain('Strict bounded review retry');
-    expect(launchArgs[2]?.[3]).toContain('Retry review scope: --uncommitted.');
-    expect(launchArgs[2]?.[3]).toContain('Prompt body');
     expect(writeTelemetry).toHaveBeenCalledTimes(1);
     expect(writeTelemetry).toHaveBeenCalledWith(
-      successState,
-      'succeeded',
-      null,
+      expect.any(ReviewExecutionState),
+      'failed',
+      expect.stringContaining('no longer attempted or available'),
       commandIntentBoundary,
-      reviewLaunchContext(null, 'inline', { legacyFallback: true })
+      reviewLaunchContext(null, 'inline')
     );
-    expect(successState.buildOutputSummary()).toEqual(
-      expect.objectContaining({
-        commandIntentViolationCount: 1,
-        commandIntentViolationKinds: ['validation-suite'],
-        commandIntentViolationSamples: ['[validation-suite] npm run test']
-      })
-    );
-    expect(logTerminationBoundaryFallback).not.toHaveBeenCalled();
+    expect(writeTelemetry.mock.calls[0]?.[4]).not.toHaveProperty('legacy_fallback_attempt');
   });
 
-  it('records legacy fallback telemetry when the compatibility retry fails', async () => {
+  it('does not report legacy fallback telemetry when default_permissions rejection fails closed', async () => {
     const sandbox = await makeSandbox();
     const manifestPath = await makeManifest(sandbox);
     const artifactPaths = await prepareReviewArtifacts(manifestPath, 'Prompt body', sandbox);
     const launchArgs: string[][] = [];
     const commandIntentFailureState = makeState(sandbox);
-    const legacyFailureState = makeState(sandbox);
     const commandIntentBoundary = {
       kind: 'command-intent',
       provenance: 'validation-suite',
@@ -580,14 +549,7 @@ describe('review-launch-attempt', () => {
               reviewState: null
             });
           }
-          throw new CodexReviewError('legacy sandbox fallback failed', {
-            exitCode: 1,
-            signal: null,
-            timedOut: false,
-            outputPreview: 'legacy sandbox fallback failed',
-            reviewState: legacyFailureState,
-            terminationBoundary: commandIntentBoundary
-          });
+          throw new Error('legacy sandbox retry should not run');
         },
         writeTelemetry,
         logTelemetrySummary: () => {
@@ -595,20 +557,22 @@ describe('review-launch-attempt', () => {
         },
         logTerminationBoundaryFallback
       })
-    ).rejects.toThrow('legacy sandbox fallback failed');
+    ).rejects.toThrow(
+      'legacy sandbox_mode="read-only" compatibility fallback expired after 2026-06-01 and is no longer attempted or available'
+    );
 
-    expect(launchArgs).toHaveLength(3);
+    expect(launchArgs).toHaveLength(2);
     expect(launchArgs[0]).toEqual(['review', '--uncommitted']);
     expect(launchArgs[1]?.slice(0, 3)).toEqual(['-c', 'default_permissions=":read-only"', 'review']);
-    expect(launchArgs[2]?.slice(0, 3)).toEqual(['-c', 'sandbox_mode="read-only"', 'review']);
     expect(writeTelemetry).toHaveBeenCalledTimes(1);
     expect(writeTelemetry).toHaveBeenCalledWith(
-      legacyFailureState,
+      expect.any(ReviewExecutionState),
       'failed',
-      'legacy sandbox fallback failed',
+      expect.stringContaining('no longer attempted or available'),
       commandIntentBoundary,
-      reviewLaunchContext(null, 'inline', { legacyFallback: true })
+      reviewLaunchContext(null, 'inline')
     );
+    expect(writeTelemetry.mock.calls[0]?.[4]).not.toHaveProperty('legacy_fallback_attempt');
   });
 
   it('carries explicit scope in an inline command-intent retry prompt under appserver runtime', async () => {

@@ -58,8 +58,8 @@ For explicit stage control:
 
 ## Feature Posture
 
-- Codex CLI `0.130.0` keeps `js_repl` and `js_repl_tools_only` removed; do not treat them as default-on, break-glass toggleable, or eligible for cloud feature lanes, and do not set cloud feature env vars or `codex features enable/disable` commands for either removed name.
-- Codex CLI `0.130.0` keeps current guidance on explicit permission profiles and trust flows; do not recommend `--full-auto` as normal flow. Built-in config profile ids are `:read-only`, `:workspace`, and `:danger-no-sandbox`; no-sandbox profile selection is local-only advisory evidence.
+- Canonical Codex CLI `0.135.0` and observed local `0.140.0` both keep `js_repl` and `js_repl_tools_only` removed; do not treat them as default-on, break-glass toggleable, or eligible for cloud feature lanes, and do not set cloud feature env vars or `codex features enable/disable` commands for either removed name.
+- Canonical Codex CLI `0.135.0` and observed local `0.140.0` both keep current guidance on explicit permission profiles and trust flows; do not recommend `--full-auto` as normal flow. Built-in config profile ids are `:read-only`, `:workspace`, and `:danger-no-sandbox`; no-sandbox profile selection is local-only advisory evidence.
 - Use cloud feature lanes only for active non-removed feature names after checking `codex features list`.
 - `memories` stays scoped to explicit eval lanes.
 - Subagent context forking (`fork_context`) is guidance-first: keep it `false` for bounded streams, and set `true` only when the child must inherit prior thread history.

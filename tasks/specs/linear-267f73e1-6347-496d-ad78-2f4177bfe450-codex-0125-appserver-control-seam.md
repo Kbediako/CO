@@ -4,7 +4,7 @@ title: CO-351 Codex CLI 0.125.0 App-Server Control Seam Validation
 status: in_progress
 owner: Codex
 created: 2026-04-24
-last_review: 2026-05-18
+last_review: 2026-06-17
 review_cadence_days: 30
 risk_level: high
 related_prd: docs/PRD-linear-267f73e1-6347-496d-ad78-2f4177bfe450.md
@@ -12,6 +12,7 @@ related_action_plan: docs/ACTION_PLAN-linear-267f73e1-6347-496d-ad78-2f4177bfe45
 related_tasks:
   - tasks/tasks-linear-267f73e1-6347-496d-ad78-2f4177bfe450.md
 review_notes:
+  - 2026-06-17: CO-579 pre-expiry review kept this spec active-current; no verified terminal/archive evidence was established in this stream, CO-579 is the live non-terminal docs-freshness owner, and docs/spec gates remain unchanged.
   - 2026-04-24: Issue-quality review approves CO-351 as a docs-first, canary-driven Codex CLI 0.125.0 app-server control seam validation lane. It is not a release-note summary, implementation lane, or immediate adoption decision.
   - 2026-04-24: Docs child lane created the initial packet from the parent-provided protected terms; parent reconciled the source anchor to `ctx:sha256:57e3788049ac55221b4dd437196096c5dd036790ab40746609e075f7b776202f#chunk:c000001`.
   - 2026-04-24: Parent canary evidence adopts bounded app-server control-host/proof usage because schema, Unix socket/proxy, permission profile, untrusted config, synthetic resume/fork metadata, and WebSocket burst checks passed; provider-supervision fallback and provider-runtime hold remain because sticky environments and real turn-backed pagination remain unproven in the worker canary and normal 0.125 promotion gates have not passed.

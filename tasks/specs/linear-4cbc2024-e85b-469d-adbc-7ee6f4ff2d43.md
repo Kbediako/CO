@@ -1,10 +1,10 @@
 ---
 id: 20260513-linear-4cbc2024-e85b-469d-adbc-7ee6f4ff2d43
 title: CO-488 plugin hook, cache, and external config import governance
-status: in_progress
+status: done
 owner: Codex
 created: 2026-05-13
-last_review: 2026-05-13
+last_review: 2026-06-17
 review_cadence_days: 30
 risk_level: medium
 related_prd: docs/PRD-linear-4cbc2024-e85b-469d-adbc-7ee6f4ff2d43.md
@@ -12,6 +12,7 @@ related_action_plan: docs/ACTION_PLAN-linear-4cbc2024-e85b-469d-adbc-7ee6f4ff2d4
 related_tasks:
   - tasks/tasks-linear-4cbc2024-e85b-469d-adbc-7ee6f4ff2d43.md
 review_notes:
+  - 2026-06-17: Live Linear issue-context verified the source issue is Done/completed; reclassified this spec inactive `done` instead of refreshing stale fallback metadata.
   - 2026-05-13: Parent orchestration created the traceability packet from live CO-488 Linear context so the issue could leave Backlog only after packet and registry evidence lands.
   - 2026-05-13: Provider-worker implementation started from PR #802, captured 0.128 release/command evidence, and added pack-smoke governance for ungoverned packaged hook/import artifacts.
 ---

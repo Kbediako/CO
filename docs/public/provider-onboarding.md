@@ -2,7 +2,7 @@
 
 This guide is the downstream-safe provider contract for Linear and Telegram.
 
-Reviewed 2026-05-18: local smoke on Codex CLI `0.130.0` still exposes the provider-facing `doctor`, `control-host`, `co-status`, and `control-host supervise` surfaces used below, so the onboarding flow remains current. This smoke note is not a posture promotion; canonical version posture remains governed by `docs/guides/codex-version-policy.md`.
+Reviewed 2026-06-17: local smoke on Codex CLI `0.140.0` still exposes the provider-facing `doctor`, `control-host`, `co-status`, and `control-host supervise` surfaces used below, so the onboarding flow remains current. This smoke note is not a posture promotion; canonical version posture remains governed by `docs/guides/codex-version-policy.md`.
 
 ## Contract
 

@@ -4,7 +4,7 @@ title: Coordinator Symphony Full-Parity Hardening and Closure
 status: in_progress
 owner: Codex
 created: 2026-03-20
-last_review: 2026-05-18
+last_review: 2026-06-17
 review_cadence_days: 30
 risk_level: high
 related_prd: docs/PRD-coordinator-symphony-full-parity-hardening-and-closure.md
@@ -12,6 +12,7 @@ related_action_plan: docs/ACTION_PLAN-coordinator-symphony-full-parity-hardening
 related_tasks:
   - tasks/tasks-1311-coordinator-symphony-full-parity-hardening-and-closure.md
 review_notes:
+  - 2026-06-17: CO-579 pre-expiry review kept this spec active-current; no verified terminal/archive evidence was established in this stream, CO-579 is the live non-terminal docs-freshness owner, and docs/spec gates remain unchanged.
   - 2026-03-20: Pre-implementation review completed and approved against user intent before the bounded `1311` implementation tranche started; the successful `docs-review` gate is recorded at `.runs/1311-coordinator-symphony-full-parity-hardening-and-closure/cli/2026-03-20T10-25-11-174Z-514b632e/manifest.json`.
   - 2026-03-20: Opened as the delivery follow-up to `1310`. The parity authority is `Symphony SPEC.md` at commit `a164593aacb3db4d6808adc5a87173d906726406`, with current Elixir reference behavior used to scope richer operational parity surfaces.
   - 2026-03-21: `1311` now remains an umbrella/historical lane rather than the current publication unit. The current branch now carries the integrated `1312`-`1316` implementation stack; the remaining work is truthful publication closeout, not another owned implementation blocker.

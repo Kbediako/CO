@@ -2,7 +2,9 @@
 id: 20260517-linear-8826c2fa-3160-4fa3-bfcb-eaa0c0b9d6f1
 title: CO-553 eliminate docs freshness policy capacity over-budget debt
 status: active
-last_review: 2026-05-17
+last_review: 2026-06-17
+review_notes:
+  - 2026-06-17: Reviewed during the hard spec-guard freshness tranche; kept active because this file did not contain terminal evidence sufficient for archival or inactive reclassification.
 ---
 
 ## Contract

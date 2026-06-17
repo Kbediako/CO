@@ -1,11 +1,14 @@
 ---
 id: 20260426-linear-fb31f0d5-56c4-4f56-8faa-1e4ef63a705a
 title: "CO-394 expire provider workflow fallback mappings"
+status: done
 relates_to: docs/PRD-linear-fb31f0d5-56c4-4f56-8faa-1e4ef63a705a.md
 risk: high
 owners:
   - Codex
-last_review: 2026-05-19
+last_review: 2026-06-17
+review_notes:
+  - 2026-06-17: Live Linear issue-context verified the source issue is Done/completed; reclassified this spec inactive `done` instead of refreshing stale fallback metadata.
 related_action_plan: docs/ACTION_PLAN-linear-fb31f0d5-56c4-4f56-8faa-1e4ef63a705a.md
 task_checklists:
   - tasks/tasks-linear-fb31f0d5-56c4-4f56-8faa-1e4ef63a705a.md

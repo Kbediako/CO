@@ -5,10 +5,12 @@ relates_to: docs/PRD-linear-c8f25aac-5bc5-4210-8fc5-a143d6b14df0.md
 risk: high
 owners:
   - Codex
-last_review: 2026-05-16
+last_review: 2026-06-17
 related_action_plan: docs/ACTION_PLAN-linear-c8f25aac-5bc5-4210-8fc5-a143d6b14df0.md
 task_checklists:
   - tasks/tasks-linear-c8f25aac-5bc5-4210-8fc5-a143d6b14df0.md
+review_notes:
+  - 2026-06-17: Reviewed during the hard spec-guard freshness tranche; kept active because this file did not contain terminal evidence sufficient for archival or inactive reclassification.
 ---
 
 # TECH_SPEC - CO-544 release rehydrated blocked provider claims from active WIP

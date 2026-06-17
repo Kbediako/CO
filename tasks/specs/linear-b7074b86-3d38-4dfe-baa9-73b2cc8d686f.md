@@ -4,7 +4,7 @@ title: CO-390 Upstream Codex CLI Release Detection And Release Intake
 status: in_progress
 owner: Codex
 created: 2026-04-26
-last_review: 2026-05-19
+last_review: 2026-06-17
 review_cadence_days: 30
 risk_level: high
 related_prd: docs/PRD-linear-b7074b86-3d38-4dfe-baa9-73b2cc8d686f.md
@@ -12,6 +12,7 @@ related_action_plan: docs/ACTION_PLAN-linear-b7074b86-3d38-4dfe-baa9-73b2cc8d686
 related_tasks:
   - tasks/tasks-linear-b7074b86-3d38-4dfe-baa9-73b2cc8d686f.md
 review_notes:
+  - 2026-06-17: CO-579 pre-expiry review kept this spec active-current; no verified terminal/archive evidence was established in this stream, CO-579 is the live non-terminal docs-freshness owner, and docs/spec gates remain unchanged.
   - 2026-04-26: Issue-quality review approves CO-390 as a docs-first release-detection and canonical release-intake shaping lane, not a Codex CLI adoption or workflow-pin lane.
   - 2026-04-26: Source payload path supplied by the parent is absent in this child checkout; packet preserves the parent-provided source anchor and protected issue wording instead of calling Linear mutation helpers or inventing body text.
 ---

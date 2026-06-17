@@ -1118,7 +1118,7 @@ fi
       done
     fi
     if [[ "$mode" == "command-intent-validation-then-ok" ]]; then
-      if [[ "$*" == *"Strict bounded review retry."* ]]; then
+      if [[ "$*" == *"Strict bounded review retry."* ]]; then [[ "\${RUN_REVIEW_REJECT_DEFAULT_PERMISSIONS:-}" == "1" ]] && { echo 'Error: default_permissions requires a [permissions] table' >&2; exit 1; }
         if has_inline_prompt "$@" && has_arg "--title" "$@"; then
           echo "custom prompt cannot be combined with --title" >&2
           exit 1
@@ -4410,7 +4410,7 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     expect(result.exitCode).toBe(0);
     const normalizedHelp = result.stdout.replace(/\s+/g, ' ').trim();
     expect(normalizedHelp).toContain(
-      'Behavior: Explicit --uncommitted/--base/--commit wrapper runs keep prompt/context in review/prompt.txt and launch codex review without any prompt argument because current CLI still treats stdin (`-`) as [PROMPT]; reviewer-visible scoped context first rides on --title (user-provided when present, otherwise synthesized from NOTES + surface) with bounded no-validation guidance visible where the current Codex review surface honors titles. If Codex rejects a synthesized scoped title, the wrapper retries the same explicit scope without `--title` and falls back to artifact-only context. If bounded review blocks a validation command, the wrapper retries once with a reviewer-visible inline no-validation prompt that names the original scope and runs under a read-only permission-profile override, falling back to one expiry-enforced legacy read-only sandbox override only when the active Codex CLI rejects `default_permissions`; successful retry preserves the command-intent boundary in telemetry as bounded-success and records legacy fallback metadata when that compatibility path is used.'
+      'Behavior: Explicit --uncommitted/--base/--commit wrapper runs keep prompt/context in review/prompt.txt and launch codex review without any prompt argument because current CLI still treats stdin (`-`) as [PROMPT]; reviewer-visible scoped context first rides on --title (user-provided when present, otherwise synthesized from NOTES + surface) with bounded no-validation guidance visible where the current Codex review surface honors titles. If Codex rejects a synthesized scoped title, the wrapper retries the same explicit scope without `--title` and falls back to artifact-only context. If bounded review blocks a validation command, the wrapper retries once with a reviewer-visible inline no-validation prompt that names the original scope and runs under a read-only permission-profile override. If the active Codex CLI rejects `default_permissions`, the expired legacy `sandbox_mode="read-only"` compatibility fallback is no longer attempted and the review fails closed.'
     );
     expect(normalizedHelp).toContain(
       'Explicit scoped wrapper runs Support only the default diff surface; audit/architecture still require prompt-capable unscoped review.'
@@ -7365,6 +7365,72 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
       expect(telemetry.summary.commandIntentViolationCount).toBe(1);
       expect(telemetry.summary.commandIntentViolationKinds).toEqual(['validation-runner']);
     }
+  }, LONG_WAIT_TEST_TIMEOUT_MS);
+
+  it('fails closed without legacy sandbox retry when the command-intent retry read-only profile is unsupported', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    const codexBin = await makeFakeCodex(sandbox);
+    await initGitRepoWithCommittedFiles(sandbox, 1);
+    await writeFile(join(sandbox, 'file-1.txt'), 'updated-uncommitted-scope\n', 'utf8');
+    const argsLogPath = join(sandbox, 'review-default-permissions-unsupported-args.log');
+
+    const result = await runReviewCommand(
+      manifestPath,
+      {
+        ...baseEnv(sandbox, codexBin),
+        RUN_REVIEW_MODE: 'command-intent-validation-then-ok',
+        RUN_REVIEW_REJECT_DEFAULT_PERMISSIONS: '1',
+        RUN_REVIEW_ARGS_LOG: argsLogPath,
+        CODEX_REVIEW_DEBUG_TELEMETRY: '1',
+        CODEX_REVIEW_STALL_TIMEOUT_SECONDS: '0',
+        CODEX_REVIEW_TIMEOUT_SECONDS: '60'
+      },
+      ['--uncommitted']
+    );
+
+    expect(result.exitCode).toBeGreaterThan(0);
+    expect(result.stderr).toContain(
+      'legacy sandbox_mode="read-only" compatibility fallback expired after 2026-06-01 and is no longer attempted or available'
+    );
+    const argsLog = await readFile(argsLogPath, 'utf8');
+    const reviewInvocations = parseArgsLogInvocations(argsLog).filter((entry) =>
+      entry.includes('argv=review')
+    );
+    expect(reviewInvocations).toHaveLength(2);
+    expect(reviewInvocations[0]).toContain('argv=review --title');
+    expect(reviewInvocations[0]).toContain('--uncommitted');
+    expect(reviewInvocations[1]).toContain('config=default_permissions=":read-only"');
+    expect(reviewInvocations[1]).not.toContain('config=sandbox_mode="read-only"');
+
+    const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
+    const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
+      status: string;
+      review_outcome: string;
+      error: string | null;
+      termination_boundary: {
+        kind: string;
+        provenance: string;
+      } | null;
+      launch_context: Record<string, unknown> | null;
+      summary: {
+        commandIntentViolationCount: number;
+        commandIntentViolationKinds: string[];
+      };
+    };
+    expect(telemetry.status).toBe('failed');
+    expect(telemetry.review_outcome).toBe('failed-boundary');
+    expect(telemetry.error).toContain('no longer attempted or available');
+    expect(telemetry.termination_boundary).toEqual(
+      expect.objectContaining({
+        kind: 'command-intent',
+        provenance: 'validation-runner'
+      })
+    );
+    expect(telemetry.launch_context).toEqual(reviewLaunchContext(null));
+    expect(telemetry.launch_context).not.toHaveProperty('legacy_fallback_attempt');
+    expect(telemetry.summary.commandIntentViolationCount).toBe(1);
+    expect(telemetry.summary.commandIntentViolationKinds).toEqual(['validation-runner']);
   }, LONG_WAIT_TEST_TIMEOUT_MS);
 
   it('waits for graceful child termination before surfacing timeout failure', async () => {

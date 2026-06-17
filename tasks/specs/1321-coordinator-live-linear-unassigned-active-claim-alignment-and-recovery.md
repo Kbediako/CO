@@ -4,7 +4,7 @@ title: Coordinator Live Linear Unassigned Active-Claim Alignment and Recovery
 status: in_progress
 owner: Codex
 created: 2026-03-23
-last_review: 2026-05-18
+last_review: 2026-06-17
 review_cadence_days: 30
 risk_level: high
 related_prd: docs/PRD-coordinator-live-linear-unassigned-active-claim-alignment-and-recovery.md
@@ -12,6 +12,7 @@ related_action_plan: docs/ACTION_PLAN-coordinator-live-linear-unassigned-active-
 related_tasks:
   - tasks/tasks-1321-coordinator-live-linear-unassigned-active-claim-alignment-and-recovery.md
 review_notes:
+  - 2026-06-17: CO-579 pre-expiry review kept this spec active-current; no verified terminal/archive evidence was established in this stream, CO-579 is the live non-terminal docs-freshness owner, and docs/spec gates remain unchanged.
   - 2026-03-23: Pre-implementation review approved via docs-review manifest `.runs/1321-coordinator-live-linear-unassigned-active-claim-alignment-and-recovery/cli/2026-03-23T10-29-46-034Z-08278ec8/manifest.json`; checklist mirrored in `tasks/tasks-1321-coordinator-live-linear-unassigned-active-claim-alignment-and-recovery.md`.
   - 2026-03-23: Opened after live `CO-3` remained `Merging` and recommended by `/api/v1/dispatch`, but persisted intake still recorded the claim as `released:assignee_changed`.
   - 2026-03-23: The current mismatch is internal to CO: fresh dispatch already accepts viewer-owned or unassigned issues, while existing-claim eligibility still treats `assignee_id: null` as a reassignment away from Codex.

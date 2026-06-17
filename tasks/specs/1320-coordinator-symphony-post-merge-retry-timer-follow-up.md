@@ -4,7 +4,7 @@ title: Coordinator Symphony Post-Merge Retry-Timer Follow-Up
 status: in_progress
 owner: Codex
 created: 2026-03-23
-last_review: 2026-05-18
+last_review: 2026-06-17
 review_cadence_days: 30
 risk_level: high
 related_prd: docs/PRD-coordinator-symphony-post-merge-retry-timer-follow-up.md
@@ -12,6 +12,7 @@ related_action_plan: docs/ACTION_PLAN-coordinator-symphony-post-merge-retry-time
 related_tasks:
   - tasks/tasks-1320-coordinator-symphony-post-merge-retry-timer-follow-up.md
 review_notes:
+  - 2026-06-17: CO-579 pre-expiry review kept this spec active-current; no verified terminal/archive evidence was established in this stream, CO-579 is the live non-terminal docs-freshness owner, and docs/spec gates remain unchanged.
   - 2026-03-23: Opened after post-merge `main` run `23425656167` failed in `Core Lane` `Test` on a single `ProviderIssueHandoff` retry-timer case.
   - 2026-03-23: The merge-triggering diff did not touch `ProviderIssueHandoff` runtime files, and local repeated targeted runs pass, so the leading diagnosis is CI-only test brittleness rather than a fresh runtime parity gap.
   - 2026-03-23: No additional live Linear workflow status is required for this follow-up; the issue, if created, should use the existing CO team workflow.

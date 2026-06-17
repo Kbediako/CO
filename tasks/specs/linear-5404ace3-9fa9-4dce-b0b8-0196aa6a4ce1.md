@@ -5,10 +5,12 @@ relates_to: docs/PRD-linear-5404ace3-9fa9-4dce-b0b8-0196aa6a4ce1.md
 risk: high
 owners:
   - Codex
-last_review: 2026-05-31
+last_review: 2026-06-17
 related_action_plan: docs/ACTION_PLAN-linear-5404ace3-9fa9-4dce-b0b8-0196aa6a4ce1.md
 task_checklists:
   - tasks/tasks-linear-5404ace3-9fa9-4dce-b0b8-0196aa6a4ce1.md
+review_notes:
+  - 2026-06-17: Reviewed CO-592 fallback metadata; kept the expiring rehydrated parent-proof seam on its existing 2026-06-30 deadline and preserved durable strict-proof/audit-retention dispositions.
 ---
 
 # TECH_SPEC - CO-592 provider parent-proof rehydration
@@ -123,9 +125,11 @@ task_checklists:
 
 | Surface | Fallback / seam | Decision | Owner | Trigger | Introduced date | Review date | Maximum lifetime | Removal condition | Validation |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Rehydrated provider parent proof | `rehydrated active provider claims` may be ignored as parent proof when original control-host launch provenance was safely cleared during active-run rehydration. | expire fallback | CO-592 parent implementation | `provider docs-review children` run after parent provider-worker rehydration. | 2026-05-31 | 2026-05-31 | 30 days, expires 2026-06-30 | `delegation-guard` recognizes current same-issue, same-run, same-manifest, same-root rehydrated active parent proof without requiring a loose override. | Focused passing rehydrated active parent-proof regression plus existing CO-461/CO-557 guard matrix. |
+| Rehydrated provider parent proof | `rehydrated active provider claims` may be ignored as parent proof when original control-host launch provenance was safely cleared during active-run rehydration. | expire fallback | CO-592 parent implementation | `provider docs-review children` run after parent provider-worker rehydration. | 2026-05-31 | 2026-06-17 | 30 days, expires 2026-06-30 | `delegation-guard` recognizes current same-issue, same-run, same-manifest, same-root rehydrated active parent proof without requiring a loose override. | Focused passing rehydrated active parent-proof regression plus existing CO-461/CO-557 guard matrix. |
 | Strict provider child authorization | Contract name: `sanctioned provider parent proof` for `provider docs-review children`. | justify retaining fallback | Owning surface: `delegation-guard` / provider child-stream contract. | Provider docs-review child validation. | CO-461 / CO-557 | 2026-05-31 | Non-expiring rationale: strict rejection is correctness behavior, not temporary fallback behavior. | Steady-state proof: `parent_run_id alone`, stale, foreign, released, and unrelated proof fail closed. | Tests/docs: negative regressions for parent-run-only, stale, foreign, released, unrelated, issue mismatch, missing parent_run_id, and unregistered top-level task ids. |
 | Provider intake audit residue | Contract name: provider-intake audit residue retention for retained/stale provider-intake rows. | justify retaining fallback | Owning surface: provider-intake audit history. | Guard scans provider-intake state for parent proof. | Existing provider-intake behavior | 2026-05-31 | Non-expiring rationale: retained audit history is durable evidence, not temporary fallback behavior. | Steady-state proof: audit rows stay visible but are excluded from sanctioned parent proof unless they satisfy active same-run proof requirements. | Tests/docs: released, stale, foreign, and unrelated rows fail closed while audit data remains unchanged. |
+
+- 2026-06-17 fallback metadata review: the expiring rehydrated parent-proof seam remains active until the existing 2026-06-30 deadline; strict provider child authorization and provider-intake audit residue remain durable correctness/audit contracts, not temporary fallback bypasses.
 
 - Contract name: strict rehydrated parent-proof authorization.
 - Owning surface: `delegation-guard` and provider-intake parent proof lookup.

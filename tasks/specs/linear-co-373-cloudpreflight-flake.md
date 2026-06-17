@@ -4,7 +4,7 @@ title: CO-373 CloudPreflight fake Codex CLI test flake stabilization
 status: in_progress
 owner: Codex
 created: 2026-04-25
-last_review: 2026-05-18
+last_review: 2026-06-17
 review_cadence_days: 30
 risk_level: high
 related_prd: docs/PRD-linear-co-373-cloudpreflight-flake.md
@@ -12,6 +12,7 @@ related_action_plan: docs/ACTION_PLAN-linear-co-373-cloudpreflight-flake.md
 related_tasks:
   - tasks/tasks-linear-co-373-cloudpreflight-flake.md
 review_notes:
+  - 2026-06-17: CO-579 pre-expiry review kept this spec active-current; no verified terminal/archive evidence was established in this stream, CO-579 is the live non-terminal docs-freshness owner, and docs/spec gates remain unchanged.
   - 2026-04-25: Opened from observed Core Lane failures in PR #668 and CO-361 release-prep validation; issue blocks CO-361 until the harness is fixed and CI evidence is green.
   - 2026-04-25: Micro-task path is intentionally not used because correctness depends on exact CloudPreflight classification surfaces and release-blocker truth.
   - 2026-05-18: CO-522 active-spec audit found 6 unchecked task checklist items, so this spec remains active and was reviewed for current lifecycle ownership rather than archived. Evidence: `out/linear-b642e879-ba50-45ef-b0d9-b059afa9e932-recovery/spec-preexpiry-local-classification.json`.

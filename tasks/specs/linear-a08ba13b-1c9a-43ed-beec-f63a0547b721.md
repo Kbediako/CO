@@ -6,11 +6,12 @@ relates_to: docs/PRD-linear-a08ba13b-1c9a-43ed-beec-f63a0547b721.md
 risk: high
 owners:
   - Codex
-last_review: 2026-05-17
+last_review: 2026-06-17
 related_action_plan: docs/ACTION_PLAN-linear-a08ba13b-1c9a-43ed-beec-f63a0547b721.md
 task_checklists:
   - tasks/tasks-linear-a08ba13b-1c9a-43ed-beec-f63a0547b721.md
 review_notes:
+  - 2026-06-17: Reviewed during the hard spec-guard freshness tranche; kept active because this file did not contain terminal evidence sufficient for archival or inactive reclassification.
   - 2026-05-17: Created from live CO-543 issue-context after shared root was verified clean latest main and isolated branch `kb/co-543-spec-guard-stale-cohorts` was created. The current blocker is thirteen Apr 16 active `tasks/specs/**` rows, not CO-548 implementation code.
   - 2026-05-17: Pre-repair `node scripts/spec-guard.mjs --dry-run` reproduced exactly thirteen stale rows with `last_review=2026-04-16`; live Linear GraphQL verified CO-189, CO-192, CO-195, CO-197, CO-198, CO-199, CO-200, CO-201, CO-202, CO-203, CO-204, and CO-205 are Done/completed.
   - 2026-05-17: gpt-5.5/xhigh review found undeclared nonstandard terminal packet paths; CO-543 added explicit PRD/ACTION/findings path mappings, including the omitted 1220 findings path, and archived six additional registry rows before rerunning validation.

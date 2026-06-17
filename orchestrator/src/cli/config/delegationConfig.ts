@@ -165,17 +165,6 @@ const SOURCE_PRIORITY: Record<ConfigSource, number> = {
   cli: 4
 };
 
-const DELEGATION_CONFIG_ROOT_KEYS = new Set([
-  'delegate',
-  'rlm',
-  'runner',
-  'ui',
-  'github',
-  'paths',
-  'confirm',
-  'sandbox'
-]);
-
 export async function loadDelegationConfigFiles(options: {
   repoRoot: string;
   env?: NodeJS.ProcessEnv;
@@ -656,314 +645,27 @@ export function parseDelegationConfigOverride(
   return normalizeLayer(parsed as Record<string, unknown>, source);
 }
 
-function getTomlParser(): { parse(input: string): unknown } | null {
-  if (typeof tomlParser !== 'undefined') {
+function getTomlParser(): { parse(input: string): unknown } {
+  if (tomlParser) {
     return tomlParser;
+  }
+  if (tomlParser === null) {
+    throw new Error('Failed to load @iarna/toml.');
   }
   try {
     tomlParser = require('@iarna/toml') as { parse(input: string): unknown };
+    return tomlParser;
   } catch {
     tomlParser = null;
+    throw new Error('Failed to load @iarna/toml.');
   }
-  return tomlParser;
 }
 
 function parseDelegationTomlConfig(raw: string): Record<string, unknown> {
   const parser = getTomlParser();
-  if (parser) {
-    const parsed = parser.parse(raw);
-    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-      return parsed as Record<string, unknown>;
-    }
-    return {};
+  const parsed = parser.parse(raw);
+  if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+    return parsed as Record<string, unknown>;
   }
-  return parseDelegationTomlSubset(raw);
-}
-
-function parseDelegationTomlSubset(raw: string): Record<string, unknown> {
-  const parsed: Record<string, unknown> = {};
-  let currentSection: string[] | null = [];
-  for (const line of raw.split(/\r?\n/u)) {
-    const trimmed = stripTomlComment(line).trim();
-    if (!trimmed) {
-      continue;
-    }
-    const tableMatch = trimmed.match(/^\[(.+)\]$/u);
-    if (tableMatch) {
-      const tablePath = parseTomlDottedPath(tableMatch[1] ?? '');
-      currentSection =
-        tablePath.length > 0 && DELEGATION_CONFIG_ROOT_KEYS.has(tablePath[0] ?? '')
-          ? tablePath
-          : null;
-      continue;
-    }
-    const separatorIndex = findTomlAssignmentSeparator(trimmed);
-    if (separatorIndex === -1) {
-      continue;
-    }
-    const keyPath = parseTomlDottedPath(trimmed.slice(0, separatorIndex));
-    if (keyPath.length === 0) {
-      continue;
-    }
-    if (currentSection === null) {
-      continue;
-    }
-    const fullPath = [...currentSection, ...keyPath];
-    if (!DELEGATION_CONFIG_ROOT_KEYS.has(fullPath[0] ?? '')) {
-      continue;
-    }
-    const parsedValue = parseTomlValue(trimmed.slice(separatorIndex + 1).trim());
-    if (typeof parsedValue === 'undefined') {
-      continue;
-    }
-    assignNestedTomlValue(parsed, fullPath, parsedValue);
-  }
-  return parsed;
-}
-
-function assignNestedTomlValue(target: Record<string, unknown>, pathSegments: string[], value: unknown): void {
-  let current: Record<string, unknown> = target;
-  for (let index = 0; index < pathSegments.length - 1; index += 1) {
-    const segment = pathSegments[index];
-    const existing = current[segment];
-    if (!existing || typeof existing !== 'object' || Array.isArray(existing)) {
-      current[segment] = {};
-    }
-    current = current[segment] as Record<string, unknown>;
-  }
-  const leafKey = pathSegments[pathSegments.length - 1];
-  current[leafKey] = value;
-}
-
-function parseTomlDottedPath(raw: string): string[] {
-  const segments: string[] = [];
-  let current = '';
-  let quote: '"' | '\'' | null = null;
-  let escaping = false;
-  const flush = () => {
-    const normalized = normalizeTomlKeySegment(current);
-    if (normalized) {
-      segments.push(normalized);
-    }
-    current = '';
-  };
-  for (const character of raw.trim()) {
-    if (escaping) {
-      current += character;
-      escaping = false;
-      continue;
-    }
-    if (quote && character === '\\') {
-      current += character;
-      escaping = true;
-      continue;
-    }
-    if (character === '"' || character === '\'') {
-      if (quote === character) {
-        quote = null;
-      } else if (!quote) {
-        quote = character;
-      }
-      current += character;
-      continue;
-    }
-    if (!quote && character === '.') {
-      flush();
-      continue;
-    }
-    current += character;
-  }
-  flush();
-  return segments;
-}
-
-function normalizeTomlKeySegment(raw: string): string | null {
-  const trimmed = raw.trim();
-  if (!trimmed) {
-    return null;
-  }
-  if (
-    (trimmed.startsWith('"') && trimmed.endsWith('"')) ||
-    (trimmed.startsWith('\'') && trimmed.endsWith('\''))
-  ) {
-    return decodeTomlString(trimmed);
-  }
-  return trimmed;
-}
-
-function parseTomlValue(raw: string): unknown {
-  if (!raw) {
-    return undefined;
-  }
-  if (
-    (raw.startsWith('"') && raw.endsWith('"')) ||
-    (raw.startsWith('\'') && raw.endsWith('\''))
-  ) {
-    return decodeTomlString(raw);
-  }
-  if (raw.startsWith('[') && raw.endsWith(']')) {
-    return splitTomlArrayEntries(raw.slice(1, -1)).map((entry) => parseTomlValue(entry));
-  }
-  if (raw === 'true') {
-    return true;
-  }
-  if (raw === 'false') {
-    return false;
-  }
-  const integer = parseTomlInteger(raw);
-  if (integer !== null) {
-    return integer;
-  }
-  const numeric = Number(raw);
-  if (Number.isFinite(numeric)) {
-    return numeric;
-  }
-  return undefined;
-}
-
-function parseTomlInteger(raw: string): number | null {
-  const trimmed = raw.trim();
-  if (!trimmed) {
-    return null;
-  }
-  if (/^[+-]?(?:0|[1-9](?:_?\d)*)$/u.test(trimmed)) {
-    return Number.parseInt(trimmed.replace(/_/gu, ''), 10);
-  }
-  if (/^[+-]?0x[0-9a-f](?:_?[0-9a-f])*$/iu.test(trimmed)) {
-    return parseTomlBasedInteger(trimmed, /^([+-]?)0x/iu, 16);
-  }
-  if (/^[+-]?0o[0-7](?:_?[0-7])*$/iu.test(trimmed)) {
-    return parseTomlBasedInteger(trimmed, /^([+-]?)0o/iu, 8);
-  }
-  if (/^[+-]?0b[01](?:_?[01])*$/iu.test(trimmed)) {
-    return parseTomlBasedInteger(trimmed, /^([+-]?)0b/iu, 2);
-  }
-  return null;
-}
-
-function parseTomlBasedInteger(raw: string, prefixPattern: RegExp, radix: number): number | null {
-  const normalized = raw.replace(/_/gu, '');
-  const prefixMatch = normalized.match(prefixPattern);
-  if (!prefixMatch) {
-    return null;
-  }
-  const sign = prefixMatch[1] === '-' ? -1 : 1;
-  const digits = normalized.slice(prefixMatch[0].length);
-  return sign * Number.parseInt(digits, radix);
-}
-
-function splitTomlArrayEntries(raw: string): string[] {
-  const entries: string[] = [];
-  let current = '';
-  let bracketDepth = 0;
-  let quote: '"' | '\'' | null = null;
-  let escaping = false;
-  const flush = () => {
-    const trimmed = current.trim();
-    if (trimmed) {
-      entries.push(trimmed);
-    }
-    current = '';
-  };
-  for (const character of raw) {
-    if (escaping) {
-      current += character;
-      escaping = false;
-      continue;
-    }
-    if (quote && character === '\\') {
-      current += character;
-      escaping = true;
-      continue;
-    }
-    if (character === '"' || character === '\'') {
-      if (quote === character) {
-        quote = null;
-      } else if (!quote) {
-        quote = character;
-      }
-      current += character;
-      continue;
-    }
-    if (!quote) {
-      if (character === '[') {
-        bracketDepth += 1;
-      } else if (character === ']') {
-        bracketDepth = Math.max(0, bracketDepth - 1);
-      } else if (character === ',' && bracketDepth === 0) {
-        flush();
-        continue;
-      }
-    }
-    current += character;
-  }
-  flush();
-  return entries;
-}
-
-function findTomlAssignmentSeparator(raw: string): number {
-  let quote: '"' | '\'' | null = null;
-  let escaping = false;
-  for (let index = 0; index < raw.length; index += 1) {
-    const character = raw[index];
-    if (escaping) {
-      escaping = false;
-      continue;
-    }
-    if (quote && character === '\\') {
-      escaping = true;
-      continue;
-    }
-    if (character === '"' || character === '\'') {
-      if (quote === character) {
-        quote = null;
-      } else if (!quote) {
-        quote = character;
-      }
-      continue;
-    }
-    if (!quote && character === '=') {
-      return index;
-    }
-  }
-  return -1;
-}
-
-function decodeTomlString(raw: string): string {
-  if (raw.startsWith('"') && raw.endsWith('"')) {
-    try {
-      return JSON.parse(raw) as string;
-    } catch {
-      return raw.slice(1, -1).replace(/\\\\/gu, '\\').replace(/\\"/gu, '"').replace(/\\'/gu, '\'');
-    }
-  }
-  return raw.slice(1, -1).replace(/\\'/gu, '\'');
-}
-
-function stripTomlComment(line: string): string {
-  let quote: '"' | '\'' | null = null;
-  let escaping = false;
-  for (let index = 0; index < line.length; index += 1) {
-    const character = line[index];
-    if (escaping) {
-      escaping = false;
-      continue;
-    }
-    if (quote && character === '\\') {
-      escaping = true;
-      continue;
-    }
-    if (character === '"' || character === '\'') {
-      if (quote === character) {
-        quote = null;
-      } else if (!quote) {
-        quote = character;
-      }
-      continue;
-    }
-    if (!quote && character === '#') {
-      return line.slice(0, index);
-    }
-  }
-  return line;
+  return {};
 }
