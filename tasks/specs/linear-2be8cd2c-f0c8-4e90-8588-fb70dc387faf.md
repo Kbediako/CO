@@ -5,10 +5,12 @@ relates_to: docs/PRD-linear-2be8cd2c-f0c8-4e90-8588-fb70dc387faf.md
 risk: medium
 owners:
   - Codex
-last_review: 2026-05-12
+last_review: 2026-06-17
 related_action_plan: docs/ACTION_PLAN-linear-2be8cd2c-f0c8-4e90-8588-fb70dc387faf.md
 task_checklists:
   - tasks/tasks-linear-2be8cd2c-f0c8-4e90-8588-fb70dc387faf.md
+review_notes:
+  - 2026-06-17: Reviewed during the hard spec-guard freshness tranche; kept active because this file did not contain terminal evidence sufficient for archival or inactive reclassification.
 ---
 
 # TECH_SPEC - CO-514 Serialize Provider-Worker Goal Evidence Manifest Patches

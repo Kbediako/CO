@@ -4,7 +4,7 @@ title: Coordinator Symphony Post-Worker Retry Queue Ownership
 status: in_progress
 owner: Codex
 created: 2026-03-21
-last_review: 2026-05-18
+last_review: 2026-06-17
 review_cadence_days: 30
 risk_level: high
 related_prd: docs/PRD-coordinator-symphony-post-worker-retry-queue-ownership.md
@@ -12,6 +12,7 @@ related_action_plan: docs/ACTION_PLAN-coordinator-symphony-post-worker-retry-que
 related_tasks:
   - tasks/tasks-1315-coordinator-symphony-post-worker-retry-queue-ownership.md
 review_notes:
+  - 2026-06-17: CO-579 pre-expiry review kept this spec active-current; no verified terminal/archive evidence was established in this stream, CO-579 is the live non-terminal docs-freshness owner, and docs/spec gates remain unchanged.
   - 2026-03-21: Opened as the next registered parity slice after `1314` so retry ownership is tracked explicitly instead of being buried as a caveat.
   - 2026-03-21: Upstream authority for this slice remains `/Users/kbediako/Code/symphony/SPEC.md:608-626`, `/Users/kbediako/Code/symphony/SPEC.md:743-794`, and `/Users/kbediako/Code/symphony/elixir/lib/symphony_elixir/orchestrator.ex:128-145,775-812,1130-1139`.
   - 2026-03-21: The current branch still owns retry dispatch through persisted wall-clock `retry_due_at` plus refresh / rehydrate cadence.

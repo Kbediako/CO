@@ -5,10 +5,12 @@ relates_to: docs/PRD-linear-5404ace3-9fa9-4dce-b0b8-0196aa6a4ce1.md
 risk: high
 owners:
   - Codex
-last_review: 2026-05-31
+last_review: 2026-06-17
 related_action_plan: docs/ACTION_PLAN-linear-5404ace3-9fa9-4dce-b0b8-0196aa6a4ce1.md
 task_checklists:
   - tasks/tasks-linear-5404ace3-9fa9-4dce-b0b8-0196aa6a4ce1.md
+review_notes:
+  - 2026-06-17: Reviewed CO-592 fallback metadata; kept the expiring rehydrated parent-proof seam on its existing 2026-06-30 deadline and preserved durable strict-proof/audit-retention dispositions.
 ---
 
 This TECH_SPEC mirrors `tasks/specs/linear-5404ace3-9fa9-4dce-b0b8-0196aa6a4ce1.md`. The canonical spec owns the full provider parent-proof rehydration contract, acceptance criteria, fallback/seam decision, and validation plan for CO-592.

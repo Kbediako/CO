@@ -5,7 +5,9 @@ relates_to: docs/PRD-linear-fb31f0d5-56c4-4f56-8faa-1e4ef63a705a.md
 risk: high
 owners:
   - Codex
-last_review: 2026-05-19
+last_review: 2026-06-17
+review_notes:
+  - 2026-06-17: CO-579 pre-expiry review kept this spec active-current; no verified terminal/archive evidence was established in this stream, CO-579 is the live non-terminal docs-freshness owner, and docs/spec gates remain unchanged.
 related_action_plan: docs/ACTION_PLAN-linear-fb31f0d5-56c4-4f56-8faa-1e4ef63a705a.md
 task_checklists:
   - tasks/tasks-linear-fb31f0d5-56c4-4f56-8faa-1e4ef63a705a.md

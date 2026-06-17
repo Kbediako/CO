@@ -8,7 +8,7 @@ description: Ship a signed tag + GitHub Release + npm publish for @kbediako/code
 Use this skill when the user asks to ship a new CO version to npm/downstream users.
 If a global `release` skill is installed, prefer that and fall back to this bundled skill.
 
-Reviewed 2026-05-18: this bundled fallback remains aligned with the release SOP after local smoke on Codex CLI `0.130.0`; signed annotated tags, docs freshness, manifest-backed review, pack audit, and pack smoke remain required before publish. This smoke note is not a posture promotion; canonical version posture remains governed by `docs/guides/codex-version-policy.md`.
+Reviewed 2026-06-17: this bundled fallback remains aligned with the release SOP after local smoke on Codex CLI `0.140.0`; signed annotated tags, docs freshness, manifest-backed review, pack audit, and pack smoke remain required before publish. This smoke note is not a posture promotion; canonical version posture remains governed by `docs/guides/codex-version-policy.md`.
 
 ## Guardrails (required)
 

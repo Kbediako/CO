@@ -5,7 +5,9 @@ relates_to: docs/PRD-linear-612a3dc3-f66f-4ba3-aea9-1282b54d93fe.md
 risk: high
 owners:
   - Codex
-last_review: 2026-05-19
+last_review: 2026-06-17
+review_notes:
+  - 2026-06-17: CO-579 pre-expiry review kept this spec active-current; no verified terminal/archive evidence was established in this stream, CO-579 is the live non-terminal docs-freshness owner, and docs/spec gates remain unchanged.
 ---
 
 ## Canonical Reference

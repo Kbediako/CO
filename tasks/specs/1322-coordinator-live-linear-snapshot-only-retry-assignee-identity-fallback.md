@@ -4,7 +4,7 @@ title: Coordinator Live Linear Snapshot-Only Retry Assignee-Identity Fallback
 status: in_progress
 owner: Codex
 created: 2026-03-24
-last_review: 2026-05-18
+last_review: 2026-06-17
 review_cadence_days: 30
 risk_level: high
 related_prd: docs/PRD-coordinator-live-linear-snapshot-only-retry-assignee-identity-fallback.md
@@ -12,6 +12,7 @@ related_action_plan: docs/ACTION_PLAN-coordinator-live-linear-snapshot-only-retr
 related_tasks:
   - tasks/tasks-1322-coordinator-live-linear-snapshot-only-retry-assignee-identity-fallback.md
 review_notes:
+  - 2026-06-17: CO-579 pre-expiry review kept this spec active-current; no verified terminal/archive evidence was established in this stream, CO-579 is the live non-terminal docs-freshness owner, and docs/spec gates remain unchanged.
   - 2026-03-24: Opened for CO-9 after auditing the queued retry ownership mismatch between the live-resolver path and snapshot-only fallback.
   - 2026-03-24: Upstream authority for the broader orchestration contract remains `/Users/kbediako/Code/symphony/SPEC.md`, `/Users/kbediako/Code/symphony/elixir/README.md`, and `/Users/kbediako/Code/symphony/elixir/lib/symphony_elixir/orchestrator.ex`.
   - 2026-03-24: Current CO truth is that snapshot-only retry fallback reconstructs `assignee_id` from persisted claim state but drops `viewer_id`, which makes self-assigned retries look foreign when live resolution is unavailable.

@@ -38,7 +38,7 @@ codex plugin marketplace add "$(npm root -g)/@kbediako/codex-orchestrator"
 
 For a local checkout, pass the repository root instead of the npm install path. For a Git-backed source, pass `owner/repo[@ref]`, an HTTPS Git URL, or an SSH Git URL. Use `codex marketplace add ...` only on Codex `0.121.0`; use `codex plugin marketplace add ...` on `0.122.0+`.
 
-On current local Codex CLI `0.130.0`, refresh a Git-backed marketplace checkout with:
+On the current policy Codex CLI posture (`0.135.0`; CO-579 observed local `0.140.0` without promotion), refresh a Git-backed marketplace checkout with:
 
 ```bash
 codex plugin marketplace upgrade codex-orchestrator
@@ -55,7 +55,7 @@ The shipped marketplace files are:
 
 The plugin launcher reads the `codex-orchestrator` marketplace entry in `${CODEX_HOME:-~/.codex}/config.toml` and resolves the recorded source checkout before starting the packaged CO CLI with `node`. Local-directory sources run from the recorded path. Git-backed sources run from Codex's installed marketplace checkout under `${CODEX_HOME:-~/.codex}/.tmp/marketplaces/codex-orchestrator`.
 
-Downstream packaged plugin governance for Codex CLI `0.130.0`:
+Downstream packaged plugin governance for canonical policy Codex CLI `0.135.0` (with CO-579 `0.140.0` smoke evidence treated as non-promoting):
 
 - Allowed: the marketplace install flow may use CO's shipped marketplace entry, plugin descriptor, MCP descriptor, launcher, and Codex's remote plugin bundle cache for the registered source checkout. `pack-smoke` governs `codex plugin marketplace add` / `upgrade` / `remove` command support plus cached plugin root shape.
 - Blocked unless governed and validated: plugin-bundled hooks, hook enablement state changes, and external-agent config import must not silently alter packaged CO behavior. If these surfaces are present but not covered by CO hook/config safety checks, they must fail closed or stay disabled for packaged downstream users.
@@ -65,7 +65,7 @@ Downstream packaged plugin governance for Codex CLI `0.130.0`:
 
 Re-run the version-appropriate marketplace add command after moving a local-directory source, replacing it, or removing Codex's installed marketplace checkout.
 
-CO-518 adopts local ChatGPT-auth/appserver posture on Codex CLI `0.130.0` after local command/runtime, package smoke, runtime canary, and release-note evidence. Release-facing marketplace/downstream-smoke workflow pins still intentionally hold at Codex CLI `0.125.0` until required cloud canary and fallback cloud evidence are clean. Model/runtime posture remains governed by `docs/guides/codex-version-policy.md`: use `gpt-5.5` / `xhigh` for validated local ChatGPT-auth/appserver access, and keep `gpt-5.4` / `xhigh` as the portable fallback when access, API/cloud portability, or downstream/no-network evidence is missing.
+CO-579 observed local Codex CLI `0.140.0` command/runtime and feature-list behavior without promoting the canonical posture beyond CO-590. Release-facing marketplace/downstream-smoke workflow pins still intentionally hold at Codex CLI `0.125.0` until required cloud canary and fallback cloud evidence are clean. Model/runtime posture remains governed by `docs/guides/codex-version-policy.md`: use `gpt-5.5` / `xhigh` for validated local ChatGPT-auth/appserver access, and keep `gpt-5.4` / `xhigh` as the portable fallback when access, API/cloud portability, or downstream/no-network evidence is missing.
 
 ## Rollback / Removal
 

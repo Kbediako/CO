@@ -1,7 +1,7 @@
 # CO-345 Evidence Book: Local Hook Impact
 
 Original date: 2026-04-24
-Reviewed: 2026-05-18
+Reviewed: 2026-06-17
 
 Scope: docs-only child lane for CO-345. This page covers local Codex hook impact only. It does not change hook configuration, repo policy, README content, task packets, Linear state, or PR state.
 
@@ -9,7 +9,7 @@ Scope: docs-only child lane for CO-345. This page covers local Codex hook impact
 
 Local hooks are an ambient host-level input, not a repo-shipped CO behavior in this child lane.
 
-The checked-out lane contains no repo-level Codex hooks config file and no repo-local Codex hook scripts. It does contain the tracked utility script `scripts/hooks/continue_co_orchestration.py`, but no repo config wires that script into Codex hooks in this lane. The inspected operator environment has user-level hook configuration under `${CODEX_HOME:-~/.codex}/hooks/`, and `codex features list` on the active `codex-cli 0.124.0` install reports `codex_hooks` as enabled.
+The checked-out lane contains no repo-level Codex hooks config file and no repo-local Codex hook scripts. It does contain the tracked utility script `scripts/hooks/continue_co_orchestration.py`, but no repo config wires that script into Codex hooks in this lane. The inspected operator environment has user-level hook configuration under `${CODEX_HOME:-~/.codex}/hooks/`; current `codex-cli 0.140.0` reports `hooks` as stable true, while the original CO-345 evidence used the older `codex_hooks` feature name on `0.124.0`.
 
 Current conclusion: the inspected user-level `continue_co_orchestration.py` hook does not directly affect spawned subagents or Linear/provider agents under the inspected state because the hook only emits a blocking auto-continue prompt when hooks are enabled, the event `cwd` is inside the local CO checkout, no stop sentinel is present, and the event `session_id` matches the configured `root_session_id`. The inspected state has `root_session_id` set, so other Codex sessions, subagent sessions, and provider-worker sessions with different ids fall through with `{"continue": true}`. If `root_session_id` is cleared later, the same hook would become broader for any hook-enabled Codex event inside the CO repo tree.
 
@@ -19,7 +19,7 @@ Host-specific absolute paths and local state values stay in the CO-345 task pack
 
 ## Official Codex Hook Semantics
 
-Official OpenAI Codex docs describe hooks as a lifecycle extensibility framework for running deterministic scripts inside the Codex loop. The docs identify the useful hook locations as user-level hooks.json and repo-level .codex/hooks.json; if more than one hook file exists, Codex loads all matching hooks, and a higher-precedence config layer does not replace lower-precedence hooks. The docs also note that matching hooks for the same event can run concurrently, and that hooks are behind the `features.codex_hooks` flag. Sources: [Hooks](https://developers.openai.com/codex/hooks), [Advanced configuration: Hooks](https://developers.openai.com/codex/config-advanced#hooks-experimental), [Config basics: Supported features](https://developers.openai.com/codex/config-basic#supported-features).
+Official OpenAI Codex docs describe hooks as a lifecycle extensibility framework for running deterministic scripts inside the Codex loop. The docs identify the useful hook locations as user-level hooks.json and repo-level .codex/hooks.json; if more than one hook file exists, Codex loads all matching hooks, and a higher-precedence config layer does not replace lower-precedence hooks. The docs also note that matching hooks for the same event can run concurrently, and current local `codex features list` exposes the feature as `hooks`. Sources: [Hooks](https://developers.openai.com/codex/hooks), [Advanced configuration: Hooks](https://developers.openai.com/codex/config-advanced#hooks-experimental), [Config basics: Supported features](https://developers.openai.com/codex/config-basic#supported-features).
 
 Important limits from the same docs:
 
@@ -42,7 +42,7 @@ Commands were run from the issue workspace only, unless noted.
 | `find docs/book -maxdepth 2 -type f -print` | `docs/book/` did not exist before this child lane created the two scoped docs files. |
 | `find . -maxdepth 4 -path '*hooks.json' -o -path '*/.codex/hooks/*' -o -path '*/hooks/*'` | No repo Codex hook config was found under `.codex`; `scripts/hooks/continue_co_orchestration.py` exists as a tracked utility/script surface and is not wired by repo config in this lane. |
 | `find .codex -maxdepth 3 -type f -print` | `.codex/orchestrator.toml` exists and contains `[sandbox] network = true`; no repo hook config was present. |
-| `codex features list` | Local `codex-cli 0.124.0` reports `codex_hooks` as `stable true`. |
+| `codex features list` | Local `codex-cli 0.140.0` reports `hooks` as `stable true`; original CO-345 evidence on `0.124.0` reported `codex_hooks` as `stable true`. |
 | User-level Codex config | `codex_hooks` and `multi_agent` are enabled in the inspected operator environment. |
 | User-level hook script | The installed user-level hook is the operative local hook; it differs from the tracked utility script and adds `root_session_id` scoping plus memory-citation handling. It checks repo containment, allows exact stop sentinels, and otherwise emits the auto-continue orchestration prompt. Exceptions fail open with `{"continue": true}`. |
 | User-level hook state | Current state is enabled for the local CO checkout, and `root_session_id` is non-empty. |
@@ -65,7 +65,7 @@ The parent lane should classify hook-driven observations into three categories:
 - Keep the local auto-continue hook out of shipped README/setup guidance. It is a local operator guard, not a downstream CO default.
 - If a future issue wants broader local auto-continue behavior, require a separate governed lane because clearing `root_session_id` would broaden the hook to any hook-enabled Codex session inside the CO repo tree.
 - If CO wants repo-governed hooks, open a separate docs-first implementation lane that owns repo-level hook configuration, hook scripts, cross-platform policy, and focused hook tests.
-- For adoption canaries, compare a normal local run against a run with `--disable codex_hooks` when the goal is to isolate hook-driven behavior from Codex CLI behavior.
+- For adoption canaries, compare a normal local run against a run with `--disable hooks` when the goal is to isolate hook-driven behavior from Codex CLI behavior.
 
 ## Sources
 

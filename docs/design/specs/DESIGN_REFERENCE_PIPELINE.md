@@ -1,5 +1,7 @@
 ---
-last_review: 2026-05-12
+last_review: 2026-06-17
+review_notes:
+  - 2026-06-17: Reviewed during the hard spec-guard freshness tranche; kept active because this file did not contain terminal evidence sufficient for archival or inactive reclassification.
 ---
 
 

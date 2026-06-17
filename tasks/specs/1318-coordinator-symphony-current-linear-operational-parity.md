@@ -4,7 +4,7 @@ title: Coordinator Symphony Current Linear Operational Parity
 status: in_progress
 owner: Codex
 created: 2026-03-22
-last_review: 2026-05-18
+last_review: 2026-06-17
 review_cadence_days: 30
 risk_level: high
 related_prd: docs/PRD-coordinator-symphony-current-linear-operational-parity.md
@@ -12,6 +12,7 @@ related_action_plan: docs/ACTION_PLAN-coordinator-symphony-current-linear-operat
 related_tasks:
   - tasks/tasks-1318-coordinator-symphony-current-linear-operational-parity.md
 review_notes:
+  - 2026-06-17: CO-579 pre-expiry review kept this spec active-current; no verified terminal/archive evidence was established in this stream, CO-579 is the live non-terminal docs-freshness owner, and docs/spec gates remain unchanged.
   - 2026-03-22: Opened after live CO monitoring proved a succeeded `CO-1` child run can still leave the Linear issue in `In Progress`, which is inconsistent with current Symphony operational behavior even though the earlier `1310` core-spec truthfulness result remains valid.
   - 2026-03-22: Current Symphony audit shows the base `SPEC.md` still treats tracker writes as worker-owned optional capability, but current Elixir operational behavior relies on that capability through `WORKFLOW.md`, `README.md`, `linear_graphql`, the repo-local `linear` skill, and live E2E coverage.
   - 2026-03-22: Current CO audit shows provider lifecycle parity remains read-only: query-only Linear source, no mutation surface, no persistent workpad contract, no Human Review/Merging/Rework/Done workflow semantics, and no provider-owned ticket-write evidence in observability.

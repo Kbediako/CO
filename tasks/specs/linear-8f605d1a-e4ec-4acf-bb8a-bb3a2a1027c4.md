@@ -6,12 +6,13 @@ relates_to: docs/PRD-linear-8f605d1a-e4ec-4acf-bb8a-bb3a2a1027c4.md
 risk: high
 owners:
   - Codex
-last_review: 2026-05-18
+last_review: 2026-06-17
 canonical_owner_marker: codex-orchestrator:canonical-owner-key=docs:freshness:maintain
 related_action_plan: docs/ACTION_PLAN-linear-8f605d1a-e4ec-4acf-bb8a-bb3a2a1027c4.md
 task_checklists:
   - tasks/tasks-linear-8f605d1a-e4ec-4acf-bb8a-bb3a2a1027c4.md
 review_notes:
+  - 2026-06-17: CO-579 pre-expiry review kept this spec active-current; no verified terminal/archive evidence was established in this stream, CO-579 is the live non-terminal docs-freshness owner, and docs/spec gates remain unchanged.
   - 2026-05-18: CO-522 active-spec audit found 1 unchecked task checklist item, so this spec remains active and was reviewed for current lifecycle ownership rather than archived. Evidence: `out/linear-b642e879-ba50-45ef-b0d9-b059afa9e932-recovery/spec-preexpiry-local-classification.json`.
 ---
 

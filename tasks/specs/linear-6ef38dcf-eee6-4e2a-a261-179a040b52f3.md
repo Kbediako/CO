@@ -4,7 +4,7 @@ title: CO-305 keep parent issue evidence truthful across cross-issue issue-conte
 status: in_progress
 owner: Codex
 created: 2026-04-22
-last_review: 2026-05-18
+last_review: 2026-06-17
 review_cadence_days: 30
 risk_level: high
 related_prd: docs/PRD-linear-6ef38dcf-eee6-4e2a-a261-179a040b52f3.md
@@ -12,6 +12,7 @@ related_action_plan: docs/ACTION_PLAN-linear-6ef38dcf-eee6-4e2a-a261-179a040b52f
 related_tasks:
   - tasks/tasks-linear-6ef38dcf-eee6-4e2a-a261-179a040b52f3.md
 review_notes:
+  - 2026-06-17: CO-579 pre-expiry review kept this spec active-current; no verified terminal/archive evidence was established in this stream, CO-579 is the live non-terminal docs-freshness owner, and docs/spec gates remain unchanged.
   - 2026-04-22: Bounded docs child lane authored the packet from the parent-preserved issue contract. The provided source pointers are provenance-only in this checkout; the issue body contract comes from the parent-owned live `linear issue-context` read and workpad.
   - 2026-04-22: Issue-quality review kept the lane narrow on issue-context cache persistence truth and authoritative downstream consumers. This is not generic Linear truth, not PR attachment ownership, not stale-blocker reconcile redesign, and not a docs-only wording fix.
   - 2026-05-18: CO-522 active-spec audit found 5 unchecked task checklist items, so this spec remains active and was reviewed for current lifecycle ownership rather than archived. Evidence: `out/linear-b642e879-ba50-45ef-b0d9-b059afa9e932-recovery/spec-preexpiry-local-classification.json`.

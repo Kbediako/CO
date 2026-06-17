@@ -4,7 +4,7 @@ title: CO Reduce Review Long Tails and Make Review Evidence Accounting Truthful
 status: in_progress
 owner: Codex
 created: 2026-03-24
-last_review: 2026-05-18
+last_review: 2026-06-17
 review_cadence_days: 30
 risk_level: high
 related_prd: docs/PRD-linear-1ea6b7f9-ff6f-42b6-af83-a77dce870514.md
@@ -12,6 +12,7 @@ related_action_plan: docs/ACTION_PLAN-linear-1ea6b7f9-ff6f-42b6-af83-a77dce87051
 related_tasks:
   - tasks/tasks-linear-1ea6b7f9-ff6f-42b6-af83-a77dce870514.md
 review_notes:
+  - 2026-06-17: CO-579 pre-expiry review kept this spec active-current; no verified terminal/archive evidence was established in this stream, CO-579 is the live non-terminal docs-freshness owner, and docs/spec gates remain unchanged.
   - 2026-03-24: Opened from Linear issue `CO-16` after confirming the live team workflow state is `Ready`, transitioning it to `In Progress`, and verifying that `In Review` is the actual review-handoff alias for this team.
   - 2026-03-24: Baseline audit confirmed the issue is real: a recent review telemetry artifact terminated as `failed` with `termination_boundary.kind: relevant-reinspection-dwell` and `provenance: post-startup-anchor` while the matching manifest and run summary still reported success.
   - 2026-03-24: The current low-yield diff tail seam lives in the review runtime/state path rather than in docs alone, so this lane owns both runtime behavior and truthful downstream evidence accounting.

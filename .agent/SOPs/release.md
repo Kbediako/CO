@@ -1,6 +1,6 @@
 # Release SOP
 
-Reviewed 2026-05-18: local smoke on Codex CLI `0.130.0` did not change the signed-tag release contract below. This note is not a posture promotion; the canonical current posture remains governed by `docs/guides/codex-version-policy.md`. The release validation floor still intentionally requires docs freshness, manifest-backed review, pack audit, and pack smoke before tagging or publishing.
+Reviewed 2026-06-17: local smoke on Codex CLI `0.140.0` did not change the signed-tag release contract below. This note is not a posture promotion; the canonical current posture remains governed by `docs/guides/codex-version-policy.md`. The release validation floor still intentionally requires docs freshness, manifest-backed review, pack audit, and pack smoke before tagging or publishing.
 
 ## Added by RLM Orchestrator release 2026-01-05
 

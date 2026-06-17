@@ -5,10 +5,12 @@ relates_to: docs/PRD-linear-c093b71f-c6bd-423a-a6ec-3ee3436d6b53.md
 risk: medium
 owners:
   - Codex
-last_review: 2026-05-17
+last_review: 2026-06-17
 related_action_plan: docs/ACTION_PLAN-linear-c093b71f-c6bd-423a-a6ec-3ee3436d6b53.md
 task_checklists:
   - tasks/tasks-linear-c093b71f-c6bd-423a-a6ec-3ee3436d6b53.md
+review_notes:
+  - 2026-06-17: Reviewed during the hard spec-guard freshness tranche; kept active because this file did not contain terminal evidence sufficient for archival or inactive reclassification.
 ---
 
 # TECH_SPEC - CO-542 deterministic quota hygiene audit
