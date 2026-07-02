@@ -1,33 +1,7 @@
 # Subagent Request
 
-## Task Id
-<id>
-- Naming: `<parent-task-id>-<stream>` (required for delegation guard)
+<!-- docs-archive:stub -->
+> Archived on 2026-07-02. Full content: https://github.com/Kbediako/CO/blob/doc-archives/.agent/task/templates/subagent-request-template.md
 
-## Objective
-<goal>
-
-## Scope
-- In scope:
-- Out of scope:
-
-## Inputs
-- Repo path:
-- Branch/worktree:
-- Relevant docs:
-- Evidence/manifest paths:
-
-## Constraints
-- Non-interactive requirements:
-- Approvals/security:
-
-## Required Deliverables
-- Findings (bulleted):
-- Recommended decision (go/no-go):
-- Evidence (manifest paths/logs):
-
-## Run Instructions
-- Commands to run:
-
-## Notes
-<optional>
+- Archive branch: doc-archives
+- Archive path: .agent/task/templates/subagent-request-template.md
