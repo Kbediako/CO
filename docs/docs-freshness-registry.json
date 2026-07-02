@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generated_at": "2026-06-17",
+  "generated_at": "2026-07-02",
   "entries": [
     {
       "path": ".agent/AGENTS.md",
@@ -3761,9 +3761,9 @@
     {
       "path": ".agent/task/design-reference-pipeline.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-01",
-      "cadence_days": 90
+      "status": "archived",
+      "last_review": "2026-07-02",
+      "cadence_days": 365
     },
     {
       "path": ".agent/task/frontend-design-pipeline-v2.md",
@@ -4851,6 +4851,22 @@
       "cadence_days": 30
     },
     {
+      "path": ".agent/task/linear-5404ace3-9fa9-4dce-b0b8-0196aa6a4ce1.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-31",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "5404ace3-9fa9-4dce-b0b8-0196aa6a4ce1",
+        "identifier": "CO-592",
+        "url": "https://linear.app/asabeko/issue/CO-592/co-preserve-sanctioned-provider-parent-proof-for-rehydrated-active"
+      },
+      "lifecycle_state": "active",
+      "created_at": "2026-05-31",
+      "next_review": "2026-06-30",
+      "doc_class": "task_mirror"
+    },
+    {
       "path": ".agent/task/linear-5417819d-738d-4e72-ab1a-4085149ed737.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -5875,6 +5891,23 @@
       "notes": "CO-574 docs-first packet for control-host machine-status probe timeout and accepted/no-run provider recovery recurrence; CO-575 docs freshness owner repair remains blocked by this lane."
     },
     {
+      "path": ".agent/task/linear-92f35fe0-35cb-4d84-851b-e1603aa9d97c.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-31",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "92f35fe0-35cb-4d84-851b-e1603aa9d97c",
+        "identifier": "CO-589",
+        "url": "https://linear.app/asabeko/issue/CO-589/co-suppress-released-terminal-failed-proofs-from-current-status"
+      },
+      "doc_class": "task_mirror",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-31",
+      "next_review": "2026-06-30",
+      "notes": "CO-589 docs-first packet for suppressing released/not-active terminal Done completed failed proof from current status at selected-run authority while preserving non-terminal failures and source-labeled audit evidence."
+    },
+    {
       "path": ".agent/task/linear-93785af4-9df9-4713-8a63-b0caddb5796f.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -6168,6 +6201,22 @@
       "status": "archived",
       "last_review": "2026-05-18",
       "cadence_days": 365
+    },
+    {
+      "path": ".agent/task/linear-a146d642-3c07-4c89-8263-2a316d952ba3.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-31",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "a146d642-3c07-4c89-8263-2a316d952ba3",
+        "identifier": "CO-590",
+        "url": "https://linear.app/asabeko/issue/CO-590/co-codex-cli-01350-release-intake-and-posture-audit"
+      },
+      "doc_class": "task_mirror",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-31",
+      "next_review": "2026-06-30"
     },
     {
       "path": ".agent/task/linear-a243025f-d1e4-4960-ac11-ddc1b9806ffe.md",
@@ -6920,6 +6969,22 @@
       "cadence_days": 30
     },
     {
+      "path": ".agent/task/linear-co-594.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-06-17",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "CO-594",
+        "identifier": "CO-594",
+        "url": "https://linear.app/asabeko/issue/CO-594/co-consolidate-linear-backlog-and-ponytail-refactor"
+      },
+      "lifecycle_state": "active",
+      "created_at": "2026-06-17",
+      "next_review": "2026-07-17",
+      "doc_class": "task_mirror"
+    },
+    {
       "path": ".agent/task/linear-d19bd14e-0604-456d-9a45-e65b898cf7a2.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "archived",
@@ -7620,9 +7685,9 @@
     {
       "path": ".agent/task/templates/manual-scenario-template.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-01",
-      "cadence_days": 90
+      "status": "archived",
+      "last_review": "2026-07-02",
+      "cadence_days": 365
     },
     {
       "path": ".agent/task/templates/prd-template.md",
@@ -7634,16 +7699,16 @@
     {
       "path": ".agent/task/templates/research-note-template.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-01",
-      "cadence_days": 90
+      "status": "archived",
+      "last_review": "2026-07-02",
+      "cadence_days": 365
     },
     {
       "path": ".agent/task/templates/subagent-request-template.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-01",
-      "cadence_days": 90
+      "status": "archived",
+      "last_review": "2026-07-02",
+      "cadence_days": 365
     },
     {
       "path": ".agent/task/templates/tasks-template.md",
@@ -11920,6 +11985,22 @@
       "cadence_days": 30
     },
     {
+      "path": "docs/ACTION_PLAN-linear-5404ace3-9fa9-4dce-b0b8-0196aa6a4ce1.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-31",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "5404ace3-9fa9-4dce-b0b8-0196aa6a4ce1",
+        "identifier": "CO-592",
+        "url": "https://linear.app/asabeko/issue/CO-592/co-preserve-sanctioned-provider-parent-proof-for-rehydrated-active"
+      },
+      "lifecycle_state": "active",
+      "created_at": "2026-05-31",
+      "next_review": "2026-06-30",
+      "doc_class": "task_packet"
+    },
+    {
       "path": "docs/ACTION_PLAN-linear-5417819d-738d-4e72-ab1a-4085149ed737.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -12972,6 +13053,23 @@
       "notes": "CO-574 docs-first packet for control-host machine-status probe timeout and accepted/no-run provider recovery recurrence; CO-575 docs freshness owner repair remains blocked by this lane."
     },
     {
+      "path": "docs/ACTION_PLAN-linear-92f35fe0-35cb-4d84-851b-e1603aa9d97c.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-31",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "92f35fe0-35cb-4d84-851b-e1603aa9d97c",
+        "identifier": "CO-589",
+        "url": "https://linear.app/asabeko/issue/CO-589/co-suppress-released-terminal-failed-proofs-from-current-status"
+      },
+      "doc_class": "task_packet",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-31",
+      "next_review": "2026-06-30",
+      "notes": "CO-589 docs-first packet for suppressing released/not-active terminal Done completed failed proof from current status at selected-run authority while preserving non-terminal failures and source-labeled audit evidence."
+    },
+    {
       "path": "docs/ACTION_PLAN-linear-93785af4-9df9-4713-8a63-b0caddb5796f.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -13274,6 +13372,22 @@
       "status": "archived",
       "last_review": "2026-05-18",
       "cadence_days": 365
+    },
+    {
+      "path": "docs/ACTION_PLAN-linear-a146d642-3c07-4c89-8263-2a316d952ba3.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-31",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "a146d642-3c07-4c89-8263-2a316d952ba3",
+        "identifier": "CO-590",
+        "url": "https://linear.app/asabeko/issue/CO-590/co-codex-cli-01350-release-intake-and-posture-audit"
+      },
+      "doc_class": "task_packet",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-31",
+      "next_review": "2026-06-30"
     },
     {
       "path": "docs/ACTION_PLAN-linear-a243025f-d1e4-4960-ac11-ddc1b9806ffe.md",
@@ -14036,6 +14150,22 @@
       "status": "active",
       "last_review": "2026-04-25",
       "cadence_days": 30
+    },
+    {
+      "path": "docs/ACTION_PLAN-linear-co-594.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-06-17",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "CO-594",
+        "identifier": "CO-594",
+        "url": "https://linear.app/asabeko/issue/CO-594/co-consolidate-linear-backlog-and-ponytail-refactor"
+      },
+      "lifecycle_state": "active",
+      "created_at": "2026-06-17",
+      "next_review": "2026-07-17",
+      "doc_class": "task_packet"
     },
     {
       "path": "docs/ACTION_PLAN-linear-d19bd14e-0604-456d-9a45-e65b898cf7a2.md",
@@ -15163,9 +15293,9 @@
     {
       "path": "docs/design/PRD-design-reference-pipeline.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-01",
-      "cadence_days": 90
+      "status": "archived",
+      "last_review": "2026-07-02",
+      "cadence_days": 365
     },
     {
       "path": "docs/design/PRD-frontend-design-pipeline-v2.md",
@@ -22444,6 +22574,22 @@
       "cadence_days": 30
     },
     {
+      "path": "docs/PRD-linear-5404ace3-9fa9-4dce-b0b8-0196aa6a4ce1.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-31",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "5404ace3-9fa9-4dce-b0b8-0196aa6a4ce1",
+        "identifier": "CO-592",
+        "url": "https://linear.app/asabeko/issue/CO-592/co-preserve-sanctioned-provider-parent-proof-for-rehydrated-active"
+      },
+      "lifecycle_state": "active",
+      "created_at": "2026-05-31",
+      "next_review": "2026-06-30",
+      "doc_class": "task_packet"
+    },
+    {
       "path": "docs/PRD-linear-5417819d-738d-4e72-ab1a-4085149ed737.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -23496,6 +23642,23 @@
       "notes": "CO-574 docs-first packet for control-host machine-status probe timeout and accepted/no-run provider recovery recurrence; CO-575 docs freshness owner repair remains blocked by this lane."
     },
     {
+      "path": "docs/PRD-linear-92f35fe0-35cb-4d84-851b-e1603aa9d97c.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-31",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "92f35fe0-35cb-4d84-851b-e1603aa9d97c",
+        "identifier": "CO-589",
+        "url": "https://linear.app/asabeko/issue/CO-589/co-suppress-released-terminal-failed-proofs-from-current-status"
+      },
+      "doc_class": "task_packet",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-31",
+      "next_review": "2026-06-30",
+      "notes": "CO-589 docs-first packet for suppressing released/not-active terminal Done completed failed proof from current status at selected-run authority while preserving non-terminal failures and source-labeled audit evidence."
+    },
+    {
       "path": "docs/PRD-linear-93785af4-9df9-4713-8a63-b0caddb5796f.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -23796,6 +23959,22 @@
       "status": "archived",
       "last_review": "2026-05-18",
       "cadence_days": 365
+    },
+    {
+      "path": "docs/PRD-linear-a146d642-3c07-4c89-8263-2a316d952ba3.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-31",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "a146d642-3c07-4c89-8263-2a316d952ba3",
+        "identifier": "CO-590",
+        "url": "https://linear.app/asabeko/issue/CO-590/co-codex-cli-01350-release-intake-and-posture-audit"
+      },
+      "doc_class": "task_packet",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-31",
+      "next_review": "2026-06-30"
     },
     {
       "path": "docs/PRD-linear-a243025f-d1e4-4960-ac11-ddc1b9806ffe.md",
@@ -24555,6 +24734,22 @@
       "status": "active",
       "last_review": "2026-04-25",
       "cadence_days": 30
+    },
+    {
+      "path": "docs/PRD-linear-co-594.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-06-17",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "CO-594",
+        "identifier": "CO-594",
+        "url": "https://linear.app/asabeko/issue/CO-594/co-consolidate-linear-backlog-and-ponytail-refactor"
+      },
+      "lifecycle_state": "active",
+      "created_at": "2026-06-17",
+      "next_review": "2026-07-17",
+      "doc_class": "task_packet"
     },
     {
       "path": "docs/PRD-linear-d19bd14e-0604-456d-9a45-e65b898cf7a2.md",
@@ -25720,6 +25915,23 @@
       "status": "active",
       "last_review": "2026-04-01",
       "cadence_days": 90
+    },
+    {
+      "path": "docs/TASKS.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-06-17",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "CO-594",
+        "identifier": "CO-594",
+        "url": "https://linear.app/asabeko/issue/CO-594/co-consolidate-linear-backlog-and-ponytail-refactor"
+      },
+      "lifecycle_state": "active",
+      "created_at": "2026-06-17",
+      "next_review": "2026-07-17",
+      "doc_class": "task_mirror",
+      "notes": "CO-594 refresh touched the global task snapshot to record the consolidated docs-first packet and full source issue provenance; keep active only while it remains the current task mirror."
     },
     {
       "path": "docs/TECH_SPEC_AUTONOMY_UPGRADE.md",
@@ -29970,6 +30182,22 @@
       "cadence_days": 30
     },
     {
+      "path": "docs/TECH_SPEC-linear-5404ace3-9fa9-4dce-b0b8-0196aa6a4ce1.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-31",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "5404ace3-9fa9-4dce-b0b8-0196aa6a4ce1",
+        "identifier": "CO-592",
+        "url": "https://linear.app/asabeko/issue/CO-592/co-preserve-sanctioned-provider-parent-proof-for-rehydrated-active"
+      },
+      "lifecycle_state": "active",
+      "created_at": "2026-05-31",
+      "next_review": "2026-06-30",
+      "doc_class": "task_packet"
+    },
+    {
       "path": "docs/TECH_SPEC-linear-5417819d-738d-4e72-ab1a-4085149ed737.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -30989,6 +31217,23 @@
       "notes": "CO-574 docs-first packet for control-host machine-status probe timeout and accepted/no-run provider recovery recurrence; CO-575 docs freshness owner repair remains blocked by this lane."
     },
     {
+      "path": "docs/TECH_SPEC-linear-92f35fe0-35cb-4d84-851b-e1603aa9d97c.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-31",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "92f35fe0-35cb-4d84-851b-e1603aa9d97c",
+        "identifier": "CO-589",
+        "url": "https://linear.app/asabeko/issue/CO-589/co-suppress-released-terminal-failed-proofs-from-current-status"
+      },
+      "doc_class": "task_packet",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-31",
+      "next_review": "2026-06-30",
+      "notes": "CO-589 docs-first packet for suppressing released/not-active terminal Done completed failed proof from current status at selected-run authority while preserving non-terminal failures and source-labeled audit evidence."
+    },
+    {
       "path": "docs/TECH_SPEC-linear-93785af4-9df9-4713-8a63-b0caddb5796f.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -31291,6 +31536,22 @@
       "status": "archived",
       "last_review": "2026-05-18",
       "cadence_days": 365
+    },
+    {
+      "path": "docs/TECH_SPEC-linear-a146d642-3c07-4c89-8263-2a316d952ba3.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-31",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "a146d642-3c07-4c89-8263-2a316d952ba3",
+        "identifier": "CO-590",
+        "url": "https://linear.app/asabeko/issue/CO-590/co-codex-cli-01350-release-intake-and-posture-audit"
+      },
+      "doc_class": "task_packet",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-31",
+      "next_review": "2026-06-30"
     },
     {
       "path": "docs/TECH_SPEC-linear-a243025f-d1e4-4960-ac11-ddc1b9806ffe.md",
@@ -32022,6 +32283,22 @@
       "status": "active",
       "last_review": "2026-04-25",
       "cadence_days": 30
+    },
+    {
+      "path": "docs/TECH_SPEC-linear-co-594.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-06-17",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "CO-594",
+        "identifier": "CO-594",
+        "url": "https://linear.app/asabeko/issue/CO-594/co-consolidate-linear-backlog-and-ponytail-refactor"
+      },
+      "lifecycle_state": "active",
+      "created_at": "2026-06-17",
+      "next_review": "2026-07-17",
+      "doc_class": "task_packet"
     },
     {
       "path": "docs/TECH_SPEC-linear-d19bd14e-0604-456d-9a45-e65b898cf7a2.md",
@@ -37867,6 +38144,22 @@
       "notes": "CO-579 2026-06-17 spec pre-expiry review: frontmatter reviewed-current under live non-terminal CO-579 owner; no verified terminal/archive evidence established, and docs/spec gates remain unchanged."
     },
     {
+      "path": "tasks/specs/linear-5404ace3-9fa9-4dce-b0b8-0196aa6a4ce1.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-31",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "5404ace3-9fa9-4dce-b0b8-0196aa6a4ce1",
+        "identifier": "CO-592",
+        "url": "https://linear.app/asabeko/issue/CO-592/co-preserve-sanctioned-provider-parent-proof-for-rehydrated-active"
+      },
+      "lifecycle_state": "active",
+      "created_at": "2026-05-31",
+      "next_review": "2026-06-30",
+      "doc_class": "active_spec"
+    },
+    {
       "path": "tasks/specs/linear-5417819d-738d-4e72-ab1a-4085149ed737.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -38952,6 +39245,23 @@
       "notes": "CO-574 docs-first packet for control-host machine-status probe timeout and accepted/no-run provider recovery recurrence; CO-575 docs freshness owner repair remains blocked by this lane. CO-579 2026-06-17 spec pre-expiry review: frontmatter reviewed-current under live non-terminal CO-579 owner; no verified terminal/archive evidence established, and docs/spec gates remain unchanged."
     },
     {
+      "path": "tasks/specs/linear-92f35fe0-35cb-4d84-851b-e1603aa9d97c-co-suppress-released-terminal-failed-proofs-from-current-status.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-31",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "92f35fe0-35cb-4d84-851b-e1603aa9d97c",
+        "identifier": "CO-589",
+        "url": "https://linear.app/asabeko/issue/CO-589/co-suppress-released-terminal-failed-proofs-from-current-status"
+      },
+      "doc_class": "task_spec",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-31",
+      "next_review": "2026-06-30",
+      "notes": "CO-589 docs-first packet for suppressing released/not-active terminal Done completed failed proof from current status at selected-run authority while preserving non-terminal failures and source-labeled audit evidence."
+    },
+    {
       "path": "tasks/specs/linear-93785af4-9df9-4713-8a63-b0caddb5796f.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -39254,6 +39564,22 @@
       "status": "archived",
       "last_review": "2026-05-18",
       "cadence_days": 365
+    },
+    {
+      "path": "tasks/specs/linear-a146d642-3c07-4c89-8263-2a316d952ba3.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-31",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "a146d642-3c07-4c89-8263-2a316d952ba3",
+        "identifier": "CO-590",
+        "url": "https://linear.app/asabeko/issue/CO-590/co-codex-cli-01350-release-intake-and-posture-audit"
+      },
+      "doc_class": "active_spec",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-31",
+      "next_review": "2026-06-30"
     },
     {
       "path": "tasks/specs/linear-a243025f-d1e4-4960-ac11-ddc1b9806ffe.md",
@@ -40033,6 +40359,22 @@
       "last_review": "2026-06-17",
       "cadence_days": 30,
       "notes": "CO-579 2026-06-17 spec pre-expiry review: frontmatter reviewed-current under live non-terminal CO-579 owner; no verified terminal/archive evidence established, and docs/spec gates remain unchanged."
+    },
+    {
+      "path": "tasks/specs/linear-co-594.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-06-17",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "CO-594",
+        "identifier": "CO-594",
+        "url": "https://linear.app/asabeko/issue/CO-594/co-consolidate-linear-backlog-and-ponytail-refactor"
+      },
+      "lifecycle_state": "active",
+      "created_at": "2026-06-17",
+      "next_review": "2026-07-17",
+      "doc_class": "active_spec"
     },
     {
       "path": "tasks/specs/linear-d19bd14e-0604-456d-9a45-e65b898cf7a2.md",
@@ -45427,6 +45769,22 @@
       "cadence_days": 30
     },
     {
+      "path": "tasks/tasks-linear-5404ace3-9fa9-4dce-b0b8-0196aa6a4ce1.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-31",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "5404ace3-9fa9-4dce-b0b8-0196aa6a4ce1",
+        "identifier": "CO-592",
+        "url": "https://linear.app/asabeko/issue/CO-592/co-preserve-sanctioned-provider-parent-proof-for-rehydrated-active"
+      },
+      "lifecycle_state": "active",
+      "created_at": "2026-05-31",
+      "next_review": "2026-06-30",
+      "doc_class": "task_mirror"
+    },
+    {
       "path": "tasks/tasks-linear-5417819d-738d-4e72-ab1a-4085149ed737.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -46477,6 +46835,23 @@
       "notes": "CO-574 docs-first packet for control-host machine-status probe timeout and accepted/no-run provider recovery recurrence; CO-575 docs freshness owner repair remains blocked by this lane."
     },
     {
+      "path": "tasks/tasks-linear-92f35fe0-35cb-4d84-851b-e1603aa9d97c.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-31",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "92f35fe0-35cb-4d84-851b-e1603aa9d97c",
+        "identifier": "CO-589",
+        "url": "https://linear.app/asabeko/issue/CO-589/co-suppress-released-terminal-failed-proofs-from-current-status"
+      },
+      "doc_class": "task_mirror",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-31",
+      "next_review": "2026-06-30",
+      "notes": "CO-589 docs-first packet for suppressing released/not-active terminal Done completed failed proof from current status at selected-run authority while preserving non-terminal failures and source-labeled audit evidence."
+    },
+    {
       "path": "tasks/tasks-linear-93785af4-9df9-4713-8a63-b0caddb5796f.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -46777,6 +47152,22 @@
       "status": "archived",
       "last_review": "2026-05-18",
       "cadence_days": 365
+    },
+    {
+      "path": "tasks/tasks-linear-a146d642-3c07-4c89-8263-2a316d952ba3.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-31",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "a146d642-3c07-4c89-8263-2a316d952ba3",
+        "identifier": "CO-590",
+        "url": "https://linear.app/asabeko/issue/CO-590/co-codex-cli-01350-release-intake-and-posture-audit"
+      },
+      "doc_class": "task_mirror",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-31",
+      "next_review": "2026-06-30"
     },
     {
       "path": "tasks/tasks-linear-a243025f-d1e4-4960-ac11-ddc1b9806ffe.md",
@@ -47538,6 +47929,22 @@
       "cadence_days": 30
     },
     {
+      "path": "tasks/tasks-linear-co-594.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-06-17",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "CO-594",
+        "identifier": "CO-594",
+        "url": "https://linear.app/asabeko/issue/CO-594/co-consolidate-linear-backlog-and-ponytail-refactor"
+      },
+      "lifecycle_state": "active",
+      "created_at": "2026-06-17",
+      "next_review": "2026-07-17",
+      "doc_class": "task_mirror"
+    },
+    {
       "path": "tasks/tasks-linear-d19bd14e-0604-456d-9a45-e65b898cf7a2.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "archived",
@@ -48247,413 +48654,6 @@
       "last_review": "2026-06-17",
       "cadence_days": 30,
       "notes": "CO-579 2026-06-17 current-doc review: checked against codex-cli 0.140.0 feature list and supplied OpenAI gpt-5.5 guidance; no content change needed, historical evidence retained as historical."
-    },
-    {
-      "path": ".agent/task/linear-92f35fe0-35cb-4d84-851b-e1603aa9d97c.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-31",
-      "cadence_days": 30,
-      "source_issue": {
-        "id": "92f35fe0-35cb-4d84-851b-e1603aa9d97c",
-        "identifier": "CO-589",
-        "url": "https://linear.app/asabeko/issue/CO-589/co-suppress-released-terminal-failed-proofs-from-current-status"
-      },
-      "doc_class": "task_mirror",
-      "lifecycle_state": "active",
-      "created_at": "2026-05-31",
-      "next_review": "2026-06-30",
-      "notes": "CO-589 docs-first packet for suppressing released/not-active terminal Done completed failed proof from current status at selected-run authority while preserving non-terminal failures and source-labeled audit evidence."
-    },
-    {
-      "path": "docs/PRD-linear-92f35fe0-35cb-4d84-851b-e1603aa9d97c.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-31",
-      "cadence_days": 30,
-      "source_issue": {
-        "id": "92f35fe0-35cb-4d84-851b-e1603aa9d97c",
-        "identifier": "CO-589",
-        "url": "https://linear.app/asabeko/issue/CO-589/co-suppress-released-terminal-failed-proofs-from-current-status"
-      },
-      "doc_class": "task_packet",
-      "lifecycle_state": "active",
-      "created_at": "2026-05-31",
-      "next_review": "2026-06-30",
-      "notes": "CO-589 docs-first packet for suppressing released/not-active terminal Done completed failed proof from current status at selected-run authority while preserving non-terminal failures and source-labeled audit evidence."
-    },
-    {
-      "path": "docs/TECH_SPEC-linear-92f35fe0-35cb-4d84-851b-e1603aa9d97c.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-31",
-      "cadence_days": 30,
-      "source_issue": {
-        "id": "92f35fe0-35cb-4d84-851b-e1603aa9d97c",
-        "identifier": "CO-589",
-        "url": "https://linear.app/asabeko/issue/CO-589/co-suppress-released-terminal-failed-proofs-from-current-status"
-      },
-      "doc_class": "task_packet",
-      "lifecycle_state": "active",
-      "created_at": "2026-05-31",
-      "next_review": "2026-06-30",
-      "notes": "CO-589 docs-first packet for suppressing released/not-active terminal Done completed failed proof from current status at selected-run authority while preserving non-terminal failures and source-labeled audit evidence."
-    },
-    {
-      "path": "docs/ACTION_PLAN-linear-92f35fe0-35cb-4d84-851b-e1603aa9d97c.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-31",
-      "cadence_days": 30,
-      "source_issue": {
-        "id": "92f35fe0-35cb-4d84-851b-e1603aa9d97c",
-        "identifier": "CO-589",
-        "url": "https://linear.app/asabeko/issue/CO-589/co-suppress-released-terminal-failed-proofs-from-current-status"
-      },
-      "doc_class": "task_packet",
-      "lifecycle_state": "active",
-      "created_at": "2026-05-31",
-      "next_review": "2026-06-30",
-      "notes": "CO-589 docs-first packet for suppressing released/not-active terminal Done completed failed proof from current status at selected-run authority while preserving non-terminal failures and source-labeled audit evidence."
-    },
-    {
-      "path": "tasks/specs/linear-92f35fe0-35cb-4d84-851b-e1603aa9d97c-co-suppress-released-terminal-failed-proofs-from-current-status.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-31",
-      "cadence_days": 30,
-      "source_issue": {
-        "id": "92f35fe0-35cb-4d84-851b-e1603aa9d97c",
-        "identifier": "CO-589",
-        "url": "https://linear.app/asabeko/issue/CO-589/co-suppress-released-terminal-failed-proofs-from-current-status"
-      },
-      "doc_class": "task_spec",
-      "lifecycle_state": "active",
-      "created_at": "2026-05-31",
-      "next_review": "2026-06-30",
-      "notes": "CO-589 docs-first packet for suppressing released/not-active terminal Done completed failed proof from current status at selected-run authority while preserving non-terminal failures and source-labeled audit evidence."
-    },
-    {
-      "path": "tasks/tasks-linear-92f35fe0-35cb-4d84-851b-e1603aa9d97c.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-31",
-      "cadence_days": 30,
-      "source_issue": {
-        "id": "92f35fe0-35cb-4d84-851b-e1603aa9d97c",
-        "identifier": "CO-589",
-        "url": "https://linear.app/asabeko/issue/CO-589/co-suppress-released-terminal-failed-proofs-from-current-status"
-      },
-      "doc_class": "task_mirror",
-      "lifecycle_state": "active",
-      "created_at": "2026-05-31",
-      "next_review": "2026-06-30",
-      "notes": "CO-589 docs-first packet for suppressing released/not-active terminal Done completed failed proof from current status at selected-run authority while preserving non-terminal failures and source-labeled audit evidence."
-    },
-    {
-      "path": ".agent/task/linear-a146d642-3c07-4c89-8263-2a316d952ba3.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-31",
-      "cadence_days": 30,
-      "source_issue": {
-        "id": "a146d642-3c07-4c89-8263-2a316d952ba3",
-        "identifier": "CO-590",
-        "url": "https://linear.app/asabeko/issue/CO-590/co-codex-cli-01350-release-intake-and-posture-audit"
-      },
-      "doc_class": "task_mirror",
-      "lifecycle_state": "active",
-      "created_at": "2026-05-31",
-      "next_review": "2026-06-30"
-    },
-    {
-      "path": "docs/ACTION_PLAN-linear-a146d642-3c07-4c89-8263-2a316d952ba3.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-31",
-      "cadence_days": 30,
-      "source_issue": {
-        "id": "a146d642-3c07-4c89-8263-2a316d952ba3",
-        "identifier": "CO-590",
-        "url": "https://linear.app/asabeko/issue/CO-590/co-codex-cli-01350-release-intake-and-posture-audit"
-      },
-      "doc_class": "task_packet",
-      "lifecycle_state": "active",
-      "created_at": "2026-05-31",
-      "next_review": "2026-06-30"
-    },
-    {
-      "path": "docs/PRD-linear-a146d642-3c07-4c89-8263-2a316d952ba3.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-31",
-      "cadence_days": 30,
-      "source_issue": {
-        "id": "a146d642-3c07-4c89-8263-2a316d952ba3",
-        "identifier": "CO-590",
-        "url": "https://linear.app/asabeko/issue/CO-590/co-codex-cli-01350-release-intake-and-posture-audit"
-      },
-      "doc_class": "task_packet",
-      "lifecycle_state": "active",
-      "created_at": "2026-05-31",
-      "next_review": "2026-06-30"
-    },
-    {
-      "path": "docs/TECH_SPEC-linear-a146d642-3c07-4c89-8263-2a316d952ba3.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-31",
-      "cadence_days": 30,
-      "source_issue": {
-        "id": "a146d642-3c07-4c89-8263-2a316d952ba3",
-        "identifier": "CO-590",
-        "url": "https://linear.app/asabeko/issue/CO-590/co-codex-cli-01350-release-intake-and-posture-audit"
-      },
-      "doc_class": "task_packet",
-      "lifecycle_state": "active",
-      "created_at": "2026-05-31",
-      "next_review": "2026-06-30"
-    },
-    {
-      "path": "tasks/specs/linear-a146d642-3c07-4c89-8263-2a316d952ba3.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-31",
-      "cadence_days": 30,
-      "source_issue": {
-        "id": "a146d642-3c07-4c89-8263-2a316d952ba3",
-        "identifier": "CO-590",
-        "url": "https://linear.app/asabeko/issue/CO-590/co-codex-cli-01350-release-intake-and-posture-audit"
-      },
-      "doc_class": "active_spec",
-      "lifecycle_state": "active",
-      "created_at": "2026-05-31",
-      "next_review": "2026-06-30"
-    },
-    {
-      "path": "tasks/tasks-linear-a146d642-3c07-4c89-8263-2a316d952ba3.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-31",
-      "cadence_days": 30,
-      "source_issue": {
-        "id": "a146d642-3c07-4c89-8263-2a316d952ba3",
-        "identifier": "CO-590",
-        "url": "https://linear.app/asabeko/issue/CO-590/co-codex-cli-01350-release-intake-and-posture-audit"
-      },
-      "doc_class": "task_mirror",
-      "lifecycle_state": "active",
-      "created_at": "2026-05-31",
-      "next_review": "2026-06-30"
-    },
-    {
-      "path": ".agent/task/linear-5404ace3-9fa9-4dce-b0b8-0196aa6a4ce1.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-31",
-      "cadence_days": 30,
-      "source_issue": {
-        "id": "5404ace3-9fa9-4dce-b0b8-0196aa6a4ce1",
-        "identifier": "CO-592",
-        "url": "https://linear.app/asabeko/issue/CO-592/co-preserve-sanctioned-provider-parent-proof-for-rehydrated-active"
-      },
-      "lifecycle_state": "active",
-      "created_at": "2026-05-31",
-      "next_review": "2026-06-30",
-      "doc_class": "task_mirror"
-    },
-    {
-      "path": "docs/ACTION_PLAN-linear-5404ace3-9fa9-4dce-b0b8-0196aa6a4ce1.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-31",
-      "cadence_days": 30,
-      "source_issue": {
-        "id": "5404ace3-9fa9-4dce-b0b8-0196aa6a4ce1",
-        "identifier": "CO-592",
-        "url": "https://linear.app/asabeko/issue/CO-592/co-preserve-sanctioned-provider-parent-proof-for-rehydrated-active"
-      },
-      "lifecycle_state": "active",
-      "created_at": "2026-05-31",
-      "next_review": "2026-06-30",
-      "doc_class": "task_packet"
-    },
-    {
-      "path": "docs/PRD-linear-5404ace3-9fa9-4dce-b0b8-0196aa6a4ce1.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-31",
-      "cadence_days": 30,
-      "source_issue": {
-        "id": "5404ace3-9fa9-4dce-b0b8-0196aa6a4ce1",
-        "identifier": "CO-592",
-        "url": "https://linear.app/asabeko/issue/CO-592/co-preserve-sanctioned-provider-parent-proof-for-rehydrated-active"
-      },
-      "lifecycle_state": "active",
-      "created_at": "2026-05-31",
-      "next_review": "2026-06-30",
-      "doc_class": "task_packet"
-    },
-    {
-      "path": "docs/TECH_SPEC-linear-5404ace3-9fa9-4dce-b0b8-0196aa6a4ce1.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-31",
-      "cadence_days": 30,
-      "source_issue": {
-        "id": "5404ace3-9fa9-4dce-b0b8-0196aa6a4ce1",
-        "identifier": "CO-592",
-        "url": "https://linear.app/asabeko/issue/CO-592/co-preserve-sanctioned-provider-parent-proof-for-rehydrated-active"
-      },
-      "lifecycle_state": "active",
-      "created_at": "2026-05-31",
-      "next_review": "2026-06-30",
-      "doc_class": "task_packet"
-    },
-    {
-      "path": "tasks/specs/linear-5404ace3-9fa9-4dce-b0b8-0196aa6a4ce1.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-31",
-      "cadence_days": 30,
-      "source_issue": {
-        "id": "5404ace3-9fa9-4dce-b0b8-0196aa6a4ce1",
-        "identifier": "CO-592",
-        "url": "https://linear.app/asabeko/issue/CO-592/co-preserve-sanctioned-provider-parent-proof-for-rehydrated-active"
-      },
-      "lifecycle_state": "active",
-      "created_at": "2026-05-31",
-      "next_review": "2026-06-30",
-      "doc_class": "active_spec"
-    },
-    {
-      "path": "tasks/tasks-linear-5404ace3-9fa9-4dce-b0b8-0196aa6a4ce1.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-31",
-      "cadence_days": 30,
-      "source_issue": {
-        "id": "5404ace3-9fa9-4dce-b0b8-0196aa6a4ce1",
-        "identifier": "CO-592",
-        "url": "https://linear.app/asabeko/issue/CO-592/co-preserve-sanctioned-provider-parent-proof-for-rehydrated-active"
-      },
-      "lifecycle_state": "active",
-      "created_at": "2026-05-31",
-      "next_review": "2026-06-30",
-      "doc_class": "task_mirror"
-    },
-    {
-      "path": ".agent/task/linear-co-594.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-06-17",
-      "cadence_days": 30,
-      "source_issue": {
-        "id": "CO-594",
-        "identifier": "CO-594",
-        "url": "https://linear.app/asabeko/issue/CO-594/co-consolidate-linear-backlog-and-ponytail-refactor"
-      },
-      "lifecycle_state": "active",
-      "created_at": "2026-06-17",
-      "next_review": "2026-07-17",
-      "doc_class": "task_mirror"
-    },
-    {
-      "path": "docs/ACTION_PLAN-linear-co-594.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-06-17",
-      "cadence_days": 30,
-      "source_issue": {
-        "id": "CO-594",
-        "identifier": "CO-594",
-        "url": "https://linear.app/asabeko/issue/CO-594/co-consolidate-linear-backlog-and-ponytail-refactor"
-      },
-      "lifecycle_state": "active",
-      "created_at": "2026-06-17",
-      "next_review": "2026-07-17",
-      "doc_class": "task_packet"
-    },
-    {
-      "path": "docs/PRD-linear-co-594.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-06-17",
-      "cadence_days": 30,
-      "source_issue": {
-        "id": "CO-594",
-        "identifier": "CO-594",
-        "url": "https://linear.app/asabeko/issue/CO-594/co-consolidate-linear-backlog-and-ponytail-refactor"
-      },
-      "lifecycle_state": "active",
-      "created_at": "2026-06-17",
-      "next_review": "2026-07-17",
-      "doc_class": "task_packet"
-    },
-    {
-      "path": "docs/TECH_SPEC-linear-co-594.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-06-17",
-      "cadence_days": 30,
-      "source_issue": {
-        "id": "CO-594",
-        "identifier": "CO-594",
-        "url": "https://linear.app/asabeko/issue/CO-594/co-consolidate-linear-backlog-and-ponytail-refactor"
-      },
-      "lifecycle_state": "active",
-      "created_at": "2026-06-17",
-      "next_review": "2026-07-17",
-      "doc_class": "task_packet"
-    },
-    {
-      "path": "tasks/specs/linear-co-594.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-06-17",
-      "cadence_days": 30,
-      "source_issue": {
-        "id": "CO-594",
-        "identifier": "CO-594",
-        "url": "https://linear.app/asabeko/issue/CO-594/co-consolidate-linear-backlog-and-ponytail-refactor"
-      },
-      "lifecycle_state": "active",
-      "created_at": "2026-06-17",
-      "next_review": "2026-07-17",
-      "doc_class": "active_spec"
-    },
-    {
-      "path": "tasks/tasks-linear-co-594.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-06-17",
-      "cadence_days": 30,
-      "source_issue": {
-        "id": "CO-594",
-        "identifier": "CO-594",
-        "url": "https://linear.app/asabeko/issue/CO-594/co-consolidate-linear-backlog-and-ponytail-refactor"
-      },
-      "lifecycle_state": "active",
-      "created_at": "2026-06-17",
-      "next_review": "2026-07-17",
-      "doc_class": "task_mirror"
-    },
-    {
-      "path": "docs/TASKS.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-06-17",
-      "cadence_days": 30,
-      "source_issue": {
-        "id": "CO-594",
-        "identifier": "CO-594",
-        "url": "https://linear.app/asabeko/issue/CO-594/co-consolidate-linear-backlog-and-ponytail-refactor"
-      },
-      "lifecycle_state": "active",
-      "created_at": "2026-06-17",
-      "next_review": "2026-07-17",
-      "doc_class": "task_mirror",
-      "notes": "CO-594 refresh touched the global task snapshot to record the consolidated docs-first packet and full source issue provenance; keep active only while it remains the current task mirror."
     }
   ]
 }
