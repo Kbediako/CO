@@ -38,6 +38,17 @@ last_review: <YYYY-MM-DD>
 - Non-functional requirements (performance, reliability, security):
 - Interfaces / contracts:
 
+## Fallback Expiry / Refactor Decision
+- Applies to fallback, compatibility, legacy, stale, cached, break-glass, or minor-seam behavior? `<Yes|No>`.
+- Required decision table:
+
+| Surface | Fallback / seam | Decision | Owner | Trigger | Introduced date | Review date | Maximum lifetime | Removal condition | Validation |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `<surface>` | `<branch or behavior>` | `remove fallback` / `expire fallback` / `justify retaining fallback` | `<issue or owner>` | `<activation condition>` | `<YYYY-MM-DD>` | `<YYYY-MM-DD>` | `<days/date>` | `<condition>` | `<test/gate/proof>` |
+
+- For `justify retaining fallback`, also record contract name, owning surface, steady-state proof, tests/docs, and why it is not governed as an expiring fallback.
+- Large-refactor check: record whether the policy in `docs/guides/fallback-expiry-and-refactor-policy.md` prefers a larger consolidation over another minor seam, and why.
+
 ## Architecture & Data
 - Architecture / design adjustments:
 - Data model changes / migrations:
